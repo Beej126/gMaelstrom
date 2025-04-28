@@ -1,1 +1,0 @@
-create a react project named "gMaelstrom" that is a gmail clone, do not nest an extra folder inside of initially chosen workspace folder, typescript build with rsbuild, context data store (no redux), css grid for main page layout, google authentication, and populated wtih actual user emails from gmail cloud
