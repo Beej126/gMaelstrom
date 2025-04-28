@@ -1,0 +1,155 @@
+body {
+  margin: 0;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  color: #fff;
+  background-color: #121212;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  display: flex;
+  min-height: 100vh;
+  line-height: 1.1;
+  text-align: center;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.content h1 {
+  font-size: 3.6rem;
+  font-weight: 700;
+}
+
+.content p {
+  font-size: 1.2rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* Loading container */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #121212;
+  color: #ffffff;
+}
+
+.loading-container.dark {
+  background-color: #121212;
+  color: #ffffff;
+}
+
+.loading-spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #2196f3;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error container */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  height: 100vh;
+  background-color: #121212;
+  color: #ffffff;
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 16px;
+  overflow-y: auto;
+}
+
+.error-container h2 {
+  color: #f44336;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+.error-container p {
+  max-width: 600px;
+  margin-bottom: 30px;
+  opacity: 0.87;
+  line-height: 1.5;
+}
+
+.error-details {
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  padding: 20px 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  max-width: 700px;
+  text-align: left;
+}
+
+.error-details h3 {
+  color: #2196f3;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.error-details ol {
+  padding-left: 20px;
+}
+
+.error-details li {
+  margin-bottom: 12px;
+  line-height: 1.5;
+  opacity: 0.87;
+}
+
+.error-details a {
+  color: #2196f3;
+  text-decoration: none;
+}
+
+.error-details a:hover {
+  text-decoration: underline;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2c2c2c;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
