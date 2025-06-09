@@ -336,21 +336,10 @@ const LABEL_NAME_MAP: Record<string, string> = {
   // Add more mappings as needed
 };
 
-// Dynamic label name map, to be filled from Gmail API
-let dynamicLabelNameMap: Record<string, string> = {};
-
-// Call this function after fetching label definitions from Gmail API
-export function setDynamicLabelNameMap(labelDefs: Array<{ id: string; name: string }>) {
-  dynamicLabelNameMap = {};
-  labelDefs.forEach(label => {
-    dynamicLabelNameMap[label.id] = label.name;
-  });
-}
-
 function prettifyLabel(labelId: string): string {
+  const { dynamicLabelNameMap } = useEmailContext();
   // Prefer dynamic label name from Gmail API, but prettify it if it looks like a system label
   if (dynamicLabelNameMap[labelId]) {
-    // If the dynamic label name is still in the form CATEGORY_* or has underscores, prettify it
     let name = dynamicLabelNameMap[labelId];
     if (/^CATEGORY_/.test(labelId) || /_/.test(name)) {
       name = name.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
@@ -358,11 +347,8 @@ function prettifyLabel(labelId: string): string {
     }
     return name;
   }
-  // Prefer static map for core Gmail/system labels
   if (LABEL_NAME_MAP[labelId]) return LABEL_NAME_MAP[labelId];
-  // Prettify CATEGORY_ and other unknowns
   let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-  // Capitalize each word for better appearance
   label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
   return label;
 }

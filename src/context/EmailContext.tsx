@@ -2,7 +2,6 @@ import React, { createContext, useContext, ReactNode, useState, useEffect, useCa
 import { getEmails, getGmailLabels } from '../services/gmailService';
 import { isUserAuthenticated } from '../services/authService';
 import { Email } from '../types/email';
-import { setDynamicLabelNameMap } from '../components/EmailList';
 
 interface EmailContextType {
   emails: Email[];
@@ -23,6 +22,8 @@ interface EmailContextType {
   setLabelVisibility: (vis: Record<string, boolean>) => void;
   labelSettingsOpen: boolean;
   setLabelSettingsOpen: (open: boolean) => void;
+  dynamicLabelNameMap: Record<string, string>;
+  setDynamicLabelNameMap: (labels: Array<{ id: string; name: string }>) => void;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -67,6 +68,15 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
   });
 
   const [labelSettingsOpen, setLabelSettingsOpen] = useState(false);
+  const [dynamicLabelNameMap, _setDynamicLabelNameMap] = useState<Record<string, string>>({});
+
+  const setDynamicLabelNameMap = (labelDefs: Array<{ id: string; name: string }>) => {
+    const map: Record<string, string> = {};
+    labelDefs.forEach(label => {
+      map[label.id] = label.name;
+    });
+    _setDynamicLabelNameMap(map);
+  };
 
   // Update localStorage when combineThreads changes
   useEffect(() => {
@@ -238,7 +248,9 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     labelVisibility,
     setLabelVisibility,
     labelSettingsOpen,
-    setLabelSettingsOpen
+    setLabelSettingsOpen,
+    dynamicLabelNameMap,
+    setDynamicLabelNameMap
   };
 
   return <EmailContext.Provider value={value}>{children}</EmailContext.Provider>;
