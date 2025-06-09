@@ -6,6 +6,7 @@ import { initializeGoogleAuth, isUserAuthenticated } from './services/authServic
 import LoginPage from './pages/LoginPage';
 import MainLayout from './pages/MainLayout';
 import EmailDetail from './pages/EmailDetail';
+import LabelSettingsDialog from './components/LabelSettingsDialog';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -93,6 +94,7 @@ const App: React.FC = () => {
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              <LabelSettingsDialog />
             </div>
           </Router>
         </EmailProvider>

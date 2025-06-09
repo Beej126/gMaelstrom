@@ -2,9 +2,6 @@ import { Email } from '../types/email';
 import { gapi } from 'gapi-script';
 import { parseEmailData } from '../utils/emailParser';
 
-// Configuration for Gmail API
-// const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-
 let accessToken: string | null = null;
 
 export const setGmailAccessToken = (token: string) => {

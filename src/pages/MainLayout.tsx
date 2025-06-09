@@ -5,7 +5,6 @@ import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
-import ResizableSidebar from '../components/ResizableSidebar';
 import { useEmailContext } from '../context/EmailContext';
 import { markEmailsAsUnread } from '../services/gmailService';
 import '../styles/MainLayout.css';
@@ -13,7 +12,6 @@ import '../styles/MainLayout.css';
 const MainLayout: React.FC = () => {
   const { fetchEmails, loading, error, refreshing, selectedCategory } = useEmailContext();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(256); // Default sidebar width
   const theme = useTheme();
 
   // State for checked emails, lifted up from EmailList
@@ -54,10 +52,6 @@ const MainLayout: React.FC = () => {
     setSnackbarOpen(false);
   };
 
-  const handleSidebarWidthChange = (width: number) => {
-    setSidebarWidth(width);
-  };
-
   const handleMarkAsUnread = async () => {
     const selectedIds = Object.entries(checkedEmails)
       .filter(([_, checked]) => checked)
@@ -85,18 +79,20 @@ const MainLayout: React.FC = () => {
     <div className="main-layout">
       <Header />
       <div className="content-grid">
-        <ResizableSidebar 
-          initialWidth={sidebarWidth}
-          minWidth={55}
-          maxWidth={400}
-          onWidthChange={handleSidebarWidthChange}
-        >
-          <Sidebar />
-        </ResizableSidebar>
-        
+        <Sidebar />
         <div className="email-content">
           <div className="email-header">
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ 
+                flexGrow: 1, 
+                display: 'flex', 
+                alignItems: 'center',
+                color: theme => theme.palette.mode === 'light' ? '#222' : theme.palette.text.primary,
+                fontWeight: 600
+              }}
+            >
               {selectedCategory}
               <Box
                 sx={{

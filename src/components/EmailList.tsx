@@ -33,7 +33,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
 }) => {
   const theme = useTheme();
   const { density, fontSize, fontWeight } = useThemeContext();
-  const { emails, combineThreads } = useEmailContext();
+  const { emails, combineThreads, labelVisibility } = useEmailContext(); // <-- add labelVisibility here
   const threadCount = React.useMemo(() => {
     if (!combineThreads) return 0;
     return emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length;
@@ -85,27 +85,29 @@ const EmailItem: React.FC<EmailItemProps> = ({
       </div>
       {/* Labels */}
       <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden', minWidth: 80, maxWidth: 320, paddingLeft: 0, paddingRight: 10 }}>
-        {email.labelIds && email.labelIds.length > 0 && email.labelIds.map(label => (
-          <Chip
-            key={label}
-            label={prettifyLabel(label)}
-            size="small"
-            sx={{
-              height: 18,
-              fontSize: '0.72rem',
-              bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
-              color: theme.palette.text.primary,
-              px: '0px', // Remove all horizontal padding inside the chip
-              borderRadius: 1.5,
-              fontWeight: 500,
-              // Remove maxWidth and ellipsis to allow full label display
-              overflow: 'visible',
-              textOverflow: 'clip',
-              whiteSpace: 'nowrap'
-            }}
-            variant="outlined"
-          />
-        ))}
+        {email.labelIds && email.labelIds.length > 0 && email.labelIds
+          .filter(label => labelVisibility[label] !== false) // Only show if ON or not set
+          .map(label => (
+            <Chip
+              key={label}
+              label={prettifyLabel(label)}
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: '0.72rem',
+                bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
+                color: theme.palette.text.primary,
+                px: '0px', // Remove all horizontal padding inside the chip
+                borderRadius: 1.5,
+                fontWeight: 500,
+                // Remove maxWidth and ellipsis to allow full label display
+                overflow: 'visible',
+                textOverflow: 'clip',
+                whiteSpace: 'nowrap'
+              }}
+              variant="outlined"
+            />
+          ))}
       </div>
       {/* From */}
       <Typography
@@ -204,7 +206,8 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
     setSelectedEmail, 
     loadMoreEmails, 
     hasMoreEmails, 
-    loading 
+    loading
+    // labelVisibility // <-- remove unused
   } = useEmailContext();
   // Use controlled checkedEmails if provided, otherwise internal state
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
@@ -262,7 +265,7 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
 
   return (
     <>
-      <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px" }}>
+      <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px", paddingRight: '0.5em' }}>
         {/* Header row for accessibility (optional) */}
         {/* <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '32px minmax(80px, max-content) 180px 1fr 32px 40px 90px', fontWeight: 600, fontSize: 14, color: '#888', padding: '0 8px' }}> ... </div> */}
         {emails.length === 0 ? (
