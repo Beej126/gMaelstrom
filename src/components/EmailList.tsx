@@ -1,32 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  List, 
-  ListItemButton, 
   Typography, 
   Box, 
   Chip,
   Checkbox,
-  IconButton,
   useTheme,
   Button,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  Switch as MuiSwitch
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import CloseIcon from '@mui/icons-material/Close';
 import { formatDistanceToNow } from 'date-fns';
 import { useEmailContext } from '../context/EmailContext';
 import { useThemeContext } from '../context/ThemeContext';
 import { Email } from '../types/email';
-import ForumIcon from '@mui/icons-material/Forum';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import StarIcon from '@mui/icons-material/Star';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
+import { useNavigate } from 'react-router-dom';
 
 interface EmailItemProps {
   email: Email;
   selected: boolean;
   onClick: () => void;
-  onStarClick: (emailId: string) => void;
   onCheckboxClick: (emailId: string, checked: boolean) => void;
   isChecked: boolean;
 }
@@ -35,191 +38,161 @@ const EmailItem: React.FC<EmailItemProps> = ({
   email, 
   selected, 
   onClick, 
-  onStarClick,
   onCheckboxClick,
   isChecked
 }) => {
   const theme = useTheme();
   const { density, fontSize, fontWeight } = useThemeContext();
-  // Get thread count for this email if we're in combined mode
-  const { emails, combineThreads } = useEmailContext();
+  const { emails, combineThreads, labelVisibility } = useEmailContext();
   const threadCount = React.useMemo(() => {
     if (!combineThreads) return 0;
     return emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length;
   }, [emails, email.gapiMessage.threadId, combineThreads]);
 
-  // Extract sender name from the from field
   const senderName = React.useMemo(() => {
     const match = email.from.match(/(.*?)\s*<.*>/);
     return match ? match[1].trim() : email.from.split('@')[0];
   }, [email.from]);
 
-  // Handle star click without propagation
-  const handleStarClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onStarClick(email.id);
-  };
-
-  // Handle checkbox click without propagation
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onCheckboxClick(email.id, !isChecked);
   };
 
-  // Set height based on density setting
   const itemHeight = density === 'condensed' ? '32px' : '40px';
 
   return (
-    <>
-      <ListItemButton 
-        selected={selected}
-        onClick={onClick}
-        sx={{ 
-          bgcolor: email.isRead ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a',
-          '&:hover': {
-            bgcolor: selected ? theme.palette.action.selected : theme.palette.mode === 'light' ? '#f5f5f5' : '#333333'
-          },
-          px: 1,
-          borderBottom: theme.palette.mode === 'light' ? '1px solid #f5f5f5' : '1px solid #333333',
-          height: itemHeight,
-          position: 'relative'
+    <div
+      role="row"
+      tabIndex={0}
+      aria-selected={selected}
+      onClick={onClick}
+      style={{
+        background: selected ? theme.palette.action.selected : (email.isRead ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
+        borderBottom: theme.palette.mode === 'light' ? '1px solid #f5f5f5' : '1px solid #333333',
+        height: itemHeight,
+        cursor: 'pointer',
+        outline: selected ? `2px solid ${theme.palette.primary.main}` : undefined,
+        transition: 'background 0.2s',
+        paddingLeft: 8,
+        paddingRight: 8,
+        display: 'contents' // Let parent grid handle layout
+      }}
+    >
+      {/* Checkbox */}
+      <div style={{ gridColumn: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Checkbox
+          size="small"
+          edge="start"
+          checked={isChecked}
+          onClick={handleCheckboxClick}
+          sx={{ p: density === 'condensed' ? 0.3 : 0.5, ml: 0, position: 'relative', top: '-4px' }}
+        />
+      </div>
+      {/* Labels */}
+      <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden', minWidth: 80, maxWidth: 320, paddingLeft: 0, paddingRight: 10 }}>
+        {email.labelIds && email.labelIds.length > 0 && email.labelIds.filter(label => labelVisibility[label] !== false).map(label => (
+          <Chip
+            key={label}
+            label={prettifyLabel(label)}
+            size="small"
+            sx={{
+              height: 18,
+              fontSize: '0.72rem',
+              bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
+              color: theme.palette.text.primary,
+              px: '0px', // Remove all horizontal padding inside the chip
+              borderRadius: 1.5,
+              fontWeight: 500,
+              // Remove maxWidth and ellipsis to allow full label display
+              overflow: 'visible',
+              textOverflow: 'clip',
+              whiteSpace: 'nowrap'
+            }}
+            variant="outlined"
+          />
+        ))}
+      </div>
+      {/* From */}
+      <Typography
+        component="span"
+        sx={{
+          gridColumn: 3,
+          fontSize: fontSize.primary,
+          fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListFrom,
+          color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          mr: 1
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px', marginLeft: '8px' }}>
-          {/* Checkbox */}
-          <Checkbox 
-            size="small" 
-            edge="start"
-            checked={isChecked}
-            onClick={handleCheckboxClick}
-            sx={{ p: density === 'condensed' ? 0.3 : 0.5 }}
-          />
-          
-          {/* Star Icon */}
-          <IconButton size="small" onClick={handleStarClick} sx={{ p: density === 'condensed' ? 0.3 : 0.5 }}>
-            {email.isStarred ? 
-              <StarIcon fontSize="small" sx={{ color: '#f4b400' }} /> : 
-              <StarBorderIcon fontSize="small" sx={{ color: theme.palette.mode === 'light' ? '#5f6368' : '#949494' }} />
-            }
-          </IconButton>
-
-          {/* Thread arrow for conversation threads */}
-          {threadCount > 1 && (
-            <ArrowRightIcon fontSize="small" sx={{ color: theme.palette.mode === 'light' ? '#5f6368' : '#949494', mr: -0.5 }} />
-          )}
-          
-          {/* Email Content - all on one line */}
-          <Box sx={{ 
-            display: 'flex', 
-            width: '100%', 
-            alignItems: 'center', 
+        {senderName}
+      </Typography>
+      {/* Subject and Snippet */}
+      <div style={{ gridColumn: 4, display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <Typography
+          sx={{
+            mr: 1,
+            fontSize: fontSize.primary,
+            fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListSubject,
+            color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
+            whiteSpace: 'nowrap',
             overflow: 'hidden',
-            pl: 0.5
-          }}>
-            {/* Sender */}
-            <Typography 
-              component="span"
-              sx={{ 
-                width: '180px', 
-                mr: 1.5,
-                flexShrink: 0,
-                fontSize: fontSize.primary,
-                fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListFrom,
-                color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {senderName}
-            </Typography>
-            
-            {/* Subject and Snippet */}
-            <Box sx={{ 
-              display: 'flex', 
-              flexGrow: 1, 
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              mr: 1
-            }}>
-              <Typography 
-                sx={{ 
-                  mr: 1,
-                  fontSize: fontSize.primary,
-                  fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListSubject,
-                  color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {email.subject}
-              </Typography>
-              <Typography 
-                sx={{ 
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '50%',
-                  opacity: 0.7,
-                  fontSize: fontSize.secondary,
-                  color: 'text.secondary'
-                }}
-              >
-                - {email.gapiMessage.snippet}
-              </Typography>
-            </Box>
-            
-            {/* Attachment indicator */}
-            {email.hasAttachments && (
-              <AttachFileIcon 
-                fontSize={density === 'condensed' ? 'inherit' : 'small'} 
-                sx={{ 
-                  mx: 0.5, 
-                  color: theme.palette.mode === 'light' ? '#5f6368' : '#949494', 
-                  transform: 'rotate(45deg)',
-                  flexShrink: 0,
-                  ...(density === 'condensed' && { fontSize: '16px' })
-                }} 
-              />
-            )}
-            
-            {/* Thread count if applicable */}
-            {threadCount > 1 && (
-              <Chip
-                icon={<ForumIcon fontSize={density === 'condensed' ? 'inherit' : 'small'} />}
-                label={`${threadCount}`}
-                size="small"
-                sx={{ 
-                  height: density === 'condensed' ? 16 : 20, 
-                  flexShrink: 0,
-                  '& .MuiChip-label': { 
-                    fontSize: fontSize.chip,
-                    padding: density === 'condensed' ? '0 6px' : '0 8px'
-                  }
-                }}
-                variant="outlined"
-              />
-            )}
-            
-            {/* Date */}
-            <Typography 
-              component="span" 
-              sx={{ 
-                ml: 1.5, 
-                minWidth: '70px', 
-                textAlign: 'right',
-                flexShrink: 0,
-                fontSize: fontSize.caption,
-                color: 'text.secondary'
-              }}
-            >
-              {formatDistanceToNow(new Date(email.date), { addSuffix: false })}
-            </Typography>
-          </Box>
-        </Box>
-      </ListItemButton>
-    </>
+            textOverflow: 'ellipsis'
+          }}
+        >
+          {email.subject}
+        </Typography>
+        <Typography
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '50%',
+            opacity: 0.7,
+            fontSize: fontSize.secondary,
+            color: 'text.secondary'
+          }}
+        >
+          - {email.gapiMessage.snippet}
+        </Typography>
+      </div>
+      {/* Attachment icon */}
+      <div style={{ gridColumn: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {email.hasAttachments && (
+          <AttachFileIcon
+            fontSize={density === 'condensed' ? 'inherit' : 'small'}
+            sx={{
+              color: theme.palette.mode === 'light' ? '#5f6368' : '#949494',
+              transform: 'rotate(45deg)',
+              flexShrink: 0,
+              ...(density === 'condensed' && { fontSize: '16px' })
+            }}
+          />
+        )}
+      </div>
+      {/* Thread arrow */}
+      <div style={{ gridColumn: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {threadCount > 1 && (
+          <ArrowRightIcon fontSize="small" sx={{ color: theme.palette.mode === 'light' ? '#5f6368' : '#949494' }} />
+        )}
+      </div>
+      {/* Date */}
+      <Typography
+        component="span"
+        sx={{
+          gridColumn: 7,
+          minWidth: '70px',
+          textAlign: 'right',
+          flexShrink: 0,
+          fontSize: fontSize.caption,
+          color: 'text.secondary'
+        }}
+      >
+        {formatDistanceToNow(new Date(email.date), { addSuffix: false })}
+      </Typography>
+    </div>
   );
 };
 
@@ -230,10 +203,13 @@ const EmailList: React.FC = () => {
     setSelectedEmail, 
     loadMoreEmails, 
     hasMoreEmails, 
-    loading 
+    loading, 
+    labelVisibility, 
+    setLabelVisibility, 
+    labelSettingsOpen, 
+    setLabelSettingsOpen 
   } = useEmailContext();
   const [checkedEmails, setCheckedEmails] = useState<Record<string, boolean>>({});
-  const [starredEmails, setStarredEmails] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -243,20 +219,13 @@ const EmailList: React.FC = () => {
     emails.forEach(email => {
       if (email.isStarred) initialStarred[email.id] = true;
     });
-    setStarredEmails(initialStarred);
+    setCheckedEmails(initialStarred);
   }, []);
 
   const handleEmailClick = (email: Email) => {
     setSelectedEmail(email);
     // Navigate to the email detail page
     navigate(`/email/${email.id}`);
-  };
-
-  const handleStarClick = (emailId: string) => {
-    setStarredEmails(prev => ({
-      ...prev,
-      [emailId]: !prev[emailId]
-    }));
   };
 
   const handleCheckboxClick = (emailId: string, checked: boolean) => {
@@ -270,18 +239,51 @@ const EmailList: React.FC = () => {
     loadMoreEmails();
   };
 
+  // Get all labelIds in use (from emails)
+  const allLabelIds = useMemo(() => {
+    const ids = new Set<string>();
+    emails.forEach(email => email.labelIds?.forEach(id => ids.add(id)));
+    return Array.from(ids);
+  }, [emails]);
+
   return (
     <>
-      <List sx={{ 
-        width: '100%', 
-        bgcolor: 'background.paper', 
-        padding: 0,
-        '& .MuiListItemButton-root:hover': {
-          bgcolor: theme => theme.palette.mode === 'light' ? '#f5f5f5' : '#333333'
-        }
-      }}>
+      {/* Label Settings Modal */}
+      <Dialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          Label Settings
+          <IconButton
+            aria-label="close"
+            onClick={() => setLabelSettingsOpen(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <List>
+            {allLabelIds.map(labelId => (
+              <ListItem key={labelId} secondaryAction={
+                <MuiSwitch
+                  edge="end"
+                  checked={labelVisibility[labelId] !== false}
+                  onChange={() => setLabelVisibility({ ...labelVisibility, [labelId]: !labelVisibility[labelId] })}
+                />
+              }>
+                <ListItemText primary={prettifyLabel(labelId)} secondary={labelId} />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLabelSettingsOpen(false)} color="primary">Close</Button>
+        </DialogActions>
+      </Dialog>
+      <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px" }}>
+        {/* Header row for accessibility (optional) */}
+        {/* <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '32px minmax(80px, max-content) 180px 1fr 32px 40px 90px', fontWeight: 600, fontSize: 14, color: '#888', padding: '0 8px' }}> ... </div> */}
         {emails.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Box sx={{ p: 3, textAlign: 'center', gridColumn: '1 / -1' }}>
             <Typography variant="body1" color="text.secondary">
               No emails found
             </Typography>
@@ -290,50 +292,96 @@ const EmailList: React.FC = () => {
           emails.map((email) => (
             <EmailItem
               key={email.id}
-              email={{
-                ...email,
-                isStarred: starredEmails[email.id] || false
-              }}
+              email={email}
               selected={selectedEmail?.id === email.id}
               onClick={() => handleEmailClick(email)}
-              onStarClick={handleStarClick}
               onCheckboxClick={handleCheckboxClick}
               isChecked={!!checkedEmails[email.id]}
             />
           ))
         )}
-      </List>
-      
-      {/* Load More button */}
-      {hasMoreEmails && (
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            p: 2, 
-            borderTop: `1px solid ${theme.palette.divider}`
-          }}
-        >
-          <Button 
-            onClick={handleLoadMore}
-            disabled={loading}
+        {/* Load More button */}
+        {hasMoreEmails && (
+          <Box 
             sx={{ 
-              textTransform: 'none',
-              minWidth: '150px'
+              display: 'flex', 
+              justifyContent: 'center', 
+              p: 2, 
+              borderTop: `1px solid ${theme.palette.divider}`,
+              gridColumn: '1 / -1'
             }}
-            variant="outlined"
-            size="small"
           >
-            {loading ? (
-              <CircularProgress size={20} sx={{ mr: 1 }} />
-            ) : (
-              'Load older emails'
-            )}
-          </Button>
-        </Box>
-      )}
+            <Button 
+              onClick={handleLoadMore}
+              disabled={loading}
+              sx={{ 
+                textTransform: 'none',
+                minWidth: '150px'
+              }}
+              variant="outlined"
+              size="small"
+            >
+              {loading ? (
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+              ) : (
+                'Load older emails'
+              )}
+            </Button>
+          </Box>
+        )}
+      </div>
     </>
   );
 };
+
+// Map of Gmail label IDs to friendly names
+const LABEL_NAME_MAP: Record<string, string> = {
+  INBOX: 'Inbox',
+  SENT: 'Sent',
+  DRAFT: 'Draft',
+  SPAM: 'Spam',
+  TRASH: 'Trash',
+  IMPORTANT: 'Important',
+  STARRED: 'Starred',
+  UNREAD: 'Unread',
+  PENDING: 'Pending',
+  CATEGORY_UPDATES: 'Updates',
+  CATEGORY_FORUMS: 'Forums',
+  CATEGORY_PROMOTIONS: 'Promotions',
+  CATEGORY_SOCIAL: 'Social',
+  CATEGORY_PERSONAL: 'Personal',
+  // Add more mappings as needed
+};
+
+// Dynamic label name map, to be filled from Gmail API
+let dynamicLabelNameMap: Record<string, string> = {};
+
+// Call this function after fetching label definitions from Gmail API
+export function setDynamicLabelNameMap(labelDefs: Array<{ id: string; name: string }>) {
+  dynamicLabelNameMap = {};
+  labelDefs.forEach(label => {
+    dynamicLabelNameMap[label.id] = label.name;
+  });
+}
+
+function prettifyLabel(labelId: string): string {
+  // Prefer dynamic label name from Gmail API, but prettify it if it looks like a system label
+  if (dynamicLabelNameMap[labelId]) {
+    // If the dynamic label name is still in the form CATEGORY_* or has underscores, prettify it
+    let name = dynamicLabelNameMap[labelId];
+    if (/^CATEGORY_/.test(labelId) || /_/.test(name)) {
+      name = name.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
+      name = name.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+    }
+    return name;
+  }
+  // Prefer static map for core Gmail/system labels
+  if (LABEL_NAME_MAP[labelId]) return LABEL_NAME_MAP[labelId];
+  // Prettify CATEGORY_ and other unknowns
+  let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
+  // Capitalize each word for better appearance
+  label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+  return label;
+}
 
 export default EmailList;

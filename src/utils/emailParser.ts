@@ -524,15 +524,8 @@ export const parseEmailData = (message: gapi.client.gmail.Message): Email => {
   if (!message.id) throw new Error('gMail Message ID came back undefined. Lots of logic depends on this being populated.');
 
   return {
-    // id: message.id,
-    // threadId: message.threadId,
-    // labelIds: message.labelIds || [],
-    // snippet: message.snippet || '',
-    // historyId: message.historyId,
-    // internalDate: message.internalDate,
-    // payload: message.payload,
-    // sizeEstimate: message.sizeEstimate,
     id: message.id!,
+    labelIds: message.labelIds || [],
     gapiMessage: message,
     from,
     to,

@@ -31,6 +31,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import { getUser, signOut } from '../services/authService';
 import { useThemeContext } from '../context/ThemeContext';
 import { useEmailContext } from '../context/EmailContext';
@@ -81,7 +82,8 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 const Header: React.FC = () => {
   const theme = useTheme();
   const { mode, toggleTheme, density, setDensity, fontWeight, setEmailListFontWeight } = useThemeContext();
-  const { combineThreads, setCombineThreads } = useEmailContext();
+  const emailContext = useEmailContext();
+  const { combineThreads, setCombineThreads } = emailContext;
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -353,6 +355,16 @@ const Header: React.FC = () => {
             onChange={handleCombineThreadsChange}
             onClick={(e) => e.stopPropagation()}
           />
+        </MenuItem>
+        <Divider />
+        <MenuItem 
+          onClick={() => { emailContext.setLabelSettingsOpen(true); handleSettingsMenuClose(); }}
+          sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
+        >
+          <ListItemIcon>
+            <LabelOutlinedIcon color="primary" />
+          </ListItemIcon>
+          <ListItemText>Label Settings</ListItemText>
         </MenuItem>
         <Divider />
         <MenuItem onClick={handleSettingsMenuClose}>

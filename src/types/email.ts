@@ -30,13 +30,7 @@
 
 export interface Email {
   id: string;
-  // threadId: string | undefined;
-  // labelIds: string[];
-  // snippet: string;
-  // historyId: string | undefined;
-  // internalDate: string | undefined;
-  // payload: gapi.client.gmail.MessagePart | undefined;
-  // sizeEstimate: number;
+  labelIds: string[];
   gapiMessage: gapi.client.gmail.Message,
   raw?: string;
   from: string;

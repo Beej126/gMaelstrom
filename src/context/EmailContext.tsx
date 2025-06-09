@@ -1,7 +1,8 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
-import { getEmails } from '../services/gmailService';
+import { getEmails, getGmailLabels } from '../services/gmailService';
 import { isUserAuthenticated } from '../services/authService';
 import { Email } from '../types/email';
+import { setDynamicLabelNameMap } from '../components/EmailList';
 
 interface EmailContextType {
   emails: Email[];
@@ -18,6 +19,10 @@ interface EmailContextType {
   refreshing: boolean;
   combineThreads: boolean;
   setCombineThreads: (combine: boolean) => void;
+  labelVisibility: Record<string, boolean>;
+  setLabelVisibility: (vis: Record<string, boolean>) => void;
+  labelSettingsOpen: boolean;
+  setLabelSettingsOpen: (open: boolean) => void;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -52,11 +57,42 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
   const [pageToken, setPageToken] = useState<string | null>(null);
   const [hasMoreEmails, setHasMoreEmails] = useState<boolean>(true);
 
+  // Initialize labelVisibility from localStorage
+  const [labelVisibility, setLabelVisibility] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('gMaelstrom_labelVisibility') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const [labelSettingsOpen, setLabelSettingsOpen] = useState(false);
+
   // Update localStorage when combineThreads changes
   useEffect(() => {
     localStorage.setItem('gMaelstrom_combineThreads', combineThreads.toString());
   }, [combineThreads]);
 
+  // Save labelVisibility to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('gMaelstrom_labelVisibility', JSON.stringify(labelVisibility));
+  }, [labelVisibility]);
+
+  // Fetch Gmail labels on mount
+  useEffect(() => {
+    async function fetchLabels() {
+      if (!isUserAuthenticated()) return;
+      try {
+        const labelDefs = await getGmailLabels();
+        setDynamicLabelNameMap(labelDefs);
+      } catch (err) {
+        console.error('Failed to fetch Gmail labels:', err);
+      }
+    }
+    fetchLabels();
+  }, []);
+
+  // In fetchEmails and loadMoreEmails, use the correct labelIds for each category
   const fetchEmails = useCallback(async () => {
     if (!isUserAuthenticated()) {
       setEmails([]);
@@ -66,7 +102,16 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
 
     setRefreshing(true);
     try {
-      const result = await getEmails(null, selectedCategory.toUpperCase());
+      // Map category to Gmail labelId
+      const labelMap: Record<string, string> = {
+        'Inbox': 'INBOX',
+        'Sent': 'SENT',
+        'Drafts': 'DRAFT',
+        'Spam': 'SPAM',
+        'Trash': 'TRASH',
+      };
+      const labelId = labelMap[selectedCategory] || 'INBOX';
+      const result = await getEmails(null, labelId);
       setEmails(result.emails);
       setPageToken(result.nextPageToken);
       setHasMoreEmails(!!result.nextPageToken);
@@ -87,9 +132,16 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
 
     setLoading(true);
     try {
-      const result = await getEmails(pageToken, selectedCategory.toUpperCase());
-      
-      // Append new emails to existing ones
+      // Map category to Gmail labelId
+      const labelMap: Record<string, string> = {
+        'Inbox': 'INBOX',
+        'Sent': 'SENT',
+        'Drafts': 'DRAFT',
+        'Spam': 'SPAM',
+        'Trash': 'TRASH',
+      };
+      const labelId = labelMap[selectedCategory] || 'INBOX';
+      const result = await getEmails(pageToken, labelId);
       setEmails(prevEmails => [...prevEmails, ...result.emails]);
       setPageToken(result.nextPageToken);
       setHasMoreEmails(!!result.nextPageToken);
@@ -119,12 +171,22 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     }
   }, [selectedCategory]);
 
-  // Filter emails based on selected category
-  const filteredEmails = emails.filter(email => 
-    selectedCategory === 'Inbox' ? 
-      email.category === 'Inbox' : 
-      email.category === selectedCategory
-  );
+  // Filter emails based on selected category and label
+  const filteredEmails = emails.filter(email => {
+    if (selectedCategory === 'Inbox') {
+      return email.labelIds?.includes('INBOX');
+    } else if (selectedCategory === 'Sent') {
+      return email.labelIds?.includes('SENT');
+    } else if (selectedCategory === 'Drafts') {
+      return email.labelIds?.includes('DRAFT');
+    } else if (selectedCategory === 'Spam') {
+      return email.labelIds?.includes('SPAM');
+    } else if (selectedCategory === 'Trash') {
+      return email.labelIds?.includes('TRASH');
+    }
+    // fallback: show all
+    return true;
+  });
 
   // If combineThreads is enabled, group emails by threadId
   const processedEmails = combineThreads
@@ -172,7 +234,11 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     setSelectedCategory,
     refreshing,
     combineThreads,
-    setCombineThreads
+    setCombineThreads,
+    labelVisibility,
+    setLabelVisibility,
+    labelSettingsOpen,
+    setLabelSettingsOpen
   };
 
   return <EmailContext.Provider value={value}>{children}</EmailContext.Provider>;

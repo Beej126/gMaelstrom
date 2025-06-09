@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "rsbuild dev --open",
+
     "build": "rsbuild build",
     "check": "biome check --write",
-    "dev": "rsbuild dev --open",
     "format": "prettier --write .",
     "lint": "eslint .",
     "preview": "rsbuild preview"

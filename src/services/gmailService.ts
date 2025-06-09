@@ -17,24 +17,24 @@ interface EmailsResponse {
 }
 
 // eslint-disable-next-line 
-export const getEmails = async (pageToken: string | null = null, _category = 'INBOX'): Promise<EmailsResponse> => {
+export const getEmails = async (pageToken: string | null = null, labelId: string = 'INBOX'): Promise<EmailsResponse> => {
   try {
     if (!accessToken) {
       throw new Error('No access token available. Please sign in.');
     }
 
-    // Build the query based on category
-    // let query = `in:${category}`;
-
-    // Get list of messages with pagination support
-    const response = await gapi.client.gmail.users.messages.list({
-      //https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list
+    // Use labelIds for folder filtering (Inbox, Sent, Spam, Trash, etc.)
+    const params: any = {
       userId: 'me',
       maxResults: 50,
       pageToken: pageToken || undefined,
-      // labelIds: ["INBOX"]//[category], //using labelIds vs query since query wasn't including emails sent from myself in inbox since they are also in sent
-      q: "label:inbox OR label:pending"
-    });
+    };
+    if (labelId) {
+      params.labelIds = [labelId];
+    }
+    // Do not use 'q' for folder filtering; only use for custom search
+
+    const response = await gapi.client.gmail.users.messages.list(params);
 
     const messages = response.result.messages || [];
     const nextPageToken = response.result.nextPageToken || null;
@@ -105,4 +105,13 @@ export const getAttachmentData = async (messageId: string, attachmentId: string)
     console.error('Error fetching attachment data:', error);
     throw error;
   }
+};
+
+// Add to gmailService.ts
+export const getGmailLabels = async (): Promise<Array<{ id: string; name: string }>> => {
+  if (!accessToken) {
+    throw new Error('No access token available. Please sign in.');
+  }
+  const response = await gapi.client.gmail.users.labels.list({ userId: 'me' });
+  return (response.result.labels || []).map((label: any) => ({ id: label.id, name: label.name }));
 };
