@@ -119,12 +119,13 @@ const EmailItem: React.FC<EmailItemProps> = ({
         sx={{
           gridColumn: 3,
           fontSize: fontSize.primary,
-          fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListFrom,
-          color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
+          fontWeight: email.isRead ? 500 : fontWeight.emailListFrom,
+          color: theme => email.isRead ? theme.palette.text.secondary : theme.palette.text.primary,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          mr: 1
+          mr: 1,
+          opacity: email.isRead ? 0.85 : 1
         }}
       >
         {senderName}
@@ -135,11 +136,12 @@ const EmailItem: React.FC<EmailItemProps> = ({
           sx={{
             mr: 1,
             fontSize: fontSize.primary,
-            fontWeight: email.isRead ? fontWeight.regular : fontWeight.emailListSubject,
-            color: theme => email.isRead ? theme.palette.text.primary : theme.palette.text.secondary,
+            fontWeight: email.isRead ? 500 : fontWeight.emailListSubject,
+            color: theme => email.isRead ? theme.palette.text.secondary : theme.palette.text.primary,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            opacity: email.isRead ? 0.85 : 1
           }}
         >
           {email.subject}
@@ -150,7 +152,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             maxWidth: '50%',
-            opacity: 0.7,
+            opacity: email.isRead ? 0.7 : 0.8,
             fontSize: fontSize.secondary,
             color: 'text.secondary'
           }}
@@ -196,7 +198,12 @@ const EmailItem: React.FC<EmailItemProps> = ({
   );
 };
 
-const EmailList: React.FC = () => {
+interface EmailListProps {
+  checkedEmails?: Record<string, boolean>;
+  setCheckedEmails?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}
+
+const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp, setCheckedEmails: setCheckedEmailsProp }) => {
   const { 
     emails, 
     selectedEmail, 
@@ -209,7 +216,10 @@ const EmailList: React.FC = () => {
     labelSettingsOpen, 
     setLabelSettingsOpen 
   } = useEmailContext();
-  const [checkedEmails, setCheckedEmails] = useState<Record<string, boolean>>({});
+  // Use controlled checkedEmails if provided, otherwise internal state
+  const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
+  const checkedEmails = checkedEmailsProp ?? internalCheckedEmails;
+  const setCheckedEmails = setCheckedEmailsProp ?? internalSetCheckedEmails;
   const navigate = useNavigate();
   const theme = useTheme();
 

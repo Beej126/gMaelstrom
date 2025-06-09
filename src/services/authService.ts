@@ -56,7 +56,10 @@ const initClient = async () => {
             apiKey: API_KEY,
             clientId: GOOGLE_CLIENT_ID,
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest'],
-            scope: 'https://www.googleapis.com/auth/gmail.readonly'
+            scope: [
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.modify'
+            ].join(' ')
         });
 
         // Listen for sign-in state changes

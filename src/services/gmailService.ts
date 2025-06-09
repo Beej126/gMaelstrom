@@ -115,3 +115,24 @@ export const getGmailLabels = async (): Promise<Array<{ id: string; name: string
   const response = await gapi.client.gmail.users.labels.list({ userId: 'me' });
   return (response.result.labels || []).map((label: any) => ({ id: label.id, name: label.name }));
 };
+
+// Mark one or more emails as unread
+export const markEmailsAsUnread = async (emailIds: string[]): Promise<void> => {
+  if (!accessToken) {
+    throw new Error('No access token available. Please sign in.');
+  }
+  if (!emailIds.length) return;
+  try {
+    await gapi.client.gmail.users.messages.batchModify({
+      userId: 'me',
+      resource: {
+        ids: emailIds,
+        addLabelIds: ['UNREAD'],
+        removeLabelIds: [], // 'READ' is not a valid label
+      },
+    });
+  } catch (error) {
+    console.error('Error marking emails as unread:', error);
+    throw error;
+  }
+};

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Box, CircularProgress, Typography, Button, Snackbar, Alert, useTheme } from '@mui/material';
+import { Box, CircularProgress, Typography, Button, Snackbar, Alert, useTheme, IconButton, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
 import ResizableSidebar from '../components/ResizableSidebar';
 import { useEmailContext } from '../context/EmailContext';
+import { markEmailsAsUnread } from '../services/gmailService';
 import '../styles/MainLayout.css';
 
 const MainLayout: React.FC = () => {
@@ -13,6 +15,10 @@ const MainLayout: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256); // Default sidebar width
   const theme = useTheme();
+
+  // State for checked emails, lifted up from EmailList
+  const [checkedEmails, setCheckedEmails] = useState<Record<string, boolean>>({});
+  const anyChecked = Object.values(checkedEmails).some(Boolean);
 
   // Set CSS variables based on theme
   useEffect(() => {
@@ -49,6 +55,20 @@ const MainLayout: React.FC = () => {
     setSidebarWidth(width);
   };
 
+  const handleMarkAsUnread = async () => {
+    const selectedIds = Object.entries(checkedEmails)
+      .filter(([_, checked]) => checked)
+      .map(([id]) => id);
+    if (!selectedIds.length) return;
+    try {
+      await markEmailsAsUnread(selectedIds);
+      setCheckedEmails({}); // Clear selection
+      await fetchEmails(); // Refresh list
+    } catch (err) {
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <div className="main-layout">
       <Header />
@@ -64,8 +84,21 @@ const MainLayout: React.FC = () => {
         
         <div className="email-content">
           <div className="email-header">
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
               {selectedCategory}
+              <Tooltip title="Mark as Unread" disableInteractive>
+                <span>
+                  <IconButton
+                    aria-label="Mark as Unread"
+                    size="small"
+                    onClick={handleMarkAsUnread}
+                    disabled={!anyChecked}
+                    sx={{ ml: 1 }}
+                  >
+                    <MarkEmailUnreadIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Typography>
             <Button 
               startIcon={<RefreshIcon />}
@@ -82,7 +115,7 @@ const MainLayout: React.FC = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <EmailList />
+            <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
           )}
         </div>
       </div>

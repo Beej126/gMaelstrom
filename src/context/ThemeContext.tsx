@@ -99,14 +99,17 @@ const DEFAULT_FONT_WEIGHTS: FontWeightSettings = {
 };
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  // Call useMediaQuery at the top level
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+
   // Check if user has a preference stored in local storage
   const getInitialMode = (): ThemeMode => {
     const savedMode = localStorage.getItem('gMaelstrom_themeMode');
     if (savedMode === 'light' || savedMode === 'dark') {
       return savedMode;
     }
-    // Otherwise, use system preference
-    return useMediaQuery('(prefers-color-scheme: dark)') ? 'dark' : 'light';
+    // Use the already-evaluated prefersDarkMode value
+    return prefersDarkMode ? 'dark' : 'light';
   };
   
   const getInitialDensity = (): DensityMode => {
