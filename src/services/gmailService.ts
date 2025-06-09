@@ -133,3 +133,24 @@ export const markEmailsAsUnread = async (emailIds: string[]): Promise<void> => {
     throw error;
   }
 };
+
+// Mark one or more emails as read
+export const markEmailsAsRead = async (emailIds: string[]): Promise<void> => {
+  if (!accessToken) {
+    throw new Error('No access token available. Please sign in.');
+  }
+  if (!emailIds.length) return;
+  try {
+    await gapi.client.gmail.users.messages.batchModify({
+      userId: 'me',
+      resource: {
+        ids: emailIds,
+        addLabelIds: [],
+        removeLabelIds: ['UNREAD'],
+      },
+    });
+  } catch (error) {
+    console.error('Error marking emails as read:', error);
+    throw error;
+  }
+};

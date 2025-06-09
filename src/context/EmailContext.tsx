@@ -24,6 +24,7 @@ interface EmailContextType {
   setLabelSettingsOpen: (open: boolean) => void;
   dynamicLabelNameMap: Record<string, string>;
   setDynamicLabelNameMap: (labels: Array<{ id: string; name: string }>) => void;
+  updateEmailInContext: (email: Email) => void; // <-- add to context
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -230,6 +231,14 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
       )
     : filteredEmails;
 
+  const updateEmailInContext = (updatedEmail: Email) => {
+    setEmails(prevEmails =>
+      prevEmails.map(email =>
+        email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
+      )
+    );
+  };
+
   const value = {
     emails: processedEmails,
     loading,
@@ -250,7 +259,8 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     labelSettingsOpen,
     setLabelSettingsOpen,
     dynamicLabelNameMap,
-    setDynamicLabelNameMap
+    setDynamicLabelNameMap,
+    updateEmailInContext // <-- add to context
   };
 
   return <EmailContext.Provider value={value}>{children}</EmailContext.Provider>;

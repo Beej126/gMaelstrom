@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Box, 
+import {
+  Typography,
+  Box,
   Chip,
   Checkbox,
   useTheme,
@@ -19,34 +19,31 @@ import { useNavigate } from 'react-router-dom';
 interface EmailItemProps {
   email: Email;
   selected: boolean;
-  onClick: () => void;
   onCheckboxClick: (emailId: string, checked: boolean) => void;
   isChecked: boolean;
+  threadCount: number;
+  labelVisibility: Record<string, boolean>;
 }
 
-const EmailItem: React.FC<EmailItemProps> = ({ 
-  email, 
-  selected, 
-  onClick, 
+const EmailItem: React.FC<EmailItemProps> = ({
+  email,
+  selected,
   onCheckboxClick,
-  isChecked
+  isChecked,
+  threadCount,
+  labelVisibility
 }) => {
   const theme = useTheme();
   const { density, fontSize, fontWeight } = useThemeContext();
-  const { emails, combineThreads, labelVisibility } = useEmailContext(); // <-- add labelVisibility here
-  const threadCount = React.useMemo(() => {
-    if (!combineThreads) return 0;
-    return emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length;
-  }, [emails, email.gapiMessage.threadId, combineThreads]);
-
-  const senderName = React.useMemo(() => {
-    const match = email.from.match(/(.*?)\s*<.*>/);
-    return match ? match[1].trim() : email.from.split('@')[0];
-  }, [email.from]);
+  const navigate = useNavigate();
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onCheckboxClick(email.id, !isChecked);
+  };
+
+  const handleEmailClick = () => {
+    navigate(`/email/${email.id}`);
   };
 
   const itemHeight = density === 'condensed' ? '32px' : '40px';
@@ -56,7 +53,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
       role="row"
       tabIndex={0}
       aria-selected={selected}
-      onClick={onClick}
+      onClick={handleEmailClick}
       style={{
         background: selected ? theme.palette.action.selected : (email.isRead ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
         borderBottom: theme.palette.mode === 'light' ? '1px solid #f5f5f5' : '1px solid #333333',
@@ -66,25 +63,25 @@ const EmailItem: React.FC<EmailItemProps> = ({
         transition: 'background 0.2s',
         paddingLeft: 8,
         paddingRight: 8,
-        display: 'contents' // Let parent grid handle layout
+        display: 'contents'
       }}
     >
       {/* Checkbox */}
-      <div style={{ gridColumn: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Checkbox
-          size="small"
-          edge="start"
-          checked={isChecked}
-          onClick={handleCheckboxClick}
-          sx={{ 
-            p: density === 'condensed' ? 0.3 : 0.5, 
-            ml: 0, 
-            position: 'relative', 
-            top: density === 'condensed' ? '-4px' : '-6px' }}
-        />
-      </div>
+      <Checkbox
+        size="small"
+        edge="start"
+        checked={isChecked}
+        onClick={handleCheckboxClick}
+        sx={{
+          gridColumn: 1,
+          p: density === 'condensed' ? 0.3 : 0.5,
+          ml: 0,
+          position: 'relative',
+          top: density === 'condensed' ? '-4px' : '-6px'
+        }}
+      />
       {/* Labels */}
-      <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden', minWidth: 80, maxWidth: 320, paddingLeft: 0, paddingRight: 10 }}>
+      <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden' }}>
         {email.labelIds && email.labelIds.length > 0 && email.labelIds
           .filter(label => labelVisibility[label] !== false) // Only show if ON or not set
           .map(label => (
@@ -97,10 +94,9 @@ const EmailItem: React.FC<EmailItemProps> = ({
                 fontSize: '0.72rem',
                 bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
                 color: theme.palette.text.primary,
-                px: '0px', // Remove all horizontal padding inside the chip
+                px: '0px',
                 borderRadius: 1.5,
                 fontWeight: 500,
-                // Remove maxWidth and ellipsis to allow full label display
                 overflow: 'visible',
                 textOverflow: 'clip',
                 whiteSpace: 'nowrap'
@@ -124,7 +120,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
           opacity: email.isRead ? 0.85 : 1
         }}
       >
-        {senderName}
+        {email.from}
       </Typography>
       {/* Subject and Snippet */}
       <div style={{ gridColumn: 4, display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>
@@ -200,20 +196,18 @@ interface EmailListProps {
 }
 
 const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp, setCheckedEmails: setCheckedEmailsProp }) => {
-  const { 
-    emails, 
-    selectedEmail, 
-    setSelectedEmail, 
-    loadMoreEmails, 
-    hasMoreEmails, 
-    loading
-    // labelVisibility // <-- remove unused
+  const {
+    emails,
+    selectedEmail,
+    loadMoreEmails,
+    hasMoreEmails,
+    loading,
+    labelVisibility
   } = useEmailContext();
   // Use controlled checkedEmails if provided, otherwise internal state
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
   const checkedEmails = checkedEmailsProp ?? internalCheckedEmails;
   const setCheckedEmails = setCheckedEmailsProp ?? internalSetCheckedEmails;
-  const navigate = useNavigate();
   const theme = useTheme();
 
   // Initialize from email data
@@ -244,13 +238,7 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
       }
     });
     if (changed) setCheckedEmails(newChecked);
-  }, [emails]);
-
-  const handleEmailClick = (email: Email) => {
-    setSelectedEmail(email);
-    // Navigate to the email detail page
-    navigate(`/email/${email.id}`);
-  };
+  }, [emails, selectedEmail]);
 
   const handleCheckboxClick = (emailId: string, checked: boolean) => {
     setCheckedEmails(prev => ({
@@ -265,7 +253,10 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
 
   return (
     <>
-      <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px", paddingRight: '0.5em' }}>
+      <div
+        key={emails.map(e => e.id + (e.isRead ? 'r' : 'u')).join(',') + (selectedEmail ? selectedEmail.id : '')}
+        style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px", paddingRight: '0.5em' }}
+      >
         {/* Header row for accessibility (optional) */}
         {/* <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '32px minmax(80px, max-content) 180px 1fr 32px 40px 90px', fontWeight: 600, fontSize: 14, color: '#888', padding: '0 8px' }}> ... </div> */}
         {emails.length === 0 ? (
@@ -280,27 +271,28 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
               key={email.id}
               email={email}
               selected={selectedEmail?.id === email.id}
-              onClick={() => handleEmailClick(email)}
               onCheckboxClick={handleCheckboxClick}
               isChecked={!!checkedEmails[email.id]}
+              threadCount={emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length}
+              labelVisibility={labelVisibility}
             />
           ))
         )}
         {/* Load More button */}
         {hasMoreEmails && (
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              p: 2, 
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              p: 2,
               borderTop: `1px solid ${theme.palette.divider}`,
               gridColumn: '1 / -1'
             }}
           >
-            <Button 
+            <Button
               onClick={handleLoadMore}
               disabled={loading}
-              sx={{ 
+              sx={{
                 textTransform: 'none',
                 minWidth: '150px'
               }}

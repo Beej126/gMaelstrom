@@ -24,7 +24,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
 import { useEmailContext } from '../context/EmailContext';
-import { getEmailThread, getAttachmentData } from '../services/gmailService';
+import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../services/gmailService';
 import { Email } from '../types/email';
 import {
   decodeBase64,
@@ -199,7 +199,7 @@ const getInitials = (name: string) => {
 
 const EmailDetail: React.FC = () => {
   const { emailId } = useParams<{ emailId: string }>();
-  const { emails, selectedEmail, setSelectedEmail } = useEmailContext();
+  const { emails, selectedEmail, setSelectedEmail, updateEmailInContext } = useEmailContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [emailThread, setEmailThread] = useState<Email[]>([]);
@@ -208,6 +208,29 @@ const EmailDetail: React.FC = () => {
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
+  // Local read state for icon only
+  const [isReadLocal, setIsReadLocal] = useState(selectedEmail?.isRead ?? true);
+
+  // Sync local state when selectedEmail changes
+  useEffect(() => {
+    setIsReadLocal(selectedEmail?.isRead ?? true);
+  }, [selectedEmail?.id, selectedEmail?.isRead]);
+
+  // Remove UNREAD label in local context and Gmail API on open
+  useEffect(() => {
+    if (selectedEmail && selectedEmail.labelIds.includes('UNREAD')) {
+      const updated = {
+        ...selectedEmail,
+        labelIds: selectedEmail.labelIds.filter(l => l !== 'UNREAD'),
+        isRead: true
+      };
+      // setSelectedEmail(updated); // REMOVE THIS LINE
+      updateEmailInContext(updated);
+      setIsReadLocal(true);
+      markEmailsAsRead([selectedEmail.id]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail?.id]);
 
   // Extract attachments from emails and update state
   const processEmailAttachments = (emails: Email[]) => {
@@ -241,21 +264,15 @@ const EmailDetail: React.FC = () => {
       if (emailId) {
         setLoading(true);
         try {
-          // Determine which email we're working with: either the currently selected email or find it in the list
-          let email = selectedEmail && selectedEmail.id === emailId ? selectedEmail : emails.find(e => e.id === emailId);
-          
+          // Find the email by id (do not depend on selectedEmail)
+          let email = emails.find(e => e.id === emailId);
           if (email) {
-            // If we found an email but it's not already selected, update the selected email
-            if (email.id !== selectedEmail?.id) {
-              setSelectedEmail(email);
-            }
-            
+            setSelectedEmail(email);
             // Load the thread
             const thread = await getEmailThread(email.gapiMessage.threadId!);
             setEmailThread(thread);
             processEmailAttachments(thread);
           } else {
-            // Email not found, go back to inbox
             setError("Email not found");
             setTimeout(() => {
               navigate('/');
@@ -269,8 +286,35 @@ const EmailDetail: React.FC = () => {
         }
       }
     })();
+  }, [emailId, setSelectedEmail, navigate]);
 
-  }, [emailId, emails, selectedEmail, setSelectedEmail, navigate]);
+  // Mark as read/unread handler
+  const handleToggleRead = async () => {
+    if (!selectedEmail) return;
+    let updated;
+    if (!isReadLocal) {
+      // Mark as read
+      updated = {
+        ...selectedEmail,
+        labelIds: selectedEmail.labelIds.filter(l => l !== 'UNREAD'),
+        isRead: true
+      };
+      setIsReadLocal(true);
+      updateEmailInContext(updated);
+      await markEmailsAsRead([selectedEmail.id]);
+    } else {
+      // Mark as unread
+      updated = {
+        ...selectedEmail,
+        labelIds: [...selectedEmail.labelIds, 'UNREAD'],
+        isRead: false
+      };
+      setIsReadLocal(false);
+      updateEmailInContext(updated);
+      await markEmailsAsUnread([selectedEmail.id]);
+    }
+    // Do NOT call setSelectedEmail(updated) here
+  };
 
   if (error) {
     return (
@@ -329,9 +373,9 @@ const EmailDetail: React.FC = () => {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title={selectedEmail.isRead ? "Mark as unread" : "Mark as read"}>
-            <IconButton>
-              {selectedEmail.isRead ? <MarkEmailUnreadIcon /> : <MarkEmailReadIcon />}
+          <Tooltip title={isReadLocal ? "Mark as unread" : "Mark as read"}>
+            <IconButton onClick={handleToggleRead}>
+              {isReadLocal ? <MarkEmailReadIcon /> : <MarkEmailUnreadIcon /> }
             </IconButton>
           </Tooltip>
 
