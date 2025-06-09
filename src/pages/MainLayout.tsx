@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, CircularProgress, Typography, Button, Snackbar, Alert, useTheme, IconButton, Tooltip } from '@mui/material';
+import { Box, CircularProgress, Typography, Button, Snackbar, Alert, useTheme, IconButton, Tooltip, Checkbox } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
@@ -19,6 +19,9 @@ const MainLayout: React.FC = () => {
   // State for checked emails, lifted up from EmailList
   const [checkedEmails, setCheckedEmails] = useState<Record<string, boolean>>({});
   const anyChecked = Object.values(checkedEmails).some(Boolean);
+  const allEmailIds = Object.keys(checkedEmails);
+  const allChecked = allEmailIds.length > 0 && allEmailIds.every(id => checkedEmails[id]);
+  const someChecked = allEmailIds.some(id => checkedEmails[id]) && !allChecked;
 
   // Set CSS variables based on theme
   useEffect(() => {
@@ -69,6 +72,15 @@ const MainLayout: React.FC = () => {
     }
   };
 
+  const handleCheckAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    const newChecked: Record<string, boolean> = {};
+    for (const id of allEmailIds) {
+      newChecked[id] = checked;
+    }
+    setCheckedEmails(newChecked);
+  };
+
   return (
     <div className="main-layout">
       <Header />
@@ -86,19 +98,42 @@ const MainLayout: React.FC = () => {
           <div className="email-header">
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
               {selectedCategory}
-              <Tooltip title="Mark as Unread" disableInteractive>
-                <span>
-                  <IconButton
-                    aria-label="Mark as Unread"
-                    size="small"
-                    onClick={handleMarkAsUnread}
-                    disabled={!anyChecked}
-                    sx={{ ml: 1 }}
-                  >
-                    <MarkEmailUnreadIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  ml: '2em',
+                  px: 1.5,
+                  py: 0.5,
+                  border: theme => `1px solid ${theme.palette.divider}`,
+                  borderRadius: 2,
+                  bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
+                  boxShadow: theme => theme.palette.mode === 'dark' ? '0 1px 2px 0 rgba(0,0,0,0.10)' : '0 1px 2px 0 rgba(0,0,0,0.04)'
+                }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onChange={handleCheckAll}
+                  inputProps={{ 'aria-label': 'Select all emails' }}
+                  sx={{ p: 0, mr: 1 }}
+                />
+                <Tooltip title="Mark as Unread" disableInteractive>
+                  <span>
+                    <IconButton
+                      aria-label="Mark as Unread"
+                      size="small"
+                      onClick={handleMarkAsUnread}
+                      disabled={!anyChecked}
+                    >
+                      <MarkEmailUnreadIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                {/* Add more icon buttons here in the future */}
+              </Box>
             </Typography>
             <Button 
               startIcon={<RefreshIcon />}

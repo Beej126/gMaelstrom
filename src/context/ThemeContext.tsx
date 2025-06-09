@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { ThemeProvider as MuiThemeProvider, createTheme, useMediaQuery } from '@mui/material';
-import CssBaseline from '@mui/material/CssBaseline';
+import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles, useMediaQuery } from '@mui/material';
 import { Theme as _Theme, ThemeOptions as _ThemeOptions } from '@mui/material/styles';
 
 // Interface for font size settings based on density
@@ -217,10 +216,33 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     },
     components: {
+      MuiButtonBase: {
+        styleOverrides: {
+          root: {
+            paddingTop: 2,
+            paddingBottom: 2,
+            minHeight: 0,
+          },
+        },
+      },
       MuiButton: {
         styleOverrides: {
           root: {
             textTransform: 'none',
+          },
+        },
+      },
+      MuiTooltip: {
+        defaultProps: {
+          PopperProps: {
+            modifiers: [
+              {
+                name: 'offset',
+                options: {
+                  offset: [0, -16], // Move up by ~1em (16px)
+                },
+              },
+            ],
           },
         },
       },
@@ -233,6 +255,30 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     },
   });
 
+  // Add global CSS override for MuiButtonBase-root to force minimal padding
+  const globalStyles = (
+    <GlobalStyles
+      styles={{
+        '.MuiMenuItem-root': {
+          minHeight: '0 !important',
+          paddingTop: '2px !important',
+          paddingBottom: '2px !important',
+          lineHeight: '1.2 !important',
+        },
+        // Only apply compactness to direct children of .MuiList-root (menu items), not to switches
+        '.MuiList-root > .MuiButtonBase-root:not(.MuiSwitch-switchBase)': {
+          paddingTop: '2px !important',
+          paddingBottom: '2px !important',
+          minHeight: '0 !important',
+          lineHeight: '1.2 !important',
+        },
+        '.MuiDivider-root': {
+          marginTop: 0,
+        },
+      }}
+    />
+  );
+
   return (
     <ThemeContext.Provider value={{ 
       mode, 
@@ -244,10 +290,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       fontWeight,
       setEmailListFontWeight
     }}>
-      <MuiThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </MuiThemeProvider>
+      <StyledEngineProvider injectFirst>
+        <MuiThemeProvider theme={theme}>
+          <CssBaseline />
+          {globalStyles}
+          {children}
+        </MuiThemeProvider>
+      </StyledEngineProvider>
     </ThemeContext.Provider>
   );
 };

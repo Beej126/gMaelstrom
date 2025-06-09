@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Box, 
@@ -6,18 +6,8 @@ import {
   Checkbox,
   useTheme,
   Button,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Switch as MuiSwitch
+  CircularProgress
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import { formatDistanceToNow } from 'date-fns';
 import { useEmailContext } from '../context/EmailContext';
 import { useThemeContext } from '../context/ThemeContext';
@@ -43,7 +33,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
 }) => {
   const theme = useTheme();
   const { density, fontSize, fontWeight } = useThemeContext();
-  const { emails, combineThreads, labelVisibility } = useEmailContext();
+  const { emails, combineThreads } = useEmailContext();
   const threadCount = React.useMemo(() => {
     if (!combineThreads) return 0;
     return emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length;
@@ -86,12 +76,16 @@ const EmailItem: React.FC<EmailItemProps> = ({
           edge="start"
           checked={isChecked}
           onClick={handleCheckboxClick}
-          sx={{ p: density === 'condensed' ? 0.3 : 0.5, ml: 0, position: 'relative', top: '-4px' }}
+          sx={{ 
+            p: density === 'condensed' ? 0.3 : 0.5, 
+            ml: 0, 
+            position: 'relative', 
+            top: density === 'condensed' ? '-4px' : '-6px' }}
         />
       </div>
       {/* Labels */}
       <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden', minWidth: 80, maxWidth: 320, paddingLeft: 0, paddingRight: 10 }}>
-        {email.labelIds && email.labelIds.length > 0 && email.labelIds.filter(label => labelVisibility[label] !== false).map(label => (
+        {email.labelIds && email.labelIds.length > 0 && email.labelIds.map(label => (
           <Chip
             key={label}
             label={prettifyLabel(label)}
@@ -210,11 +204,7 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
     setSelectedEmail, 
     loadMoreEmails, 
     hasMoreEmails, 
-    loading, 
-    labelVisibility, 
-    setLabelVisibility, 
-    labelSettingsOpen, 
-    setLabelSettingsOpen 
+    loading 
   } = useEmailContext();
   // Use controlled checkedEmails if provided, otherwise internal state
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
@@ -231,6 +221,27 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
     });
     setCheckedEmails(initialStarred);
   }, []);
+
+  // Ensure checkedEmails always has all visible email IDs as keys
+  useEffect(() => {
+    if (!checkedEmailsProp || !setCheckedEmailsProp) return;
+    const newChecked: Record<string, boolean> = { ...checkedEmails };
+    let changed = false;
+    emails.forEach(email => {
+      if (!(email.id in newChecked)) {
+        newChecked[email.id] = false;
+        changed = true;
+      }
+    });
+    // Remove any keys for emails no longer in the list
+    Object.keys(newChecked).forEach(id => {
+      if (!emails.find(e => e.id === id)) {
+        delete newChecked[id];
+        changed = true;
+      }
+    });
+    if (changed) setCheckedEmails(newChecked);
+  }, [emails]);
 
   const handleEmailClick = (email: Email) => {
     setSelectedEmail(email);
@@ -249,46 +260,8 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
     loadMoreEmails();
   };
 
-  // Get all labelIds in use (from emails)
-  const allLabelIds = useMemo(() => {
-    const ids = new Set<string>();
-    emails.forEach(email => email.labelIds?.forEach(id => ids.add(id)));
-    return Array.from(ids);
-  }, [emails]);
-
   return (
     <>
-      {/* Label Settings Modal */}
-      <Dialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          Label Settings
-          <IconButton
-            aria-label="close"
-            onClick={() => setLabelSettingsOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <List>
-            {allLabelIds.map(labelId => (
-              <ListItem key={labelId} secondaryAction={
-                <MuiSwitch
-                  edge="end"
-                  checked={labelVisibility[labelId] !== false}
-                  onChange={() => setLabelVisibility({ ...labelVisibility, [labelId]: !labelVisibility[labelId] })}
-                />
-              }>
-                <ListItemText primary={prettifyLabel(labelId)} secondary={labelId} />
-              </ListItem>
-            ))}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLabelSettingsOpen(false)} color="primary">Close</Button>
-        </DialogActions>
-      </Dialog>
       <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px" }}>
         {/* Header row for accessibility (optional) */}
         {/* <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '32px minmax(80px, max-content) 180px 1fr 32px 40px 90px', fontWeight: 600, fontSize: 14, color: '#888', padding: '0 8px' }}> ... </div> */}

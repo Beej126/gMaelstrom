@@ -30,7 +30,6 @@ import ViewComfyIcon from '@mui/icons-material/ViewComfy';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
-import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import { getUser, signOut } from '../services/authService';
 import { useThemeContext } from '../context/ThemeContext';
@@ -81,7 +80,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 
 const Header: React.FC = () => {
   const theme = useTheme();
-  const { mode, toggleTheme, density, setDensity, fontWeight, setEmailListFontWeight } = useThemeContext();
+  const { mode, toggleTheme, density, setDensity } = useThemeContext();
   const emailContext = useEmailContext();
   const { combineThreads, setCombineThreads } = emailContext;
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
@@ -137,11 +136,6 @@ const Header: React.FC = () => {
   const handleCombineThreadsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     event.stopPropagation();
     setCombineThreads(!combineThreads);
-  };
-
-  // Handle text weight change for email list items
-  const handleFontWeightChange = (type: 'from' | 'subject', value: number) => {
-    setEmailListFontWeight(type, value);
   };
 
   return (
@@ -267,10 +261,10 @@ const Header: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           />
         </MenuItem>
-        <Divider />
-        <MenuItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <Box display="flex" alignItems="center" width="100%" mb={1}>
-            <ListItemIcon>
+        <Divider sx={{ my: 0, minHeight: 0 }} />
+        <MenuItem sx={{ flexDirection: 'column', alignItems: 'flex-start', mb: 0, py: 0, minHeight: 0, height: 'auto', px: 2 }}>
+          <Box display="flex" alignItems="center" width="100%" mb={0}>
+            <ListItemIcon sx={{ minWidth: 36, alignItems: 'center', mt: 0.5 }}>
               <ViewComfyIcon color="primary" />
             </ListItemIcon>
             <ListItemText primary="Email List Density" />
@@ -281,60 +275,30 @@ const Header: React.FC = () => {
             value={density}
             onChange={handleDensityChange}
             onClick={(e) => e.stopPropagation()}
+            sx={{
+              width: '100%',
+              flexDirection: 'row',
+              alignItems: 'center',
+              mt: 0.5,
+              mb: 0.5,
+              gap: 1
+            }}
           >
-            <FormControlLabel value="sparse" control={<Radio size="small" />} label="Sparse" />
-            <FormControlLabel value="condensed" control={<Radio size="small" />} label="Condensed" />
+            <FormControlLabel 
+              value="sparse" 
+              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} 
+              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Sparse</Typography>} 
+              sx={{ ml: 0, mr: 2, py: 0, minHeight: 0, alignItems: 'center' }}
+            />
+            <FormControlLabel 
+              value="condensed" 
+              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} 
+              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Condensed</Typography>} 
+              sx={{ ml: 0, mr: 0, py: 0, minHeight: 0, alignItems: 'center' }}
+            />
           </RadioGroup>
         </MenuItem>
-        <Divider />
-        {/* Text Weight Settings */}
-        <MenuItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <Box display="flex" alignItems="center" width="100%" mb={1}>
-            <ListItemIcon>
-              <FormatBoldIcon color="primary" />
-            </ListItemIcon>
-            <ListItemText primary="Email List Text Weight" />
-          </Box>
-          
-          <Box sx={{ ml: 2, width: '100%' }}>
-            <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
-              Sender Weight
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <RadioGroup
-                aria-label="from-weight"
-                name="from-weight"
-                row
-                value={fontWeight.emailListFrom}
-                onChange={(e) => handleFontWeightChange('from', Number(e.target.value))}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FormControlLabel value={400} control={<Radio size="small" />} label="Normal" />
-                <FormControlLabel value={500} control={<Radio size="small" />} label="Medium" />
-                <FormControlLabel value={700} control={<Radio size="small" />} label="Bold" />
-              </RadioGroup>
-            </Box>
-            
-            <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
-              Subject Weight
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <RadioGroup
-                aria-label="subject-weight"
-                name="subject-weight"
-                row
-                value={fontWeight.emailListSubject}
-                onChange={(e) => handleFontWeightChange('subject', Number(e.target.value))}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FormControlLabel value={400} control={<Radio size="small" />} label="Normal" />
-                <FormControlLabel value={500} control={<Radio size="small" />} label="Medium" />
-                <FormControlLabel value={700} control={<Radio size="small" />} label="Bold" />
-              </RadioGroup>
-            </Box>
-          </Box>
-        </MenuItem>
-        <Divider />
+        <Divider sx={{ my: 0, minHeight: 0 }} />
         <MenuItem 
           onClick={() => setCombineThreads(!combineThreads)} 
           sx={{ 
@@ -356,7 +320,7 @@ const Header: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           />
         </MenuItem>
-        <Divider />
+        <Divider sx={{ my: 0, minHeight: 0 }} />
         <MenuItem 
           onClick={() => { emailContext.setLabelSettingsOpen(true); handleSettingsMenuClose(); }}
           sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
@@ -365,13 +329,6 @@ const Header: React.FC = () => {
             <LabelOutlinedIcon color="primary" />
           </ListItemIcon>
           <ListItemText>Label Settings</ListItemText>
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleSettingsMenuClose}>
-          <ListItemIcon>
-            <SettingsIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>All Settings</ListItemText>
         </MenuItem>
       </Menu>
       

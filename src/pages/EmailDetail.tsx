@@ -311,7 +311,7 @@ const EmailDetail: React.FC = () => {
         }}
       >
         <Tooltip title="Back to inbox">
-          <IconButton onClick={() => navigate('/')}>
+          <IconButton onClick={() => navigate('/', { replace: true })}>
             <ArrowBackIcon />
           </IconButton>
         </Tooltip>
