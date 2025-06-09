@@ -1,6 +1,6 @@
 # gMail clone in React with RSBuild compiler
 
-[original wishlist here](https://github.com/Beej126/GmailZero)... geez, has it been 4 years!?! kids just in high school right now, they'z all that matters =)
+[original wishlist here](https://github.com/Beej126/GmailZero)... geez, has it been 4 years!?! kids are cranking into high school now, they'z all that matters =)
 
 - generated with VSCode Copilot in `Agent` mode with `Claude 3.7 Sonnet` model
 - prompt: `create a react project named "gMaelstrom" that is a gmail clone, typescript build with rsbuild, context data store (no redux), css grid for main page layout, google authentication, and populated with actual user emails from gmail cloud`
@@ -19,6 +19,16 @@
 <br/>
 <br/>
 
+# Current TBDs
+1. there's a mild read/unread transition bug... click into unread email, it should auto flip to read, but then manually flip it back to unread and return to email list, then go back into it and it will NOT auto flip to read at this point, fun =)
+1. next enhancement i want to make the email detail land in the same space as the email list versus taking over the whole page
+1. then **resizable** column headers on the email list, which persist to local storage like everything else... 
+1. the attachment icon doesn't show up for a current email in the inbox (nike registration), check that out
+1. and establish a good default width of subject and snippet
+
+<br/>
+<br/>
+<hr>
 PS- if anyone is out there listening, can we please please please get a big monitor that finally really hits the mark for programmers:
 # 50-inch 5k2k 21:9 IPS 120+Hz
 
