@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "wait-on:dev-server",
+      "type": "shell",
+      "command": "npx wait-on http://localhost:3000 || npm run dev",
+      "problemMatcher": [],
+      "isBackground": false,
+      "presentation": {
+        // "reveal": "never",
+        "close": true
+      },
+      
+    }
+  ]
+}
