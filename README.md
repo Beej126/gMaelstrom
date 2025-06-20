@@ -10,9 +10,11 @@
 <br/>
 
 # Install & Run
-1. clone repo
+1. clone the repo
 1. [generate & apply your own google credentials for gmail api access](google_auth_readme.md)
-1. `npm run dev` to launch
+1. easy startup Windows batch files provided in root folder:
+   - run_dev.cmd
+   - run_build.cmd
 
 *this will not be bundled up as a full fledged standalone application for the foreseeable future*
 
@@ -21,13 +23,25 @@
 # Tech Stack
 - React (v19.1 currently)
 - Typescript
-- [RSBuild](https://rsbuild.rs/)  as the bundler/compiler (seems to be a great modern CRA alternative)
+- [RSBuild](https://rsbuild.rs/)  as the bundler/transpiler (seems to be a great modern CRA alternative)
   - [pluginTypeCheck](https://github.com/rspack-contrib/rsbuild-plugin-type-check) for typescript syntax checking (see in rsbuild.config.ts)
 - MUI component library
 - GMail API
-- React Context based data store
+- simple Context based data store
 
-### generated with VSCode Copilot in `Agent` mode with `Claude 3.7 Sonnet` model
+<br/>
+
+# Features
+- light/dark mode
+- all user settings saved to local storage
+- fair amount of regex effort on mapping css color patterns to contrast equivalents in dark mode =)
+- working attachments handling
+- including built-in PDF viewer
+
+<br/>
+
+<hr>
+generated with VSCode Copilot in `Agent` mode with `Claude 3.7 Sonnet` model
 - prompt: `create a react project named "gMaelstrom" that is a gmail clone, typescript build with rsbuild, context data store (no redux), css grid for main page layout, google authentication, and populated with actual user emails from gmail cloud`
 
 - this being my first real experience with copilot AI "vibe" style coding was a real treat...
