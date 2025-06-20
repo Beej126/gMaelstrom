@@ -1,7 +1,5 @@
 # gMail clone with enhanced workflows
-- e.g. drag email to calendar
-
-[original wishlist here](https://github.com/Beej126/GmailZero)... geez, has it been 4 years!?! kids are cranking into high school now, they'z all that matters =)
+[original wishlist here](https://github.com/Beej126/GmailZero)... geez, has it been 4 years!?! 
 
 
 <img src="https://github.com/user-attachments/assets/3399bff8-4de3-412b-9efb-d32ed748f21f" width="500" />
