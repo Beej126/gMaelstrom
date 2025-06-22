@@ -2,26 +2,57 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn, isUserAuthenticated } from '../services/authService';
 import { Button, Box, Typography, Container, Paper, CircularProgress } from '@mui/material';
-import GMailstromIcon from '../components/GMailstromIcon';
+import GMaelstromIcon from '../components/gMaelstromIcon';
+import { useEmailContext } from '../context/EmailContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { fetchEmails } = useEmailContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loginAttempted, setLoginAttempted] = useState(false);
 
-  // If user is already authenticated, redirect to main page
+  // Wait for auth state to be ready on mount
   React.useEffect(() => {
-    if (isUserAuthenticated()) {
-      navigate('/');
-    }
+    let cancelled = false;
+    const checkAuth = async () => {
+      for (let i = 0; i < 10; i++) { // try for up to 1s
+        if (isUserAuthenticated()) {
+          if (!cancelled) navigate('/');
+          return;
+        }
+        await new Promise(res => setTimeout(res, 100));
+      }
+      if (!cancelled) setCheckingAuth(false);
+    };
+    checkAuth();
+    return () => { cancelled = true; };
   }, [navigate]);
 
   const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
+    setLoginAttempted(true);
     try {
       await signIn();
-      if (isUserAuthenticated()) {
+
+      // Poll for authentication for up to 1s after signIn
+      // needed this to smooth out landing on the /login page after signin flow where authentication status wasn't all the way present yet
+      let authed = false;
+      for (let i = 0; i < 10; i++) {
+        if (isUserAuthenticated()) {
+          authed = true;
+          break;
+        }
+        await new Promise(res => setTimeout(res, 100));
+      }
+      if (authed) {
+        const emails = await fetchEmails();
+        if (!emails || emails.length === 0) {
+          await new Promise(res => setTimeout(res, 500));
+          await fetchEmails();
+        }
         navigate('/');
       } else {
         setError('Authentication failed. Please try again.');
@@ -33,6 +64,14 @@ const LoginPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Container component="main" maxWidth="xs">
@@ -52,10 +91,10 @@ const LoginPage: React.FC = () => {
             flexDirection: 'column',
             alignItems: 'center',
             width: '100%',
-            backgroundColor: 'white',
+            backgroundColor: 'background.paper',
           }}
         >
-          <GMailstromIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+          <GMaelstromIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
           <Typography component="h1" variant="h4" sx={{ mb: 3, color: 'text.primary' }}>
             gMaelstrom
           </Typography>
@@ -63,7 +102,7 @@ const LoginPage: React.FC = () => {
             Your personalized Gmail experience
           </Typography>
           
-          {error && (
+          {loginAttempted && error && (
             <Typography color="error" sx={{ mb: 2 }}>
               {error}
             </Typography>

@@ -9,7 +9,7 @@ interface EmailContextType {
   error: string | null;
   selectedEmail: Email | null;
   setSelectedEmail: (email: Email | null) => void;
-  fetchEmails: () => Promise<void>;
+  fetchEmails: () => Promise<Email[]>;
   loadMoreEmails: () => Promise<void>;
   hasMoreEmails: boolean;
   categories: string[];
@@ -108,7 +108,7 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     if (!isUserAuthenticated()) {
       setEmails([]);
       setLoading(false);
-      return;
+      return [];
     }
 
     setRefreshing(true);
@@ -127,9 +127,11 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
       setPageToken(result.nextPageToken);
       setHasMoreEmails(!!result.nextPageToken);
       setError(null);
+      return result.emails;
     } catch (err: any) {
       setError(`Failed to fetch emails: ${err.message || 'Unknown error'}`);
       console.error('Error fetching emails:', err);
+      return [];
     } finally {
       setLoading(false);
       setRefreshing(false);

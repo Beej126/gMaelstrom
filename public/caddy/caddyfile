@@ -1,4 +1,14 @@
 localhost {
     root * ..
     file_server
+
+    # Serve index.html for all routes not matching a static file (for React Router)
+    # this keeps from landing on /login url outside of the spa router during google auth redirects
+    @notStatic {
+        file {
+            try_files {path} {path}/
+        }
+        not file
+    }
+    rewrite @notStatic /index.html
 }

@@ -58,7 +58,9 @@ const initClient = async () => {
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest'],
             scope: [
                 'https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/gmail.modify'
+                'https://www.googleapis.com/auth/gmail.modify',
+                'profile',
+                'email'
             ].join(' ')
         });
 
