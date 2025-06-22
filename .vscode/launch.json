@@ -9,7 +9,7 @@
       "name": "Debug gMaelstrom (rsbuild)",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
-      "preLaunchTask": "wait-on:dev-server",
+      "preLaunchTask": "dev-server",
       "sourceMaps": true,
       "trace": true,
       "skipFiles": [

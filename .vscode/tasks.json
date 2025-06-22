@@ -2,16 +2,25 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "wait-on:dev-server",
+      "label": "dev-server",
       "type": "shell",
-      "command": "npx wait-on http://localhost:3000 || npm run dev",
-      "problemMatcher": [],
-      "isBackground": false,
-      "presentation": {
-        // "reveal": "never",
-        "close": true
-      },
-      
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": {
+            "regexp": ".*",
+            "file": 1,
+            "location": 2,
+            "message": 0
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".*rsbuild dev.*|.*starting dev server.*",
+            "endsPattern": ".*ready.*|.*compiled successfully.*|.*dev server running at.*"
+          }
+        }
+      ]
     }
   ]
 }
