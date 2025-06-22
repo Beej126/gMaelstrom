@@ -34,7 +34,7 @@ import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import { getUser, signOut } from '../services/authService';
 import { useThemeContext } from '../context/ThemeContext';
 import { useEmailContext } from '../context/EmailContext';
-import GMailstromIcon from './GMailstromIcon';
+import GMaelstromIcon from './gMaelstromIcon';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -150,7 +150,7 @@ const Header: React.FC = () => {
     >
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <GMailstromIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+          <GMaelstromIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
           <Typography
             variant="h6"
             noWrap
@@ -342,8 +342,11 @@ const Header: React.FC = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         PaperProps={{
           sx: {
-            width: 250,
+            minWidth: 'unset',
+            width: 'auto',
+            maxWidth: 'none',
             backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : undefined,
+            px: 2
           }
         }}
       >
