@@ -178,7 +178,7 @@ const Header: React.FC = () => {
         
         <Box sx={{ display: 'flex' }}>
           <Tooltip title="Help">
-            <IconButton size="large">
+            <IconButton size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
               <HelpOutlineIcon />
             </IconButton>
           </Tooltip>
