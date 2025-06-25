@@ -6,6 +6,11 @@
       "type": "shell",
       "command": "npm run dev",
       "isBackground": true,
+      "options": {
+        "env": {
+          "BROWSER": "none" //prevents the --open flag on the package.json "dev" script from opening a browser automatically since the debugger must create it's own special browser instance anyway
+        }
+      },
       "problemMatcher": [
         {
           "pattern": {
