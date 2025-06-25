@@ -1,0 +1,175 @@
+// Variables
+$primary-bg: #121212;
+$secondary-bg: #1e1e1e;
+$text-light: #ffffff;
+$text-opacity: 0.87;
+$primary-blue: #2196f3;
+$error-red: #f44336;
+$border-radius: 8px;
+$scrollbar-track: #2c2c2c;
+$scrollbar-thumb: #555;
+$scrollbar-thumb-hover: #777;
+
+:root {
+--toastify-text-color-warning: black;
+// --toastify-container-width: unset;
+// --toastify-toast-width: unset;
+}
+
+// Base styles
+body {
+    margin: 0;
+    font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+    color: $text-light;
+    background-color: $primary-bg;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    display: flex;
+    min-height: 100vh;
+    line-height: 1.1;
+    text-align: center;
+    flex-direction: column;
+    justify-content: center;
+
+    h1 {
+        font-size: 3.6rem;
+        font-weight: 700;
+    }
+
+    p {
+        font-size: 1.2rem;
+        font-weight: 400;
+        opacity: 0.7;
+    }
+}
+
+// Loading container
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: $primary-bg;
+    color: $text-light;
+
+    &.dark {
+        background-color: $primary-bg;
+        color: $text-light;
+    }
+}
+
+.loading-spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: $primary-blue;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+// Error container
+.error-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    height: 100vh;
+    background-color: $primary-bg;
+    color: $text-light;
+    padding: 40px 20px;
+    text-align: center;
+    font-size: 16px;
+    overflow-y: auto;
+
+    h2 {
+        color: $error-red;
+        margin-bottom: 20px;
+        font-size: 24px;
+    }
+
+    p {
+        max-width: 600px;
+        margin-bottom: 30px;
+        opacity: $text-opacity;
+        line-height: 1.5;
+    }
+}
+
+.error-details {
+    background-color: $secondary-bg;
+    border-radius: $border-radius;
+    padding: 20px 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    max-width: 700px;
+    text-align: left;
+
+    h3 {
+        color: $primary-blue;
+        margin-bottom: 15px;
+        font-size: 18px;
+    }
+
+    ol {
+        padding-left: 20px;
+    }
+
+    li {
+        margin-bottom: 12px;
+        line-height: 1.5;
+        opacity: $text-opacity;
+    }
+
+    a {
+        color: $primary-blue;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+// Custom scrollbar
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+
+    &-track {
+        background: $scrollbar-track;
+    }
+
+    &-thumb {
+        background: $scrollbar-thumb;
+        border-radius: 4px;
+
+        &:hover {
+            background: $scrollbar-thumb-hover;
+        }
+    }
+}

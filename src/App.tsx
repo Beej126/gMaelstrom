@@ -7,7 +7,9 @@ import LoginPage from './pages/LoginPage';
 import MainLayout from './pages/MainLayout';
 import EmailDetail from './pages/EmailDetail';
 import LabelSettingsDialog from './components/LabelSettingsDialog';
-import './App.css';
+import { ToastContainer, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import './App.scss';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return isUserAuthenticated() ? (
@@ -29,20 +31,20 @@ const App: React.FC = () => {
         setGapiInitialized(true);
       } catch (error: any) {
         console.error('Failed to initialize Google Auth:', error);
-        
+
         // More user-friendly error messages
         if (error.message?.includes('Client ID') || error.message?.includes('API Key')) {
           setInitError(error.message);
-        } else if (error.error === 'idpiframe_initialization_failed' || 
-                  error.details?.includes('invalid_client') || 
-                  error.message?.includes('OAuth client was not found')) {
+        } else if (error.error === 'idpiframe_initialization_failed' ||
+          error.details?.includes('invalid_client') ||
+          error.message?.includes('OAuth client was not found')) {
           setInitError('Google OAuth configuration is invalid. Please check your client ID and make sure the OAuth consent screen is properly configured in Google Cloud Console.');
         } else {
           setInitError('Failed to initialize Google services. Please check your internet connection and try again later.');
         }
       }
     };
-    
+
     initGoogleAuth();
   }, []);
 
@@ -76,25 +78,47 @@ const App: React.FC = () => {
             <div className="app">
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
-                <Route 
-                  path="/" 
+                <Route
+                  path="/"
                   element={
                     <ProtectedRoute>
                       <MainLayout />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/email/:emailId" 
+                <Route
+                  path="/email/:emailId"
                   element={
                     <ProtectedRoute>
                       <EmailDetail />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               <LabelSettingsDialog />
+              <ToastContainer
+                style={{
+                  width: "unset",
+                  // maxWidth: '90vw'
+                }}
+                toastStyle={{
+                  width: "unset",
+                  // minHeight: 'auto'
+                }}
+
+                position="top-center"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={true}
+                closeOnClick={true}
+                pauseOnFocusLoss={true}
+                draggable={true}
+                pauseOnHover={true}
+                theme="colored"
+                transition={Bounce}
+
+              />
             </div>
           </Router>
         </EmailProvider>
