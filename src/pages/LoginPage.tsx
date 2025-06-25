@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn, isUserAuthenticated } from '../services/authService';
-import { Button, Box, Typography, Container, Paper, CircularProgress } from '@mui/material';
+import { Button, Box, Typography, Container, Paper, CircularProgress, Checkbox, FormControlLabel, Link } from '@mui/material';
+import { toast } from 'react-toastify';
 import GMaelstromIcon from '../components/gMaelstromIcon';
 import { useEmailContext } from '../context/EmailContext';
 
@@ -12,7 +13,6 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loginAttempted, setLoginAttempted] = useState(false);
-
   // Wait for auth state to be ready on mount
   React.useEffect(() => {
     let cancelled = false;
@@ -29,6 +29,63 @@ const LoginPage: React.FC = () => {
     checkAuth();
     return () => { cancelled = true; };
   }, [navigate]);
+
+  const showHostWarning = () => {
+    const ignored = localStorage.getItem('gMaelstrom_ignoreHostWarning');
+    if (ignored === 'true') return;
+    
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    // Only show warning if not on localhost
+    if (isLocalhost && (port === '3000' || port === '80' || port === '')) return;
+
+    const IgnoreButton = () => (
+      <Box sx={{ mt: 1 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              onChange={handleIgnoreHostWarning}
+              sx={{ p: 0.5 }}
+            />
+          }
+          label="Ignore forever"
+          sx={{ 
+            color: 'inherit', 
+            fontSize: '0.875rem',
+            '& .MuiFormControlLabel-label': { fontSize: '0.875rem' }
+          }}
+        />
+      </Box>
+    );
+
+    toast.warning(
+      <Box>
+        <Typography variant="body2">
+          You've likely configured Google Auth to only accept localhost on port 80 and 3000.
+          <br /><br />
+          If you want to use gMaelstrom on a different host, please update your Google Cloud Console OAuth settings.
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1, mb: 1 }}>
+          <Link 
+            href="https://github.com/Beej126/gMaelstrom/blob/main/readme_google_auth.md" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            color="inherit"
+            underline="always"
+          >
+            View Google Auth Setup Guide
+          </Link>
+        </Typography>
+        <IgnoreButton />
+      </Box>,
+      {
+        autoClose: false
+      }
+    );
+  };
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -56,13 +113,20 @@ const LoginPage: React.FC = () => {
         navigate('/');
       } else {
         setError('Authentication failed. Please try again.');
+        showHostWarning();
       }
     } catch (error) {
       console.error('Login failed:', error);
       setError('Authentication failed. Please try again.');
+      showHostWarning();
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleIgnoreHostWarning = () => {
+    localStorage.setItem('gMaelstrom_ignoreHostWarning', 'true');
+    toast.dismiss('host-warning');
   };
 
   if (checkingAuth) {
