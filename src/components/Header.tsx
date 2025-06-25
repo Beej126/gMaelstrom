@@ -23,7 +23,6 @@ import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SettingsIcon from '@mui/icons-material/Settings';
-import AppsIcon from '@mui/icons-material/Apps';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import ViewComfyIcon from '@mui/icons-material/ViewComfy';
@@ -32,9 +31,11 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import { getUser, signOut } from '../services/authService';
+import WarningIcon from '@mui/icons-material/Warning';
 import { useThemeContext } from '../context/ThemeContext';
 import { useEmailContext } from '../context/EmailContext';
 import GMaelstromIcon from './gMaelstromIcon';
+import { toast } from 'react-toastify';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -138,6 +139,28 @@ const Header: React.FC = () => {
     setCombineThreads(!combineThreads);
   };
 
+  // Handle un-ignore all warnings
+  const handleUnignoreAllWarnings = () => {
+    // List of all localStorage keys for ignored warnings
+    const warningKeys = [
+      'gMaelstrom_ignoreHostWarning',
+      // Add more warning keys here as they are implemented
+    ];
+
+    // Remove all ignored warning preferences
+    warningKeys.forEach(key => {
+      localStorage.removeItem(key);
+    });
+
+    // Show confirmation toast
+    toast.success('All warning preferences have been reset. Warnings will now appear again when applicable.', {
+      autoClose: 4000,
+    });
+
+    // Close the settings menu
+    handleSettingsMenuClose();
+  };
+
   return (
     <AppBar 
       position="static" 
@@ -194,11 +217,15 @@ const Header: React.FC = () => {
             </IconButton>
           </Tooltip>
           
+          {/* keep for now, maybe bring back later
+          
+          import AppsIcon from '@mui/icons-material/Apps';
+
           <Tooltip title="Google Apps">
             <IconButton size="large">
               <AppsIcon />
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
           
           <Tooltip title={user?.getName() || 'User'}>
             <IconButton
@@ -329,6 +356,16 @@ const Header: React.FC = () => {
             <LabelOutlinedIcon color="primary" />
           </ListItemIcon>
           <ListItemText>Label Settings</ListItemText>
+        </MenuItem>
+        <Divider sx={{ my: 0, minHeight: 0 }} />
+        <MenuItem 
+          onClick={handleUnignoreAllWarnings}
+          sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
+        >
+          <ListItemIcon>
+            <WarningIcon color="primary" />
+          </ListItemIcon>
+          <ListItemText>Un-Ignore All Warnings</ListItemText>
         </MenuItem>
       </Menu>
       
