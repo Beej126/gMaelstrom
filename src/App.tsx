@@ -3,9 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { EmailProvider } from './context/EmailContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { initializeGoogleAuth, isUserAuthenticated } from './services/authService';
-import LoginPage from './pages/LoginPage';
-import MainLayout from './pages/MainLayout';
-import EmailDetail from './pages/EmailDetail';
+import LoginPage from './components/LoginPage';
+import MainLayout from './components/MainLayout';
+import EmailDetail from './components/EmailDetail';
 import LabelSettingsDialog from './components/LabelSettingsDialog';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -58,9 +58,9 @@ const App: React.FC = () => {
           <div className="error-details">
             <h3>Troubleshooting Steps:</h3>
             <ol>
-              <li>Verify that you've created a project in the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud Console</a></li>
+              <li>Verify that you&apos;ve created a project in the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud Console</a></li>
               <li>Make sure the Gmail API is enabled for your project</li>
-              <li>Check that you've created OAuth consent screen and credentials</li>
+              <li>Check that you&apos;ve created OAuth consent screen and credentials</li>
               <li>Verify that your client ID and API key are correctly set in the .env file</li>
               <li>Ensure that your OAuth consent screen has been configured and published</li>
               <li>Add your application domain to the authorized JavaScript origins</li>

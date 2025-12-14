@@ -39,7 +39,7 @@ const LoginPage: React.FC = () => {
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
     // Only show warning if not on localhost
-    if (isLocalhost && (port === '3000' || port === '80' || port === '')) return;
+    if (isLocalhost && (port === '3500' || port === '80' || port === '')) return;
 
     const IgnoreButton = () => (
       <Box sx={{ mt: 1 }}>
@@ -64,7 +64,7 @@ const LoginPage: React.FC = () => {
     toast.warning(
       <Box>
         <Typography variant="body2">
-          You've likely configured Google Auth to only accept localhost on port 80 and 3000.
+          You&apos;ve likely configured Google Auth to only accept localhost on port 80 and 3500.
           <br /><br />
           If you want to use gMaelstrom on a different host, please update your Google Cloud Console OAuth settings.
         </Typography>

@@ -37,8 +37,9 @@ import {
   processEmailContentForDarkMode
 } from '../utils/emailParser';
 import AttachmentList from '../components/AttachmentList';
+import styles from './EmailDetail.module.scss';
 
-// Separate component for email content to properly manage hooks
+// Separate component for email content
 interface EmailContentProps {
   email: Email;
   inlineAttachments: Map<string, Record<string, InlineAttachment>>;
@@ -170,9 +171,9 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
 
   return (
     <div
+      className={styles.emailHtmlReset}
       style={{
-        wordBreak: 'break-word',
-        color: theme.palette.text.primary
+        color: theme.palette.text.primary,
       }}
       dangerouslySetInnerHTML={{ __html: content }}
     />
@@ -266,20 +267,32 @@ const EmailDetail: React.FC = () => {
         try {
           // Find the email by id (do not depend on selectedEmail)
           let email = emails.find(e => e.id === emailId);
-          if (email) {
+          if (!email) {
+            // Try to fetch the thread directly if not found in context
+            const thread = await getEmailThread(emailId);
+            if (thread && thread.length > 0) {
+              email = thread.find(e => e.id === emailId);
+              setEmailThread(thread);
+              processEmailAttachments(thread);
+              if (email) {
+                setSelectedEmail(email);
+                setLoading(false);
+                return;
+              }
+            }
+            setError("Email not found");
+            setTimeout(() => {
+              navigate('/');
+            }, 2000);
+          } else {
             setSelectedEmail(email);
             // Load the thread
             const thread = await getEmailThread(email.gapiMessage.threadId!);
             setEmailThread(thread);
             processEmailAttachments(thread);
-          } else {
-            setError("Email not found");
-            setTimeout(() => {
-              navigate('/');
-            }, 2000);
           }
-        } catch (error: any) {
-          setError(`Failed to load email: ${error.message || 'Unknown error'}`);
+        } catch (error: unknown) {
+          setError(`Failed to load email: ${error instanceof Error ? error.message : 'Unknown error'}`);
           console.error('Error loading email thread:', error);
         } finally {
           setLoading(false);
@@ -315,6 +328,7 @@ const EmailDetail: React.FC = () => {
     }
     // Do NOT call setSelectedEmail(updated) here
   };
+
 
   if (error) {
     return (
@@ -398,7 +412,8 @@ const EmailDetail: React.FC = () => {
         <Box
           sx={{
             flexGrow: 1,
-            overflow: 'auto',
+            overflowY: 'auto', // Enable vertical scrolling
+            maxHeight: 'calc(100vh - 120px)', // Adjust as needed for your header/toolbars
             p: 2,
             bgcolor: theme.palette.mode === 'dark' ? theme.palette.background.default : '#f5f5f5'
           }}>

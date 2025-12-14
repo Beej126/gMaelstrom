@@ -31,7 +31,7 @@
 export interface Email {
   id: string;
   labelIds: string[];
-  gapiMessage: gapi.client.gmail.Message,
+  gapiMessage: gapi.client.gmail.Message;
   raw?: string;
   from: string;
   to: string[];

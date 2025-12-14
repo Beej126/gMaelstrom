@@ -88,6 +88,19 @@ const Header: React.FC = () => {
   const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const user = getUser();
+  // Helper to get initials from user's name or email
+  const getInitials = (name?: string, email?: string) => {
+    const base = name && name.trim() ? name : (email || '');
+    if (!base) return 'U';
+    const parts = base.trim().split(/\s+|\./); // split on space or dot
+    if (parts.length === 1) {
+      return parts[0].charAt(0).toUpperCase();
+    }
+    return (
+      parts[0].charAt(0).toUpperCase() +
+      parts[parts.length - 1].charAt(0).toUpperCase()
+    );
+  };
   
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setProfileAnchorEl(event.currentTarget);
@@ -235,10 +248,10 @@ const Header: React.FC = () => {
               onClick={handleProfileMenuOpen}
             >
               {user?.getImageUrl() ? (
-                <Avatar src={user.getImageUrl()} alt={user.getName()} />
+                <Avatar src={user.getImageUrl()} alt={user.getName() || user?.getEmail() || 'User'} />
               ) : (
                 <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
-                  {user?.getName()?.charAt(0) || 'U'}
+                  {getInitials(user?.getName(), user?.getEmail())}
                 </Avatar>
               )}
             </IconButton>
@@ -392,7 +405,13 @@ const Header: React.FC = () => {
           <Typography variant="body2" color="text.secondary">{user?.getEmail()}</Typography>
         </Box>
         <Divider />
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem
+          component="a"
+          href={user?.getEmail() ? `https://myaccount.google.com/?authuser=${encodeURIComponent(user.getEmail())}` : 'https://myaccount.google.com'}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={handleProfileMenuClose}
+        >
           <ListItemIcon>
             <PersonIcon fontSize="small" />
           </ListItemIcon>

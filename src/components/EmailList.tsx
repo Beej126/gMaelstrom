@@ -36,6 +36,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
   const theme = useTheme();
   const { density, fontSize, fontWeight } = useThemeContext();
   const navigate = useNavigate();
+  const prettifyLabel = usePrettifyLabel();
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,9 +51,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
 
   return (
     <div
-      role="row"
       tabIndex={0}
-      aria-selected={selected}
       onClick={handleEmailClick}
       style={{
         background: selected ? theme.palette.action.selected : (email.isRead ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
@@ -330,22 +329,25 @@ const LABEL_NAME_MAP: Record<string, string> = {
   CATEGORY_PERSONAL: 'Personal',
   // Add more mappings as needed
 };
-
-function prettifyLabel(labelId: string): string {
+// Creates a prettifyLabel function with access to the dynamic label map
+const usePrettifyLabel = () => {
   const { dynamicLabelNameMap } = useEmailContext();
-  // Prefer dynamic label name from Gmail API, but prettify it if it looks like a system label
-  if (dynamicLabelNameMap[labelId]) {
-    let name = dynamicLabelNameMap[labelId];
-    if (/^CATEGORY_/.test(labelId) || /_/.test(name)) {
-      name = name.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-      name = name.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+  
+  return (labelId: string): string => {
+    // Prefer dynamic label name from Gmail API, but prettify it if it looks like a system label
+    if (dynamicLabelNameMap[labelId]) {
+      let name = dynamicLabelNameMap[labelId];
+      if (/^CATEGORY_/.test(labelId) || /_/.test(name)) {
+        name = name.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
+        name = name.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+      }
+      return name;
     }
-    return name;
-  }
-  if (LABEL_NAME_MAP[labelId]) return LABEL_NAME_MAP[labelId];
-  let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-  label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-  return label;
-}
+    if (LABEL_NAME_MAP[labelId]) return LABEL_NAME_MAP[labelId];
+    let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
+    label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+    return label;
+  };
+};
 
 export default EmailList;

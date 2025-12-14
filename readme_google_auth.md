@@ -19,7 +19,7 @@ Instructions to generate your Google OAuth Client ID and API Key for use with yo
    1. Click "Create Credentials" > "OAuth client ID".
    1. Choose "Web application".
    1. Set a name (e.g., "gMaelstrom").
-   1. Under "Authorized JavaScript origins", add your local URL(s) (e.g., http://localhost:3000 for dev, https://localhost for build).
+   1. Under "Authorized JavaScript origins", add your local URL(s) (e.g., http://localhost:3500 for dev, https://localhost for build).
    1. Under "Authorized redirect URIs", add (if needed) your app's redirect URI.
    1. Click "Create".
    1. Copy the "Client ID" shown to .env file in step #7

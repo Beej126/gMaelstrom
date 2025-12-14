@@ -7,7 +7,7 @@
       "type": "msedge",
       "request": "launch",
       "name": "Debug gMaelstrom (rsbuild)",
-      "url": "http://localhost:3000",
+      "url": "http://localhost:3500",
       "webRoot": "${workspaceFolder}/src",
       "preLaunchTask": "dev-server",
       "sourceMaps": true,

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg width="800px" height="800px" viewBox="0 0 24 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Modified viewBox height to 72 (3x original) and adjusted path coordinates -->
-  <path d="M5 42H19M5 30H19M5 54H19M5 18H19M5 6H19M5 66H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

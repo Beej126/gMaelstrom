@@ -1,0 +1,57 @@
+.emailHtmlReset {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  padding: 0;
+  margin: 0;
+  box-sizing: content-box;
+  word-break: break-word;
+  color: inherit;
+
+  table,
+  td,
+  tr,
+  tbody,
+  img {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-sizing: content-box !important;
+    background: none !important;
+    vertical-align: top !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: auto !important;
+    border-spacing: 0 !important;
+  }
+
+  td,
+  th {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    vertical-align: top !important;
+    line-height: 1 !important;
+  }
+
+  tr {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    height: auto !important;
+  }
+
+  tbody {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  img {
+    display: inline-block !important;
+    max-width: 100% !important;
+    height: auto !important;
+    vertical-align: middle !important;
+  }
+}

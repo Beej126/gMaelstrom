@@ -15,6 +15,9 @@ export default defineConfig({
     pluginTypeCheck(),
     pluginSass()
   ],
+  server: {
+    port: 3500,
+  },
   html: {
     title: 'gMaelstrom',
     favicon: './public/favicon.svg',
