@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { EmailProvider } from './ctxEmail';
 import { ThemeProvider } from './ctxTheme';
-import { initializeGoogleAuth, isUserAuthenticated } from '../app/googleAuthApi';
+import { initializeGoogleAuth, isUserAuthenticated } from './GAuthApi';
+import { setGmailAccessToken } from './GToken';
 import LoginPage from '../components/LoginPage';
 import MainLayout from './MainLayout';
 import EmailDetail from '../components/EmailDetail';
@@ -10,6 +11,10 @@ import LabelSettingsDialog from '../components/LabelSettingsDialog';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
+
+// Ensure tokenStore is initialized from localStorage on app startup
+const storedToken = localStorage.getItem('gMaelstrom_accessToken');
+if (storedToken) setGmailAccessToken(storedToken);
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return isUserAuthenticated() ? (

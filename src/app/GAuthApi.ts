@@ -1,4 +1,4 @@
-import { setGmailAccessToken } from '../app/gmailApi';
+import { setGmailAccessToken } from './GToken';
 
 const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
 const API_KEY = import.meta.env.PUBLIC_GOOGLE_API_KEY;
@@ -93,7 +93,7 @@ interface UserProfile {
 // Authentication state
 let isAuthenticated = false;
 let user: UserProfile | null = null;
-let accessToken: string | null = null;
+
 
 // Restore state from localStorage on load
 const storedAuth = localStorage.getItem('gMaelstrom_isAuthenticated');
@@ -101,7 +101,7 @@ const storedUser = localStorage.getItem('gMaelstrom_user');
 const storedToken = localStorage.getItem('gMaelstrom_accessToken');
 if (storedAuth === 'true' && storedUser && storedToken) {
   isAuthenticated = true;
-  accessToken = storedToken;
+    // accessToken is now managed by tokenStore
   const payload = JSON.parse(storedUser);
   user = {
     getName: () => payload.name,
@@ -109,7 +109,7 @@ if (storedAuth === 'true' && storedUser && storedToken) {
     getImageUrl: () => payload.picture,
     getId: () => payload.sub
   };
-  setGmailAccessToken(accessToken);
+    setGmailAccessToken(storedToken);
 }
 
 // Initialize the Google API client
@@ -265,7 +265,7 @@ export const signOut = (): Promise<void> => {
     }
     isAuthenticated = false;
     user = null;
-    accessToken = null;
+    // accessToken is now managed by tokenStore
     localStorage.removeItem('gMaelstrom_isAuthenticated');
     localStorage.removeItem('gMaelstrom_user');
     localStorage.removeItem('gMaelstrom_accessToken');

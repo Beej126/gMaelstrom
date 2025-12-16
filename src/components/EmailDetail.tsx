@@ -24,7 +24,8 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
 import { useEmailContext } from '../app/ctxEmail';
-import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/gmailApi';
+import { getEmailById } from '../app/GmailApi';
+import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/GmailApi';
 // import { Email } from '../types/email';
 import {
   extractHtmlContent,
@@ -141,7 +142,7 @@ const getInitials = (name: string) => {
 
 const EmailDetail: React.FC = () => {
   const { emailId } = useParams<{ emailId: string }>();
-  const { emails, selectedEmail, setSelectedEmail, updateEmailInContext } = useEmailContext();
+  const { selectedEmail, setSelectedEmail, updateEmailInContext, getCachedEmail, setCachedEmail } = useEmailContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [emailThread, setEmailThread] = useState<gapi.client.gmail.Message[]>([]);
@@ -204,35 +205,22 @@ const EmailDetail: React.FC = () => {
       if (emailId) {
         setLoading(true);
         try {
-          // Find the email by id (do not depend on selectedEmail)
-          let email = emails.find((e: gapi.client.gmail.Message) => e.id === emailId);
+          // Use cache if available
+          let email = getCachedEmail(emailId);
           if (!email) {
-            // Try to fetch the thread directly if not found in context
-            const thread = await getEmailThread(emailId);
-            if (thread && thread.length > 0) {
-              email = thread.find((e: gapi.client.gmail.Message) => e.id === emailId);
-              setEmailThread(thread);
-              processEmailAttachments(thread);
-              if (email) {
-                setSelectedEmail(email);
-                setLoading(false);
-                return;
-              }
-            }
-            setError("Email not found");
-            setTimeout(() => {
-              navigate('/');
-            }, 2000);
-          } else {
-            setSelectedEmail(email);
-            // Load the thread
-            const thread = await getEmailThread(email.threadId!);
+            email = await getEmailById(emailId);
+            setCachedEmail(email);
+          }
+          setSelectedEmail(email);
+          // Optionally, fetch the thread for context/attachments
+          if (email.threadId) {
+            const thread = await getEmailThread(email.threadId);
             setEmailThread(thread);
             processEmailAttachments(thread);
           }
         } catch (error: unknown) {
           setError(`Failed to load email: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error('Error loading email thread:', error);
+          console.error('Error loading email:', error);
         } finally {
           setLoading(false);
         }

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
-import { getEmails, getGmailLabels } from './gmailApi';
-import { isUserAuthenticated } from '../app/googleAuthApi';
+import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
+import { getEmails, getGmailLabels } from './GmailApi';
+import { isUserAuthenticated } from './GAuthApi';
 // import { Email } from '../types/email';
 
 interface EmailContextType {
@@ -24,7 +24,9 @@ interface EmailContextType {
   setLabelSettingsOpen: (open: boolean) => void;
   dynamicLabelNameMap: Record<string, string>;
   setDynamicLabelNameMap: (labels: Array<{ id: string; name: string }>) => void;
-  updateEmailInContext: (email: gapi.client.gmail.Message) => void; // <-- add to context
+  updateEmailInContext: (email: gapi.client.gmail.Message) => void;
+  getCachedEmail: (id: string) => gapi.client.gmail.Message | null;
+  setCachedEmail: (email: gapi.client.gmail.Message) => void;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -43,10 +45,18 @@ interface EmailProviderProps {
 
 export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
   const [emails, setEmails] = useState<gapi.client.gmail.Message[]>([]);
+  // In-memory cache for full email details
+  const emailCache = useRef<{ [id: string]: gapi.client.gmail.Message }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
+
+  // Helper to get/set full email details in cache
+  const getCachedEmail = (id: string) => emailCache.current[id] || null;
+  const setCachedEmail = (email: gapi.client.gmail.Message) => {
+    if (email && email.id) emailCache.current[email.id] = email;
+  };
   const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
   const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
 
@@ -261,7 +271,9 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     setLabelSettingsOpen,
     dynamicLabelNameMap,
     setDynamicLabelNameMap,
-    updateEmailInContext // <-- add to context
+    updateEmailInContext,
+    getCachedEmail,
+    setCachedEmail
   };
 
   return <EmailContext.Provider value={value}>{children}</EmailContext.Provider>;

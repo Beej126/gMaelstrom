@@ -1,32 +1,43 @@
-// import { Email } from '../types/email';
+import { refreshGmailAccessToken } from './GAuthApi';
+import { getGmailAccessToken } from './GToken';
 
-let accessToken: string | null = null;
-
-export const setGmailAccessToken = (token: string) => {
-  accessToken = token;
-  localStorage.setItem('gMaelstrom_accessToken', token);
-};
-
-// Helper to always get the latest token from localStorage if needed
-const getAccessToken = (): string | null => {
-  if (accessToken) return accessToken;
-  return localStorage.getItem('gMaelstrom_accessToken');
-};
-
-// (Removed invalid leftover type declarations)
 
 // Helper for Gmail API requests
-const gmailApiFetch = async (endpoint: string, options: RequestInit = {}) => {
-  if (!getAccessToken()) throw new Error('No access token available. Please sign in.');
+const gmailApiFetch = async (endpoint: string, options: RequestInit = {}, retry = true) => {
+  if (!getGmailAccessToken()) throw new Error('No access token available. Please sign in.');
   const url = `https://gmail.googleapis.com/gmail/v1/users/me/${endpoint}`;
   const headers = {
-    Authorization: `Bearer ${getAccessToken()}`,
+    Authorization: `Bearer ${getGmailAccessToken()}`,
     'Accept': 'application/json',
     ...options.headers,
   };
   const response = await fetch(url, { ...options, headers });
+  if (response.status === 401 && retry) {
+    // Try to refresh token and retry once
+    try {
+      await refreshGmailAccessToken();
+      // Use the new token
+      const retryHeaders = {
+        ...headers,
+        Authorization: `Bearer ${getGmailAccessToken()}`,
+      };
+      const retryResponse = await fetch(url, { ...options, headers: retryHeaders });
+      if (!retryResponse.ok) throw new Error(`Gmail API error: ${retryResponse.statusText}`);
+      return retryResponse.json();
+    } catch {
+      throw new Error('Token refresh failed. Please sign in again.');
+    }
+  }
   if (!response.ok) throw new Error(`Gmail API error: ${response.statusText}`);
-  return response.json();
+  // Gmail batchModify and some endpoints return 204 No Content or empty body
+  if (response.status === 204) return null;
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 };
 
 
@@ -34,9 +45,9 @@ const gmailApiFetch = async (endpoint: string, options: RequestInit = {}) => {
 export const getEmails = async (
   pageToken?: string,
   labelId?: string
-): Promise<{ emails: gapi.client.gmail.Message[]; nextPageToken: string | null }> => {
+): Promise<{ emails: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken: string | null }> => {
   try {
-    if (!getAccessToken()) {
+    if (!getGmailAccessToken()) {
       throw new Error('No access token available. Please sign in.');
     }
     // Use labelIds for folder filtering (Inbox, Sent, Spam, Trash, etc.)
@@ -49,11 +60,21 @@ export const getEmails = async (
     const messages = data.messages || [];
     const nextPageToken = data.nextPageToken || null;
 
-    // Fetch full email details for each message
-    const emailPromises = messages.map(async (message: { id: string }) => {
-      return await gmailApiFetch(`messages/${message.id}?format=full`);
+    if (!messages.length) return { emails: [], nextPageToken };
+
+    // Fetch message metadata in batch (using format=minimal for efficiency)
+    const emailPromises = messages.map(async (message: { id: string; threadId: string }) => {
+      // Only fetch minimal fields for list view
+      const meta = await gmailApiFetch(`messages/${message.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`);
+      return {
+        id: meta.id,
+        threadId: meta.threadId,
+        snippet: meta.snippet,
+        labelIds: meta.labelIds || [],
+        payload: meta.payload, // contains headers for From, Subject, Date
+      };
     });
-    const emails: gapi.client.gmail.Message[] = await Promise.all(emailPromises);
+    const emails = await Promise.all(emailPromises);
     return { emails, nextPageToken };
   } catch (error) {
     console.error('Error fetching emails:', error);
@@ -61,6 +82,10 @@ export const getEmails = async (
   }
 };
 
+// Fetch full message details only when needed (e.g., when user opens an email)
+export const getEmailById = async (id: string): Promise<gapi.client.gmail.Message> => {
+  return gmailApiFetch(`messages/${id}?format=full`);
+};
 export const getEmailThread = async (threadId: string): Promise<gapi.client.gmail.Message[]> => {
   try {
     const thread = await gmailApiFetch(`threads/${threadId}`);

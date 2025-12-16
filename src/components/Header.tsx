@@ -30,7 +30,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import { getUser, signOut, refreshGmailAccessToken } from '../app/googleAuthApi';
+import { getUser, signOut, refreshGmailAccessToken } from '../app/GAuthApi';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningIcon from '@mui/icons-material/Warning';
 import { useThemeContext } from '../app/ctxTheme';

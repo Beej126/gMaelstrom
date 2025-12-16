@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
 import { useEmailContext } from './ctxEmail';
-import { markEmailsAsUnread } from './gmailApi';
+import { markEmailsAsUnread } from './GmailApi';
 import './MainLayout.css';
 
 const MainLayout: React.FC = () => {

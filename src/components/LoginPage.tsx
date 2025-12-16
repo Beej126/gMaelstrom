@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signIn, isUserAuthenticated } from '../app/googleAuthApi';
+import { signIn, isUserAuthenticated } from '../app/GAuthApi';
 import { Button, Box, Typography, Container, Paper, CircularProgress, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { toast } from 'react-toastify';
 import GMaelstromIcon from './gMaelstromLogoSvg';
