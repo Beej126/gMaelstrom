@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  InputBase, 
-  Avatar, 
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  InputBase,
+  Avatar,
   IconButton,
   Box,
   Menu,
@@ -30,22 +30,33 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import { getUser, signOut } from '../app/googleAuthApi';
+import { getUser, signOut, refreshGmailAccessToken } from '../app/googleAuthApi';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningIcon from '@mui/icons-material/Warning';
 import { useThemeContext } from '../app/ctxTheme';
 import { useEmailContext } from '../app/ctxEmail';
 import GMaelstromIcon from './gMaelstromLogoSvg';
 import { toast } from 'react-toastify';
 
+const onRefreshToken = () => {
+  refreshGmailAccessToken()
+    .then(() => {
+      toast.success('Gmail API access token refreshed!');
+    })
+    .catch((err) => {
+      toast.error('Failed to refresh token: ' + err.message);
+    });
+};
+
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
   borderRadius: theme.shape.borderRadius,
-  backgroundColor: theme.palette.mode === 'dark' 
-    ? alpha(theme.palette.common.white, 0.15) 
+  backgroundColor: theme.palette.mode === 'dark'
+    ? alpha(theme.palette.common.white, 0.15)
     : alpha(theme.palette.common.black, 0.05),
   '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark' 
-      ? alpha(theme.palette.common.white, 0.25) 
+    backgroundColor: theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.25)
       : alpha(theme.palette.common.black, 0.1),
   },
   width: '100%',
@@ -101,59 +112,59 @@ const Header: React.FC = () => {
       parts[parts.length - 1].charAt(0).toUpperCase()
     );
   };
-  
-  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+
+  const onProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setProfileAnchorEl(event.currentTarget);
   };
 
-  const handleSettingsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const onSettingsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setSettingsAnchorEl(event.currentTarget);
   };
 
-  const handleProfileMenuClose = () => {
+  const onProfileMenuClose = () => {
     setProfileAnchorEl(null);
   };
 
-  const handleSettingsMenuClose = () => {
+  const onSettingsMenuClose = () => {
     setSettingsAnchorEl(null);
   };
 
-  const handleSignOut = () => {
+  const onSignOut = () => {
     signOut().then(() => {
       window.location.href = '/login';
     });
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   };
 
-  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // Implement search functionality here
     console.log('Search for:', searchQuery);
   };
 
-  // Handle theme toggle separately from menu item click
-  const handleThemeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Theme toggle separately from menu item click
+  const onThemeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     // Stop propagation to prevent the MenuItem's onClick from firing
     event.stopPropagation();
     toggleTheme();
   };
 
-  // Handle density change
-  const handleDensityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Density change
+  const onDensityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setDensity(event.target.value as 'sparse' | 'condensed');
   };
 
-  // Handle combine threads toggle
-  const handleCombineThreadsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Combine threads toggle
+  const onCombineThreadsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     event.stopPropagation();
     setCombineThreads(!combineThreads);
   };
 
-  // Handle un-ignore all warnings
-  const handleUnignoreAllWarnings = () => {
+  // Un-ignore all warnings
+  const onUnignoreAllWarnings = () => {
     // List of all localStorage keys for ignored warnings
     const warningKeys = [
       'gMaelstrom_ignoreHostWarning',
@@ -171,13 +182,13 @@ const Header: React.FC = () => {
     });
 
     // Close the settings menu
-    handleSettingsMenuClose();
+    onSettingsMenuClose();
   };
 
   return (
-    <AppBar 
-      position="static" 
-      color="default" 
+    <AppBar
+      position="static"
+      color="default"
       elevation={1}
       sx={{
         backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.background.default,
@@ -196,8 +207,8 @@ const Header: React.FC = () => {
             gMaelstrom
           </Typography>
         </Box>
-        
-        <Box component="form" onSubmit={handleSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
+
+        <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
           <Search>
             <SearchIconWrapper>
               <SearchIcon />
@@ -206,30 +217,30 @@ const Header: React.FC = () => {
               placeholder="Search mail…"
               inputProps={{ 'aria-label': 'search' }}
               value={searchQuery}
-              onChange={handleSearchChange}
+              onChange={onSearchChange}
               fullWidth
             />
           </Search>
         </Box>
-        
+
         <Box sx={{ display: 'flex' }}>
           <Tooltip title="Help">
             <IconButton size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
               <HelpOutlineIcon />
             </IconButton>
           </Tooltip>
-          
+
           <Tooltip title="Settings">
-            <IconButton 
+            <IconButton
               size="large"
-              onClick={handleSettingsMenuOpen}
+              onClick={onSettingsMenuOpen}
               aria-controls="settings-menu"
               aria-haspopup="true"
             >
               <SettingsIcon />
             </IconButton>
           </Tooltip>
-          
+
           {/* keep for now, maybe bring back later
           
           import AppsIcon from '@mui/icons-material/Apps';
@@ -239,13 +250,13 @@ const Header: React.FC = () => {
               <AppsIcon />
             </IconButton>
           </Tooltip> */}
-          
+
           <Tooltip title={user?.getName() || 'User'}>
             <IconButton
               size="large"
               edge="end"
               aria-haspopup="true"
-              onClick={handleProfileMenuOpen}
+              onClick={onProfileMenuOpen}
             >
               {user?.getImageUrl() ? (
                 <Avatar src={user.getImageUrl()} alt={user.getName() || user?.getEmail() || 'User'} />
@@ -258,13 +269,13 @@ const Header: React.FC = () => {
           </Tooltip>
         </Box>
       </Toolbar>
-      
+
       {/* Settings Menu */}
       <Menu
         id="settings-menu"
         anchorEl={settingsAnchorEl}
         open={Boolean(settingsAnchorEl)}
-        onClose={handleSettingsMenuClose}
+        onClose={onSettingsMenuClose}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         PaperProps={{
@@ -278,10 +289,10 @@ const Header: React.FC = () => {
           <Typography variant="subtitle1">Settings</Typography>
         </Box>
         <Divider />
-        <MenuItem 
-          onClick={toggleTheme} 
-          sx={{ 
-            display: 'flex', 
+        <MenuItem
+          onClick={toggleTheme}
+          sx={{
+            display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             py: 1.5
@@ -295,9 +306,9 @@ const Header: React.FC = () => {
               {mode === 'dark' ? 'Dark Mode' : 'Light Mode'}
             </ListItemText>
           </Box>
-          <Switch 
+          <Switch
             checked={mode === 'dark'}
-            onChange={handleThemeToggle}
+            onChange={onThemeToggle}
             onClick={(e) => e.stopPropagation()}
           />
         </MenuItem>
@@ -313,7 +324,7 @@ const Header: React.FC = () => {
             aria-label="density"
             name="density"
             value={density}
-            onChange={handleDensityChange}
+            onChange={onDensityChange}
             onClick={(e) => e.stopPropagation()}
             sx={{
               width: '100%',
@@ -324,25 +335,25 @@ const Header: React.FC = () => {
               gap: 1
             }}
           >
-            <FormControlLabel 
-              value="sparse" 
-              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} 
-              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Sparse</Typography>} 
+            <FormControlLabel
+              value="sparse"
+              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />}
+              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Sparse</Typography>}
               sx={{ ml: 0, mr: 2, py: 0, minHeight: 0, alignItems: 'center' }}
             />
-            <FormControlLabel 
-              value="condensed" 
-              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} 
-              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Condensed</Typography>} 
+            <FormControlLabel
+              value="condensed"
+              control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />}
+              label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Condensed</Typography>}
               sx={{ ml: 0, mr: 0, py: 0, minHeight: 0, alignItems: 'center' }}
             />
           </RadioGroup>
         </MenuItem>
         <Divider sx={{ my: 0, minHeight: 0 }} />
-        <MenuItem 
-          onClick={() => setCombineThreads(!combineThreads)} 
-          sx={{ 
-            display: 'flex', 
+        <MenuItem
+          onClick={() => setCombineThreads(!combineThreads)}
+          sx={{
+            display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             py: 1.5
@@ -354,15 +365,15 @@ const Header: React.FC = () => {
             </ListItemIcon>
             <ListItemText>Combine Threads</ListItemText>
           </Box>
-          <Switch 
+          <Switch
             checked={combineThreads}
-            onChange={handleCombineThreadsChange}
+            onChange={onCombineThreadsChange}
             onClick={(e) => e.stopPropagation()}
           />
         </MenuItem>
         <Divider sx={{ my: 0, minHeight: 0 }} />
-        <MenuItem 
-          onClick={() => { emailContext.setLabelSettingsOpen(true); handleSettingsMenuClose(); }}
+        <MenuItem
+          onClick={() => { emailContext.setLabelSettingsOpen(true); onSettingsMenuClose(); }}
           sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
         >
           <ListItemIcon>
@@ -371,8 +382,8 @@ const Header: React.FC = () => {
           <ListItemText>Label Settings</ListItemText>
         </MenuItem>
         <Divider sx={{ my: 0, minHeight: 0 }} />
-        <MenuItem 
-          onClick={handleUnignoreAllWarnings}
+        <MenuItem
+          onClick={onUnignoreAllWarnings}
           sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
         >
           <ListItemIcon>
@@ -381,13 +392,13 @@ const Header: React.FC = () => {
           <ListItemText>Un-Ignore All Warnings</ListItemText>
         </MenuItem>
       </Menu>
-      
+
       {/* Profile Menu */}
       <Menu
         id="profile-menu"
         anchorEl={profileAnchorEl}
         open={Boolean(profileAnchorEl)}
-        onClose={handleProfileMenuClose}
+        onClose={onProfileMenuClose}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         PaperProps={{
@@ -410,18 +421,24 @@ const Header: React.FC = () => {
           href={user?.getEmail() ? `https://myaccount.google.com/?authuser=${encodeURIComponent(user.getEmail())}` : 'https://myaccount.google.com'}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={handleProfileMenuClose}
+          onClick={onProfileMenuClose}
         >
           <ListItemIcon>
             <PersonIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>My account</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleSignOut}>
+        <MenuItem onClick={onSignOut}>
           <ListItemIcon>
             <LogoutIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Sign out</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={onRefreshToken}>
+          <ListItemIcon>
+            <RefreshIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Refresh Auth Token</ListItemText>
         </MenuItem>
       </Menu>
     </AppBar>

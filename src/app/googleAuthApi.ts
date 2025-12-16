@@ -1,10 +1,40 @@
 import { setGmailAccessToken } from '../app/gmailApi';
 
-// Access environment variables directly with full references 
 const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
 const API_KEY = import.meta.env.PUBLIC_GOOGLE_API_KEY;
 
-// TypeScript interfaces for Google Identity Services
+
+// Developer utility: refresh Gmail API access token
+export const refreshGmailAccessToken = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (window.google?.accounts?.oauth2) {
+            window.google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: [
+                    'https://www.googleapis.com/auth/gmail.readonly',
+                    'https://www.googleapis.com/auth/gmail.modify',
+                    'profile',
+                    'email'
+                ].join(' '),
+                callback: (tokenResponse: GoogleTokenResponse) => {
+                    if (tokenResponse.access_token) {
+                        setGmailAccessToken(tokenResponse.access_token);
+                        localStorage.setItem('gMaelstrom_accessToken', tokenResponse.access_token);
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to refresh access token'));
+                    }
+                }
+            }).requestAccessToken();
+        } else {
+            reject(new Error('Google OAuth2 not initialized'));
+        }
+    });
+};
+
+
+// for some reason Google hasn't provided standardized @types for their new Identity Services yet
+//   all google's sample code so far either uses untyped JS or custom interfaces like below
 interface GoogleCredentialResponse {
     credential: string;
     select_by: string;
@@ -131,23 +161,38 @@ const initClient = async () => {
   }
 };
 
+
+// Always request a real OAuth access token for Gmail API
 const handleCredentialResponse = (response: GoogleCredentialResponse) => {
-    // Decode JWT token to get user info
+    // Decode JWT token to get user info (for display only)
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    
     user = {
         getName: () => payload.name,
         getEmail: () => payload.email,
         getImageUrl: () => payload.picture,
         getId: () => payload.sub
     };
-
     isAuthenticated = true;
     localStorage.setItem('gMaelstrom_isAuthenticated', 'true');
     localStorage.setItem('gMaelstrom_user', JSON.stringify(payload));
-    localStorage.setItem('gMaelstrom_accessToken', response.credential);
-
-    setGmailAccessToken(response.credential);
+    // Now request a real OAuth access token for Gmail API
+    if (window.google?.accounts?.oauth2) {
+        window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: [
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.modify',
+                'profile',
+                'email'
+            ].join(' '),
+            callback: (tokenResponse: GoogleTokenResponse) => {
+                if (tokenResponse.access_token) {
+                    setGmailAccessToken(tokenResponse.access_token);
+                    localStorage.setItem('gMaelstrom_accessToken', tokenResponse.access_token);
+                }
+            }
+        }).requestAccessToken();
+    }
 };
 
 export const signIn = (): Promise<void> => {

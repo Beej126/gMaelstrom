@@ -11,10 +11,6 @@
   overflow: hidden;
 }
 
-.sidebar-container {
-  overflow-y: auto;
-  position: relative; /* Added for resize handle positioning */
-}
 
 .email-content {
   flex: 1; /* Take remaining space */
@@ -24,16 +20,13 @@
   overflow: hidden;
 }
 
-/* Hyperlink styling for dark mode */
-/* @media (prefers-color-scheme: dark) { */
-  .email-content a {
-    color: var(--email-content-a, unset);
-  }
+.email-content a {
+  color: var(--email-content-a, unset);
+}
 
-  .email-content a:hover {
-    text-decoration: underline;
-  }
-/* } */
+.email-content a:hover {
+  text-decoration: underline;
+}
 
 .email-header {
   display: flex;
@@ -42,76 +35,4 @@
   height: 48px;
   background-color: var(--email-header-bg, #1e1e1e);
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-}
-
-/* Resizable sidebar styles */
-.resize-handle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 8px;
-  height: 100%;
-  cursor: ew-resize;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.resize-handle:hover,
-.resize-handle.dragging {
-  background-color: var(--resize-handle-color, rgba(33, 150, 243, 0.4));
-}
-
-.drag-handle-icon {
-  height: 40px;
-  width: 3px;
-  background-color: transparent;
-  position: relative;
-  transition: background-color 0.2s;
-}
-
-.resize-handle:hover .drag-handle-icon,
-.resize-handle.dragging .drag-handle-icon {
-  background-color: var(--drag-handle-color, rgba(255, 255, 255, 0.5));
-}
-
-/* Classic drag handle dots pattern */
-.drag-handle-icon::before,
-.drag-handle-icon::after {
-  content: "";
-  position: absolute;
-  left: -2px;
-  width: 1px;
-  height: 100%;
-  background-image: linear-gradient(
-    to bottom,
-    var(--drag-handle-dots, rgba(200, 200, 200, 0.5)) 40%,
-    transparent 40%
-  );
-  background-size: 1px 6px;
-  background-repeat: repeat-y;
-}
-
-.drag-handle-icon::after {
-  left: 4px;
-}
-
-/* For smaller screens, switch to a stacked layout */
-@media (max-width: 768px) {
-  .content-grid {
-    flex-direction: column;
-  }
-  
-  .sidebar-container,
-  .resizable-sidebar {
-    max-height: 200px !important;
-    width: 100% !important;
-    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  }
-  
-  .resize-handle {
-    display: none; /* Hide resize handle on small screens */
-  }
 }
