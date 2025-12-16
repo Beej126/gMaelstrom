@@ -1,5 +1,5 @@
 
-// --- RSBuild (Vite alternative) environment variable types ---
+// --- RSBuild environment variable types ---
 /// <reference types="@rsbuild/core/types" />
 
 // --- Google API TypeScript type definitions ---
@@ -34,4 +34,7 @@ declare module '*.svg' {
   export default src;
 }
 
-
+interface Expando {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}

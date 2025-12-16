@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signIn, isUserAuthenticated } from '../services/authService';
+import { signIn, isUserAuthenticated } from '../app/googleAuthApi';
 import { Button, Box, Typography, Container, Paper, CircularProgress, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { toast } from 'react-toastify';
-import GMaelstromIcon from '../components/gMaelstromIcon';
-import { useEmailContext } from '../context/EmailContext';
+import GMaelstromIcon from './gMaelstromLogoSvg';
+import { useEmailContext } from '../app/ctxEmail';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();

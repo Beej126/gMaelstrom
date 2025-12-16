@@ -5,6 +5,12 @@ import { pluginTypeCheck } from "@rsbuild/plugin-type-check";
 import { pluginSass } from '@rsbuild/plugin-sass';
 
 export default defineConfig({
+  source: {
+    entry: {
+      index: './src/app/index.tsx',
+    },
+  },
+
   plugins: [
     pluginReact(),
     pluginSvgr({
@@ -15,9 +21,11 @@ export default defineConfig({
     pluginTypeCheck(),
     pluginSass()
   ],
+
   server: {
     port: 3500,
   },
+
   html: {
     title: 'gMaelstrom',
     favicon: './public/favicon.svg',

@@ -30,11 +30,11 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import { getUser, signOut } from '../services/authService';
+import { getUser, signOut } from '../app/googleAuthApi';
 import WarningIcon from '@mui/icons-material/Warning';
-import { useThemeContext } from '../context/ThemeContext';
-import { useEmailContext } from '../context/EmailContext';
-import GMaelstromIcon from './gMaelstromIcon';
+import { useThemeContext } from '../app/ctxTheme';
+import { useEmailContext } from '../app/ctxEmail';
+import GMaelstromIcon from './gMaelstromLogoSvg';
 import { toast } from 'react-toastify';
 
 const Search = styled('div')(({ theme }) => ({

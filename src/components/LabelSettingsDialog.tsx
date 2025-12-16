@@ -8,7 +8,7 @@ import {
     Box
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useEmailContext } from '../context/EmailContext';
+import { useEmailContext } from '../app/ctxEmail';
 
 const LabelSettingsDialog: React.FC = () => {
     const {

@@ -1,4 +1,4 @@
-import { setGmailAccessToken } from './gmailService';
+import { setGmailAccessToken } from '../app/gmailApi';
 
 // Access environment variables directly with full references 
 const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;

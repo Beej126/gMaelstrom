@@ -1,3 +1,11 @@
+interface EmailItemProps {
+  email: gapi.client.gmail.Message;
+  selected: boolean;
+  onCheckboxClick: (emailId: string, checked: boolean) => void;
+  isChecked: boolean;
+  threadCount: number;
+  labelVisibility: Record<string, boolean>;
+}
 import React, { useState, useEffect } from 'react';
 import {
   Typography,
@@ -8,22 +16,19 @@ import {
   Button,
   CircularProgress
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { useEmailContext } from '../context/EmailContext';
-import { useThemeContext } from '../context/ThemeContext';
-import { Email } from '../types/email';
+import { useEmailContext } from '../app/ctxEmail';
+import {
+  getFrom,
+  getSubject,
+  getDate,
+  isRead
+} from '../helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
-import { useNavigate } from 'react-router-dom';
+import { useThemeContext } from '../app/ctxTheme';
 
-interface EmailItemProps {
-  email: Email;
-  selected: boolean;
-  onCheckboxClick: (emailId: string, checked: boolean) => void;
-  isChecked: boolean;
-  threadCount: number;
-  labelVisibility: Record<string, boolean>;
-}
 
 const EmailItem: React.FC<EmailItemProps> = ({
   email,
@@ -40,7 +45,9 @@ const EmailItem: React.FC<EmailItemProps> = ({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onCheckboxClick(email.id, !isChecked);
+    if (email.id) {
+      onCheckboxClick(email.id, !isChecked);
+    }
   };
 
   const handleEmailClick = () => {
@@ -54,7 +61,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
       tabIndex={0}
       onClick={handleEmailClick}
       style={{
-        background: selected ? theme.palette.action.selected : (email.isRead ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
+        background: selected ? theme.palette.action.selected : (isRead(email) ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
         borderBottom: theme.palette.mode === 'light' ? '1px solid #f5f5f5' : '1px solid #333333',
         height: itemHeight,
         cursor: 'pointer',
@@ -82,8 +89,8 @@ const EmailItem: React.FC<EmailItemProps> = ({
       {/* Labels */}
       <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden' }}>
         {email.labelIds && email.labelIds.length > 0 && email.labelIds
-          .filter(label => labelVisibility[label] !== false) // Only show if ON or not set
-          .map(label => (
+          .filter((label: string) => labelVisibility[label] !== false)
+          .map((label: string) => (
             <Chip
               key={label}
               label={prettifyLabel(label)}
@@ -109,17 +116,17 @@ const EmailItem: React.FC<EmailItemProps> = ({
         component="span"
         sx={{
           gridColumn: 3,
-          fontSize: fontSize.primary,
-          fontWeight: email.isRead ? 500 : fontWeight.emailListFrom,
-          color: theme => email.isRead ? theme.palette.text.secondary : theme.palette.text.primary,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          mr: 1,
-          opacity: email.isRead ? 0.85 : 1
+            fontSize: fontSize.primary,
+            fontWeight: isRead(email) ? 500 : fontWeight.emailListFrom,
+            color: theme => isRead(email) ? theme.palette.text.secondary : theme.palette.text.primary,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            mr: 1,
+            opacity: isRead(email) ? 0.85 : 1
         }}
       >
-        {email.from}
+          {getFrom(email)}
       </Typography>
       {/* Subject and Snippet */}
       <div style={{ gridColumn: 4, display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>
@@ -127,15 +134,15 @@ const EmailItem: React.FC<EmailItemProps> = ({
           sx={{
             mr: 1,
             fontSize: fontSize.primary,
-            fontWeight: email.isRead ? 500 : fontWeight.emailListSubject,
-            color: theme => email.isRead ? theme.palette.text.secondary : theme.palette.text.primary,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            opacity: email.isRead ? 0.85 : 1
+              fontWeight: isRead(email) ? 500 : fontWeight.emailListSubject,
+              color: theme => isRead(email) ? theme.palette.text.secondary : theme.palette.text.primary,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              opacity: isRead(email) ? 0.85 : 1
           }}
         >
-          {email.subject}
+            {getSubject(email)}
         </Typography>
         <Typography
           sx={{
@@ -143,17 +150,18 @@ const EmailItem: React.FC<EmailItemProps> = ({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             maxWidth: '50%',
-            opacity: email.isRead ? 0.7 : 0.8,
+              opacity: isRead(email) ? 0.7 : 0.8,
             fontSize: fontSize.secondary,
             color: 'text.secondary'
           }}
         >
-          - {email.gapiMessage.snippet}
+            - {email.snippet}
         </Typography>
       </div>
       {/* Attachment icon */}
       <div style={{ gridColumn: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {email.hasAttachments && (
+        {/* Show attachment icon if email has any attachment part */}
+        {email.payload && Array.isArray(email.payload.parts) && email.payload.parts.some((part) => part.filename && part.filename.length > 0) && (
           <AttachFileIcon
             fontSize={density === 'condensed' ? 'inherit' : 'small'}
             sx={{
@@ -183,7 +191,7 @@ const EmailItem: React.FC<EmailItemProps> = ({
           color: 'text.secondary'
         }}
       >
-        {formatDistanceToNow(new Date(email.date), { addSuffix: false })}
+          {formatDistanceToNow(new Date(getDate(email)), { addSuffix: false })}
       </Typography>
     </div>
   );
@@ -209,22 +217,22 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
   const setCheckedEmails = setCheckedEmailsProp ?? internalSetCheckedEmails;
   const theme = useTheme();
 
-  // Initialize from email data
-  React.useEffect(() => {
-    const initialStarred: Record<string, boolean> = {};
-    emails.forEach(email => {
-      if (email.isStarred) initialStarred[email.id] = true;
+  // Initialize checkedEmails from email data
+  useEffect(() => {
+    const initialChecked: Record<string, boolean> = {};
+    emails.forEach((email: gapi.client.gmail.Message) => {
+      if (email.id) initialChecked[email.id] = false;
     });
-    setCheckedEmails(initialStarred);
-  }, []);
+    setCheckedEmails(initialChecked);
+  }, [emails]);
 
   // Ensure checkedEmails always has all visible email IDs as keys
   useEffect(() => {
     if (!checkedEmailsProp || !setCheckedEmailsProp) return;
     const newChecked: Record<string, boolean> = { ...checkedEmails };
     let changed = false;
-    emails.forEach(email => {
-      if (!(email.id in newChecked)) {
+    emails.forEach((email: gapi.client.gmail.Message) => {
+      if (email.id && !(email.id in newChecked)) {
         newChecked[email.id] = false;
         changed = true;
       }
@@ -237,6 +245,7 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
       }
     });
     if (changed) setCheckedEmails(newChecked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emails, selectedEmail]);
 
   const handleCheckboxClick = (emailId: string, checked: boolean) => {
@@ -253,7 +262,7 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
   return (
     <>
       <div
-        key={emails.map(e => e.id + (e.isRead ? 'r' : 'u')).join(',') + (selectedEmail ? selectedEmail.id : '')}
+        key={emails.map(e => e.id + ((e.labelIds || []).includes('UNREAD') ? 'u' : 'r')).join(',') + (selectedEmail ? selectedEmail.id : '')}
         style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px", paddingRight: '0.5em' }}
       >
         {/* Header row for accessibility (optional) */}
@@ -271,8 +280,8 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
               email={email}
               selected={selectedEmail?.id === email.id}
               onCheckboxClick={handleCheckboxClick}
-              isChecked={!!checkedEmails[email.id]}
-              threadCount={emails.filter(e => e.gapiMessage.threadId === email.gapiMessage.threadId).length}
+              isChecked={!!(email.id && checkedEmails[email.id])}
+              threadCount={emails.filter((e) => e.threadId && email.threadId && e.threadId === email.threadId).length}
               labelVisibility={labelVisibility}
             />
           ))

@@ -1,4 +1,46 @@
-import { Email } from '../types/email';
+// Extract the 'From' field from a Gmail message
+export const getFrom = (message: gapi.client.gmail.Message): string => {
+  const headers = message.payload?.headers || [];
+  const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
+  return fromHeader?.value || '';
+};
+
+// Extract the 'To' field from a Gmail message
+export const getTo = (message: gapi.client.gmail.Message): string[] => {
+  const headers = message.payload?.headers || [];
+  const toHeader = headers.find(h => h.name?.toLowerCase() === 'to');
+  if (!toHeader?.value) return [];
+  // Split by comma and trim
+  return toHeader.value.split(',').map(addr => addr.trim());
+};
+
+// Extract the 'Subject' field from a Gmail message
+export const getSubject = (message: gapi.client.gmail.Message): string => {
+  const headers = message.payload?.headers || [];
+  const subjectHeader = headers.find(h => h.name?.toLowerCase() === 'subject');
+  return subjectHeader?.value || '';
+};
+
+// Extract the date from a Gmail message (as ISO string)
+export const getDate = (message: gapi.client.gmail.Message): string => {
+  const headers = message.payload?.headers || [];
+  const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date');
+  if (!dateHeader?.value) return '';
+  // Try to parse the date string
+  const date = new Date(dateHeader.value);
+  return isNaN(date.getTime()) ? '' : date.toISOString();
+};
+
+// Check if a Gmail message is read
+export const isRead = (message: gapi.client.gmail.Message): boolean => {
+  return !(message.labelIds || []).includes('UNREAD');
+};
+
+// Check if a Gmail message is starred
+export const isStarred = (message: gapi.client.gmail.Message): boolean => {
+  return (message.labelIds || []).includes('STARRED');
+};
+
 
 // Helper function to decode base64 content
 export const decodeBase64 = (data: string): string => {
@@ -18,7 +60,7 @@ export const decodeBase64 = (data: string): string => {
         .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
         .join('')
     );
-  } catch (e) {
+  } catch {
     try {
       // Second attempt: decode directly
       const decoded = atob(base64);
@@ -116,8 +158,7 @@ export const processEmailContentForDarkMode = (htmlContent: string, isDarkMode: 
     Array.from(node.children).forEach(child => processNode(child as HTMLElement));
   };
   
-  // Start processing from the root elements
-  Array.from(tempDiv.children).forEach(processNode as any);
+  Array.from(tempDiv.children).forEach(node => processNode(node as HTMLElement));
   
   // Remove any <style> tags that might contain color definitions
   const styleTags = tempDiv.querySelectorAll('style');
@@ -129,46 +170,37 @@ export const processEmailContentForDarkMode = (htmlContent: string, isDarkMode: 
   return tempDiv.innerHTML;
 }
 
-// Helper function to extract HTML content from a multipart email
-export const extractHtmlContent = (email: any): string => {
-  // Check if the email has a simple body
-  if (email.body?.data) {
-    return sanitizeHtmlContent(decodeBase64(email.body.data));
+// Helper function to extract HTML content from a Gmail message or message part
+export const extractHtmlContent = (item: gapi.client.gmail.Message | gapi.client.gmail.MessagePart): string => {
+  const payload = (item as gapi.client.gmail.Message).payload ? (item as gapi.client.gmail.Message).payload : (item as gapi.client.gmail.MessagePart);
+  // Check if the payload has a simple body
+  if (payload && payload.body && payload.body.data) {
+    return sanitizeHtmlContent(decodeBase64(payload.body.data));
   }
-  
   // Check for multipart content
-  if (email.parts) {
+  if (payload && payload.parts) {
     // First try to find HTML part
-    const htmlPart = email.parts.find((part: any) => 
-      part.mimeType === 'text/html' && part.body?.data
-    );
-    
-    if (htmlPart && htmlPart.body?.data) {
+    const htmlPart = payload.parts.find((part: gapi.client.gmail.MessagePart) => part.mimeType === 'text/html' && part.body && part.body.data);
+    if (htmlPart && htmlPart.body && htmlPart.body.data) {
       return sanitizeHtmlContent(decodeBase64(htmlPart.body.data));
     }
-    
     // If no HTML, try to find plain text part
-    const textPart = email.parts.find((part: any) => 
-      part.mimeType === 'text/plain' && part.body?.data
-    );
-    
-    if (textPart && textPart.body?.data) {
+    const textPart = payload.parts.find((part: gapi.client.gmail.MessagePart) => part.mimeType === 'text/plain' && part.body && part.body.data);
+    if (textPart && textPart.body && textPart.body.data) {
       const plainText = decodeBase64(textPart.body.data);
       // Convert plain text to HTML with line breaks
       return plainText.replace(/\n/g, '<br/>');
     }
-    
     // Check for nested multipart content
-    for (const part of email.parts) {
+    for (const part of payload.parts) {
       if (part.parts) {
         const nestedContent = extractHtmlContent(part);
         if (nestedContent) return nestedContent;
       }
     }
   }
-  
   return '';
-};
+}
 
 // Find and extract inline attachments (images) from email parts
 export interface InlineAttachment {
@@ -181,59 +213,43 @@ export interface InlineAttachment {
 
 export const extractInlineAttachments = (emailId: string, email: gapi.client.gmail.MessagePart): Record<string, InlineAttachment> => {
   const attachments: Record<string, InlineAttachment> = {};
-  
-  const processEmailPart = (part: any) => {
+  const processEmailPart = (part: gapi.client.gmail.MessagePart) => {
     // Look for parts with content IDs (typically inline images)
-    const contentIdHeader = (part.headers || []).find((h: any) => 
-      h.name.toLowerCase() === 'content-id' || h.name.toLowerCase() === 'x-attachment-id'
+    const contentIdHeader = (part.headers || []).find((h: gapi.client.gmail.MessagePartHeader) =>
+      h.name && (h.name.toLowerCase() === 'content-id' || h.name.toLowerCase() === 'x-attachment-id')
     );
-    
-    const contentDisposition = (part.headers || []).find((h: any) => 
-      h.name.toLowerCase() === 'content-disposition'
+    const contentDisposition = (part.headers || []).find((h: gapi.client.gmail.MessagePartHeader) =>
+      h.name && h.name.toLowerCase() === 'content-disposition'
     );
-    
-    const isInline = contentDisposition && 
+    const isInline = contentDisposition && typeof contentDisposition.value === 'string' &&
       contentDisposition.value.toLowerCase().includes('inline');
-    
     // If we have a content ID, this might be an inline attachment
-    if (contentIdHeader && (isInline || part.mimeType.startsWith('image/'))) {
-      // Extract the content ID, removing angle brackets if present
-      let contentId = contentIdHeader.value.replace(/[<>]/g, '');
-      
+    if (contentIdHeader && (isInline || (typeof part.mimeType === 'string' && part.mimeType.startsWith('image/')))) {
+      const contentId = (contentIdHeader.value || '').replace(/[<>]/g, '');
       const attachment: InlineAttachment = {
         contentId: contentId,
         mimeType: part.mimeType || 'application/octet-stream'
       };
-      
       // If data is available immediately, use it
       if (part.body?.data) {
         attachment.data = part.body.data;
-      } 
-      // Otherwise store the attachmentId for later fetching
-      else if (part.body?.attachmentId) {
+      } else if (part.body?.attachmentId) {
         attachment.attachmentId = part.body.attachmentId;
         attachment.messageId = emailId;
       }
-      
-      // Store both the full Content-ID and just the filename part for more robust matching
       attachments[contentId] = attachment;
-      
       // For Content-IDs like "image001.jpg@01DB4F99.B8666330", also store with just "image001.jpg"
       const filenamePart = contentId.split('@')[0];
       if (filenamePart && filenamePart !== contentId) {
         attachments[filenamePart] = attachment;
       }
     }
-    
     // Recursively check nested parts
     if (part.parts) {
       part.parts.forEach(processEmailPart);
     }
   };
-  
-  // Start processing from the email payload
   processEmailPart(email);
-  
   return attachments;
 };
 
@@ -342,56 +358,43 @@ const guessMimeType = (base64Data: string): string => {
   return 'application/octet-stream';
 };
 
-// Extract a specific header value from headers array
-const getHeader = (headers: any[], name: string): string => {
-  const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
-  return header ? header.value : '';
-};
+// (getHeader removed: unused)
 
 // Helper to check if an email has attachments
-const hasAttachments = (message: any): boolean => {
+export const hasAttachments = (message: gapi.client.gmail.Message): boolean => {
   // Check if there's a label that indicates attachments
   if ((message.labelIds || []).includes('HAS_ATTACHMENT')) {
     return true;
   }
-  
   // If no label, check the payload structure
   const payload = message.payload;
-  
   // Function to recursively check parts for attachments
-  const checkPartsForAttachments = (parts: any[]): boolean => {
+  const checkPartsForAttachments = (parts?: gapi.client.gmail.MessagePart[]): boolean => {
     if (!parts || !Array.isArray(parts)) return false;
-    
     for (const part of parts) {
       // Check if this part is an attachment (has filename and not inline)
       if (part.filename && part.filename.length > 0) {
         // Exclude inline images which are often not considered "attachments" by users
-        const contentDispositionHeader = (part.headers || []).find((h: any) => 
-          h.name.toLowerCase() === 'content-disposition'
+        const contentDispositionHeader = (part.headers || []).find((h: gapi.client.gmail.MessagePartHeader) =>
+          h.name && h.name.toLowerCase() === 'content-disposition'
         );
-        const isInline = contentDispositionHeader && 
+        const isInline = contentDispositionHeader && typeof contentDispositionHeader.value === 'string' &&
           contentDispositionHeader.value.toLowerCase().includes('inline');
-        
         // If it's not an inline image or if the filename looks like an attachment
-        if (!isInline || !part.mimeType.startsWith('image/')) {
+        if (!isInline || !(typeof part.mimeType === 'string' && part.mimeType.startsWith('image/'))) {
           return true;
         }
       }
-      
       // Recursively check nested parts
       if (part.parts && checkPartsForAttachments(part.parts)) {
         return true;
       }
     }
-    
     return false;
   };
-  
-  // Check parts for attachments
-  if (payload.parts) {
+  if (payload && payload.parts) {
     return checkPartsForAttachments(payload.parts);
   }
-  
   // No parts to check
   return false;
 };
@@ -406,46 +409,43 @@ export interface Attachment {
   data?: string; // Base64 encoded data
 }
 
-export const extractAttachments = (emailPayload: any): Attachment[] => {
+export const extractAttachments = (emailPayload: gapi.client.gmail.MessagePart): Attachment[] => {
   const attachments: Attachment[] = [];
   
-  const processEmailPart = (part: any, partId: string = '') => {
+  const processEmailPart = (part: gapi.client.gmail.MessagePart, partId: string = '') => {
     // Skip parts with no bodies
     if (!part) return;
     
     // Check if this part has a filename (typical for attachments)
     if (part.filename && part.filename.length > 0) {
       // Get the content disposition to check if it's an attachment vs inline image
-      const contentDisposition = (part.headers || []).find((h: any) => 
-        h.name.toLowerCase() === 'content-disposition'
+      const contentDisposition = (part.headers || []).find((h: gapi.client.gmail.MessagePartHeader) => 
+        h.name && h.name.toLowerCase() === 'content-disposition'
       );
 
-      const isInline = contentDisposition && 
-        contentDisposition.value.toLowerCase().includes('inline') && 
-        part.mimeType.startsWith('image/');
-      
+      const isInline = contentDisposition && typeof contentDisposition.value === 'string' &&
+        contentDisposition.value.toLowerCase().includes('inline') &&
+        typeof part.mimeType === 'string' && part.mimeType.startsWith('image/');
       // If it's not inline or it has a distinct filename, consider it an attachment
       if (!isInline || part.filename.length > 3) {
         const attachment: Attachment = {
           id: partId || part.partId || `attachment-${attachments.length + 1}`,
           filename: part.filename,
-          mimeType: part.mimeType,
+          mimeType: part.mimeType || 'application/octet-stream',
           size: part.body?.size || 0,
           attachmentId: part.body?.attachmentId
         };
-        
         // If small attachment data is already in the response, include it
         if (part.body?.data) {
           attachment.data = part.body.data;
         }
-        
         attachments.push(attachment);
       }
     }
     
     // Recursively process nested parts
     if (part.parts && Array.isArray(part.parts)) {
-      part.parts.forEach((nestedPart: any, index: number) => {
+      part.parts.forEach((nestedPart: gapi.client.gmail.MessagePart, index: number) => {
         const nestedPartId = partId ? `${partId}.${index + 1}` : `${index + 1}`;
         processEmailPart(nestedPart, nestedPartId);
       });
@@ -469,72 +469,4 @@ export const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Convert Gmail API message to our Email interface
-export const parseEmailData = (message: gapi.client.gmail.Message): Email => {
-  const headers = message.payload?.headers ?? [];
-  
-  const from = getHeader(headers, 'From');
-  const to = getHeader(headers, 'To').split(',').map((email: string) => email.trim());
-  const subject = getHeader(headers, 'Subject');
-  const dateStr = getHeader(headers, 'Date');
-  
-  // Parse email body
-  // let body = '';
-  // const mimeType = message.payload?.mimeType;
-  
-  // if (mimeType === 'text/plain' || mimeType === 'text/html') {
-  //   body = !!message.payload?.body?.data 
-  //     ? decodeBase64(message.payload.body.data)
-  //     : '';
-  // } else if (message.payload?.parts) {
-  //   // Multipart email, try to find text parts
-  //   const textPart = message.payload.parts.find((part: any) => 
-  //     part.mimeType === 'text/plain' || part.mimeType === 'text/html'
-  //   );
-    
-  //   if (textPart && textPart.body && textPart.body.data) {
-  //     body = decodeBase64(textPart.body.data);
-  //   }
-  // }
-  
-  // Check if any label indicates the email is read
-  const isRead = !(message.labelIds || []).includes('UNREAD');
-  
-  // Check if any label indicates the email is starred
-  const isStarred = (message.labelIds || []).includes('STARRED');
-  
-  // Check if any label indicates the email is important
-  const isImportant = (message.labelIds || []).includes('IMPORTANT');
-  
-  // Determine category based on labels
-  let category = 'Inbox';
-  if ((message.labelIds || []).includes('SENT')) {
-    category = 'Sent';
-  } else if ((message.labelIds || []).includes('DRAFT')) {
-    category = 'Drafts';
-  } else if ((message.labelIds || []).includes('SPAM')) {
-    category = 'Spam';
-  } else if ((message.labelIds || []).includes('TRASH')) {
-    category = 'Trash';
-  }
-
-  // Check for attachments
-  const hasEmailAttachments = hasAttachments(message);
-
-  if (!message.id) throw new Error('gMail Message ID came back undefined. Lots of logic depends on this being populated.');
-
-  return {
-    id: message.id!,
-    labelIds: message.labelIds || [],
-    gapiMessage: message,
-    from,
-    to,
-    subject,
-    date: new Date(dateStr),
-    isRead,
-    isStarred,
-    isImportant,
-    category,
-    hasAttachments: hasEmailAttachments
-  };
-};
+// No longer needed: parseEmailData. Use gapi.client.gmail.Message directly throughout the app.

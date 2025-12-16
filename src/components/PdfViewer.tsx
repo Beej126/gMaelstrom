@@ -11,7 +11,7 @@ import {
   Paper
 } from '@mui/material';
 import { Close as CloseIcon} from '@mui/icons-material';
-import { Attachment } from '../utils/emailParser';
+import { Attachment } from '../helpers/emailParser';
 
 interface PdfViewerProps {
   open: boolean;

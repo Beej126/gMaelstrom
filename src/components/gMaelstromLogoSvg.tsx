@@ -1,11 +1,11 @@
 import React from 'react';
 import { SvgIcon, SvgIconProps } from '@mui/material';
 
-interface gMaelstromIconProps extends SvgIconProps {
+interface gMaelstromLogoSvgProps extends SvgIconProps {
   fontSize?: 'inherit' | 'small' | 'medium' | 'large';
 }
 
-const GMaelstromIcon: React.FC<gMaelstromIconProps> = (props) => {
+const GMaelstromLogoSvg: React.FC<gMaelstromLogoSvgProps> = (props) => {
   return (
     <SvgIcon {...props} viewBox="0 0 24 24">
       {/* Base Email Envelope Icon */}
@@ -24,4 +24,4 @@ const GMaelstromIcon: React.FC<gMaelstromIconProps> = (props) => {
   );
 };
 
-export default GMaelstromIcon;
+export default GMaelstromLogoSvg;

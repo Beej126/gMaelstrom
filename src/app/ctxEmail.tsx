@@ -1,15 +1,15 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
-import { getEmails, getGmailLabels } from '../services/gmailService';
-import { isUserAuthenticated } from '../services/authService';
-import { Email } from '../types/email';
+import { getEmails, getGmailLabels } from './gmailApi';
+import { isUserAuthenticated } from '../app/googleAuthApi';
+// import { Email } from '../types/email';
 
 interface EmailContextType {
-  emails: Email[];
+  emails: gapi.client.gmail.Message[];
   loading: boolean;
   error: string | null;
-  selectedEmail: Email | null;
-  setSelectedEmail: (email: Email | null) => void;
-  fetchEmails: () => Promise<Email[]>;
+  selectedEmail: gapi.client.gmail.Message | null;
+  setSelectedEmail: (email: gapi.client.gmail.Message | null) => void;
+  fetchEmails: () => Promise<gapi.client.gmail.Message[]>;
   loadMoreEmails: () => Promise<void>;
   hasMoreEmails: boolean;
   categories: string[];
@@ -24,7 +24,7 @@ interface EmailContextType {
   setLabelSettingsOpen: (open: boolean) => void;
   dynamicLabelNameMap: Record<string, string>;
   setDynamicLabelNameMap: (labels: Array<{ id: string; name: string }>) => void;
-  updateEmailInContext: (email: Email) => void; // <-- add to context
+  updateEmailInContext: (email: gapi.client.gmail.Message) => void; // <-- add to context
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -42,11 +42,11 @@ interface EmailProviderProps {
 }
 
 export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
-  const [emails, setEmails] = useState<Email[]>([]);
+  const [emails, setEmails] = useState<gapi.client.gmail.Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
   const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
   const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
 
@@ -104,7 +104,7 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
   }, []);
 
   // In fetchEmails and loadMoreEmails, use the correct labelIds for each category
-  const fetchEmails = useCallback(async () => {
+  const fetchEmails = useCallback(async (): Promise<gapi.client.gmail.Message[]> => {
     if (!isUserAuthenticated()) {
       setEmails([]);
       setLoading(false);
@@ -122,14 +122,14 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
         'Trash': 'TRASH',
       };
       const labelId = labelMap[selectedCategory] || 'INBOX';
-      const result = await getEmails(null, labelId);
+      const result = await getEmails(undefined, labelId);
       setEmails(result.emails);
       setPageToken(result.nextPageToken);
       setHasMoreEmails(!!result.nextPageToken);
       setError(null);
       return result.emails;
-    } catch (err: any) {
-      setError(`Failed to fetch emails: ${err.message || 'Unknown error'}`);
+    } catch (err) {
+      setError(`Failed to fetch emails: ${err instanceof Error ? err.message : 'Unknown error'}`);
       console.error('Error fetching emails:', err);
       return [];
     } finally {
@@ -158,8 +158,8 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
       setEmails(prevEmails => [...prevEmails, ...result.emails]);
       setPageToken(result.nextPageToken);
       setHasMoreEmails(!!result.nextPageToken);
-    } catch (err: any) {
-      setError(`Failed to load more emails: ${err.message || 'Unknown error'}`);
+    } catch (err) {
+      setError(`Failed to load more emails: ${err instanceof Error ? err.message : 'Unknown error'}`);
       console.error('Error loading more emails:', err);
     } finally {
       setLoading(false);
@@ -182,60 +182,59 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     if (isUserAuthenticated()) {
       fetchEmails();
     }
-  }, [selectedCategory]);
+  }, [fetchEmails]);
 
   // Filter emails based on selected category and label
   const filteredEmails = emails.filter(email => {
-    if (selectedCategory === 'Inbox') {
-      return email.labelIds?.includes('INBOX');
-    } else if (selectedCategory === 'Sent') {
-      return email.labelIds?.includes('SENT');
-    } else if (selectedCategory === 'Drafts') {
-      return email.labelIds?.includes('DRAFT');
-    } else if (selectedCategory === 'Spam') {
-      return email.labelIds?.includes('SPAM');
-    } else if (selectedCategory === 'Trash') {
-      return email.labelIds?.includes('TRASH');
-    }
-    // fallback: show all
-    return true;
+      if (selectedCategory === 'Inbox') {
+        return (email.labelIds || []).includes('INBOX');
+      } else if (selectedCategory === 'Sent') {
+        return (email.labelIds || []).includes('SENT');
+      } else if (selectedCategory === 'Drafts') {
+        return (email.labelIds || []).includes('DRAFT');
+      } else if (selectedCategory === 'Spam') {
+        return (email.labelIds || []).includes('SPAM');
+      } else if (selectedCategory === 'Trash') {
+        return (email.labelIds || []).includes('TRASH');
+      }
+      // fallback: show all
+      return true;
   });
 
   // If combineThreads is enabled, group emails by threadId
   const processedEmails = combineThreads
     ? Object.values(
         filteredEmails.reduce((threads, email) => {
-          // Use the threadId as the key
-          const threadId = email.gapiMessage.threadId!;
-          
-          // Check if this thread already exists
+          const threadId = email.threadId;
+          if (!threadId) return threads;
           if (!threads[threadId]) {
-            // First email in thread
             threads[threadId] = email;
           } else {
-            // If this email is newer than the existing one
-            if (new Date(email.date) > new Date(threads[threadId].date)) {
-              // Update thread representative with newer email
+            // Use getDate helper for comparison
+            const getDate = (msg: gapi.client.gmail.Message) => {
+              const headers = msg.payload?.headers || [];
+              const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date');
+              return dateHeader?.value ? new Date(dateHeader.value) : new Date(0);
+            };
+            if (getDate(email) > getDate(threads[threadId])) {
               threads[threadId] = email;
             }
-            
-            // Check if this email has attachments and the thread representative doesn't
-            if (email.hasAttachments && !threads[threadId].hasAttachments) {
-              // Update the thread representative to show it has attachments
-              threads[threadId] = {
-                ...threads[threadId],
-                hasAttachments: true
-              };
+            // Check for attachments
+            const hasAttachments = (msg: gapi.client.gmail.Message) => {
+              return !!(msg.payload && Array.isArray(msg.payload.parts) && msg.payload.parts.some((part: gapi.client.gmail.MessagePart) => part.filename && part.filename.length > 0));
+            };
+            if (hasAttachments(email) && !hasAttachments(threads[threadId])) {
+              threads[threadId] = email;
             }
           }
           return threads;
-        }, {} as Record<string, Email>)
+        }, {} as Record<string, gapi.client.gmail.Message>)
       )
     : filteredEmails;
 
-  const updateEmailInContext = (updatedEmail: Email) => {
+  const updateEmailInContext = (updatedEmail: gapi.client.gmail.Message) => {
     setEmails(prevEmails =>
-      prevEmails.map(email =>
+      prevEmails.map((email: gapi.client.gmail.Message) =>
         email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
       )
     );

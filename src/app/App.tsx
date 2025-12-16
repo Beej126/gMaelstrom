@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { EmailProvider } from './context/EmailContext';
-import { ThemeProvider } from './context/ThemeContext';
-import { initializeGoogleAuth, isUserAuthenticated } from './services/authService';
-import LoginPage from './components/LoginPage';
-import MainLayout from './components/MainLayout';
-import EmailDetail from './components/EmailDetail';
-import LabelSettingsDialog from './components/LabelSettingsDialog';
+import { EmailProvider } from './ctxEmail';
+import { ThemeProvider } from './ctxTheme';
+import { initializeGoogleAuth, isUserAuthenticated } from '../app/googleAuthApi';
+import LoginPage from '../components/LoginPage';
+import MainLayout from './MainLayout';
+import EmailDetail from '../components/EmailDetail';
+import LabelSettingsDialog from '../components/LabelSettingsDialog';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
@@ -29,15 +29,15 @@ const App: React.FC = () => {
       try {
         await initializeGoogleAuth();
         setGapiInitialized(true);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Failed to initialize Google Auth:', error);
 
         // More user-friendly error messages
-        if (error.message?.includes('Client ID') || error.message?.includes('API Key')) {
+        if (error instanceof Error && (error.message?.includes('Client ID') || error.message?.includes('API Key'))) {
           setInitError(error.message);
-        } else if (error.error === 'idpiframe_initialization_failed' ||
-          error.details?.includes('invalid_client') ||
-          error.message?.includes('OAuth client was not found')) {
+        } else if ((error as Expando)?.error === 'idpiframe_initialization_failed' ||
+          (error as Expando)?.details?.includes('invalid_client') ||
+          (error as Expando)?.message?.includes('OAuth client was not found')) {
           setInitError('Google OAuth configuration is invalid. Please check your client ID and make sure the OAuth consent screen is properly configured in Google Cloud Console.');
         } else {
           setInitError('Failed to initialize Google services. Please check your internet connection and try again later.');

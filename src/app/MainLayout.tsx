@@ -5,9 +5,9 @@ import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
-import { useEmailContext } from '../context/EmailContext';
-import { markEmailsAsUnread } from '../services/gmailService';
-import '../styles/MainLayout.css';
+import { useEmailContext } from './ctxEmail';
+import { markEmailsAsUnread } from './gmailApi';
+import './MainLayout.css';
 
 const MainLayout: React.FC = () => {
   const { fetchEmails, loading, error, refreshing, selectedCategory } = useEmailContext();
@@ -35,7 +35,7 @@ const MainLayout: React.FC = () => {
       document.documentElement.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.12)');
       document.documentElement.style.setProperty('--resize-handle-color', `${theme.palette.primary.main}40`);
     }
-  }, [theme.palette.mode, theme.palette.primary.main]);
+  }, [theme.palette.background.default, theme.palette.background.paper, theme.palette.divider, theme.palette.mode, theme.palette.primary.main]);
 
   // Show error snackbar when there's an error
   useEffect(() => {
@@ -61,7 +61,7 @@ const MainLayout: React.FC = () => {
       await markEmailsAsUnread(selectedIds);
       setCheckedEmails({}); // Clear selection
       await fetchEmails(); // Refresh list
-    } catch (err) {
+    } catch {
       setSnackbarOpen(true);
     }
   };

@@ -1,5 +1,4 @@
-import { Email } from '../types/email';
-import { parseEmailData } from '../utils/emailParser';
+// import { Email } from '../types/email';
 
 let accessToken: string | null = null;
 
@@ -14,10 +13,7 @@ const getAccessToken = (): string | null => {
   return localStorage.getItem('gMaelstrom_accessToken');
 };
 
-interface EmailsResponse {
-  emails: Email[];
-  nextPageToken: string | null;
-}
+// (Removed invalid leftover type declarations)
 
 // Helper for Gmail API requests
 const gmailApiFetch = async (endpoint: string, options: RequestInit = {}) => {
@@ -33,8 +29,12 @@ const gmailApiFetch = async (endpoint: string, options: RequestInit = {}) => {
   return response.json();
 };
 
-// eslint-disable-next-line 
-export const getEmails = async (pageToken: string | null = null, labelId: string = 'INBOX'): Promise<EmailsResponse> => {
+
+// Fetch emails with optional pagination and label filtering
+export const getEmails = async (
+  pageToken?: string,
+  labelId?: string
+): Promise<{ emails: gapi.client.gmail.Message[]; nextPageToken: string | null }> => {
   try {
     if (!getAccessToken()) {
       throw new Error('No access token available. Please sign in.');
@@ -50,12 +50,10 @@ export const getEmails = async (pageToken: string | null = null, labelId: string
     const nextPageToken = data.nextPageToken || null;
 
     // Fetch full email details for each message
-    const emailPromises = messages.map(async (message: any) => {
-      const emailData = await gmailApiFetch(`messages/${message.id}?format=full`);
-      return parseEmailData(emailData);
+    const emailPromises = messages.map(async (message: { id: string }) => {
+      return await gmailApiFetch(`messages/${message.id}?format=full`);
     });
-    const emails = await Promise.all(emailPromises);
-
+    const emails: gapi.client.gmail.Message[] = await Promise.all(emailPromises);
     return { emails, nextPageToken };
   } catch (error) {
     console.error('Error fetching emails:', error);
@@ -63,10 +61,10 @@ export const getEmails = async (pageToken: string | null = null, labelId: string
   }
 };
 
-export const getEmailThread = async (threadId: string): Promise<Email[]> => {
+export const getEmailThread = async (threadId: string): Promise<gapi.client.gmail.Message[]> => {
   try {
     const thread = await gmailApiFetch(`threads/${threadId}`);
-    const emails = thread.messages?.map((message: any) => parseEmailData(message)) || [];
+    const emails: gapi.client.gmail.Message[] = thread.messages || [];
     return emails;
   } catch (error) {
     console.error('Error fetching email thread:', error);
@@ -89,7 +87,7 @@ export const getAttachmentData = async (messageId: string, attachmentId: string)
 export const getGmailLabels = async (): Promise<Array<{ id: string; name: string }>> => {
   try {
     const response = await gmailApiFetch('labels');
-    return (response.labels || []).map((label: any) => ({ id: label.id, name: label.name }));
+    return (response.labels || []).map((label: gapi.client.gmail.Label) => ({ id: label.id, name: label.name }));
   } catch (error) {
     console.error('Error fetching labels:', error);
     throw error;

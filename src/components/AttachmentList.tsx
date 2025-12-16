@@ -22,8 +22,8 @@ import {
   Download as DownloadIcon,
   Visibility as ViewIcon
 } from '@mui/icons-material';
-import { Attachment, formatFileSize } from '../utils/emailParser';
-import { getAttachmentData } from '../services/gmailService';
+import { Attachment, formatFileSize } from '../helpers/emailParser';
+import { getAttachmentData } from '../app/gmailApi';
 import PdfViewer from './PdfViewer';
 
 interface AttachmentListProps {

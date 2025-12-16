@@ -23,25 +23,31 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
-import { useEmailContext } from '../context/EmailContext';
-import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../services/gmailService';
-import { Email } from '../types/email';
+import { useEmailContext } from '../app/ctxEmail';
+import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/gmailApi';
+// import { Email } from '../types/email';
 import {
-  decodeBase64,
   extractHtmlContent,
   extractInlineAttachments,
   replaceInlineAttachments,
   extractAttachments,
   Attachment,
   InlineAttachment,
-  processEmailContentForDarkMode
-} from '../utils/emailParser';
+  processEmailContentForDarkMode,
+  getFrom,
+  getTo,
+  getSubject,
+  getDate,
+  isRead,
+  isStarred,
+  hasAttachments
+} from '../helpers/emailParser';
 import AttachmentList from '../components/AttachmentList';
 import styles from './EmailDetail.module.scss';
 
 // Separate component for email content
 interface EmailContentProps {
-  email: Email;
+  email: gapi.client.gmail.Message;
   inlineAttachments: Map<string, Record<string, InlineAttachment>>;
   isDarkMode: boolean;
 }
@@ -56,72 +62,9 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
       setLoading(true);
 
       try {
-        let htmlContent = '';
-
-        // Get the basic HTML content first
-        const extractedHtml = extractHtmlContent(email.gapiMessage.payload);
-        if (extractedHtml) {
-          htmlContent = extractedHtml;
-        } else if (email.gapiMessage.payload?.body?.data) {
-          // Handle direct body data
-          const decoded = decodeBase64(email.gapiMessage.payload.body.data);
-          // Check if content is already HTML or needs conversion
-          htmlContent = decoded.trim().startsWith('<') ? decoded : decoded.replace(/\n/g, '<br/>');
-        } else if (email.gapiMessage.payload?.parts) {
-          // Handle multipart emails
-          // First look for HTML content
-          const htmlPart = email.gapiMessage.payload.parts.find(part =>
-            part.mimeType === 'text/html' && part.body?.data
-          );
-
-          // Then look for plain text content
-          const textPart = email.gapiMessage.payload.parts.find(part =>
-            part.mimeType === 'text/plain' && part.body?.data
-          );
-
-          // Check for attachments that might be inline content
-          const inlineHtmlPart = email.gapiMessage.payload.parts.find(part =>
-            part.mimeType === 'text/html' &&
-            part.headers?.some(h => h.name?.toLowerCase() === 'content-disposition' &&
-              h.value?.toLowerCase().includes('inline'))
-          );
-
-          // Prefer HTML content over plain text
-          if (htmlPart && htmlPart.body?.data) {
-            htmlContent = decodeBase64(htmlPart.body.data);
-          } else if (inlineHtmlPart && inlineHtmlPart.body?.data) {
-            htmlContent = decodeBase64(inlineHtmlPart.body.data);
-          } else if (textPart && textPart.body?.data) {
-            const plainText = decodeBase64(textPart.body.data);
-            // Convert plain text to HTML with line breaks
-            htmlContent = plainText.replace(/\n/g, '<br/>');
-          } else {
-            // Handle nested multipart messages
-            for (const part of email.gapiMessage.payload.parts) {
-              if (part.parts) {
-                const nestedHtmlPart = part.parts.find(p =>
-                  p.mimeType === 'text/html' && p.body?.data
-                );
-                if (nestedHtmlPart && nestedHtmlPart.body?.data) {
-                  htmlContent = decodeBase64(nestedHtmlPart.body.data);
-                  break;
-                }
-
-                const nestedTextPart = part.parts.find(p =>
-                  p.mimeType === 'text/plain' && p.body?.data
-                );
-                if (nestedTextPart && nestedTextPart.body?.data) {
-                  htmlContent = decodeBase64(nestedTextPart.body.data).replace(/\n/g, '<br/>');
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // If no content was found but we have a snippet, use that
-        if (!htmlContent && email.gapiMessage.snippet) {
-          htmlContent = `<p>${email.gapiMessage.snippet}...</p><p><i>(Full message content not available)</i></p>`;
+        let htmlContent = extractHtmlContent(email.payload!);
+        if (!htmlContent && email.snippet) {
+          htmlContent = `<p>${email.snippet}...</p><p><i>(Full message content not available)</i></p>`;
         }
 
         // If we still have no content, show a message
@@ -130,12 +73,10 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
         }
 
         // Replace inline image references with actual data
-        if (inlineAttachments.has(email.id)) {
-          // This is now an async operation that can fetch missing image data
+        if (email.id && inlineAttachments.has(email.id)) {
           htmlContent = await replaceInlineAttachments(
             htmlContent,
             inlineAttachments.get(email.id) || {},
-            // Pass the getAttachmentData function to fetch missing attachments
             async (messageId, attachmentId) => {
               try {
                 return await getAttachmentData(messageId, attachmentId);
@@ -159,7 +100,7 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
     };
 
     processEmailContent();
-  }, [email.id, email.gapiMessage.payload, email.gapiMessage.snippet, inlineAttachments, isDarkMode]);
+  }, [email.id, email.payload, email.snippet, inlineAttachments, isDarkMode]);
 
   if (loading) {
     return (
@@ -203,53 +144,51 @@ const EmailDetail: React.FC = () => {
   const { emails, selectedEmail, setSelectedEmail, updateEmailInContext } = useEmailContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [emailThread, setEmailThread] = useState<Email[]>([]);
+  const [emailThread, setEmailThread] = useState<gapi.client.gmail.Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [emailAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   // Local read state for icon only
-  const [isReadLocal, setIsReadLocal] = useState(selectedEmail?.isRead ?? true);
+  const [isReadLocal, setIsReadLocal] = useState(selectedEmail ? isRead(selectedEmail) : true);
 
   // Sync local state when selectedEmail changes
   useEffect(() => {
-    setIsReadLocal(selectedEmail?.isRead ?? true);
-  }, [selectedEmail?.id, selectedEmail?.isRead]);
+    setIsReadLocal(selectedEmail ? isRead(selectedEmail) : true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail?.id]);
 
   // Remove UNREAD label in local context and Gmail API on open
   useEffect(() => {
-    if (selectedEmail && selectedEmail.labelIds.includes('UNREAD')) {
+    if (selectedEmail && (selectedEmail.labelIds || []).includes('UNREAD')) {
       const updated = {
         ...selectedEmail,
-        labelIds: selectedEmail.labelIds.filter(l => l !== 'UNREAD'),
+        labelIds: (selectedEmail.labelIds || []).filter(l => l !== 'UNREAD'),
         isRead: true
       };
       // setSelectedEmail(updated); // REMOVE THIS LINE
       updateEmailInContext(updated);
       setIsReadLocal(true);
-      markEmailsAsRead([selectedEmail.id]);
+      if (selectedEmail.id) markEmailsAsRead([selectedEmail.id]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail?.id]);
 
   // Extract attachments from emails and update state
-  const processEmailAttachments = (emails: Email[]) => {
+  const processEmailAttachments = (emails: gapi.client.gmail.Message[]) => {
     const attachmentsMap = new Map<string, Attachment[]>();
     const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
 
-    emails.forEach(email => {
-      // Process regular attachments
-      if (email.hasAttachments && email.gapiMessage.payload) {
-        const attachments = extractAttachments(email.gapiMessage.payload);
+    emails.forEach((email: gapi.client.gmail.Message) => {
+      if (hasAttachments(email) && email.payload && email.id) {
+        const attachments = extractAttachments(email.payload);
         if (attachments.length > 0) {
           attachmentsMap.set(email.id, attachments);
         }
       }
-
-      // Process inline images
-      if (email.gapiMessage.payload) {
-        const inline = extractInlineAttachments(email.id, email.gapiMessage.payload);
+      if (email.payload && email.id) {
+        const inline = extractInlineAttachments(email.id, email.payload);
         if (Object.keys(inline).length > 0) {
           inlineAttachmentsMap.set(email.id, inline);
         }
@@ -266,12 +205,12 @@ const EmailDetail: React.FC = () => {
         setLoading(true);
         try {
           // Find the email by id (do not depend on selectedEmail)
-          let email = emails.find(e => e.id === emailId);
+          let email = emails.find((e: gapi.client.gmail.Message) => e.id === emailId);
           if (!email) {
             // Try to fetch the thread directly if not found in context
             const thread = await getEmailThread(emailId);
             if (thread && thread.length > 0) {
-              email = thread.find(e => e.id === emailId);
+              email = thread.find((e: gapi.client.gmail.Message) => e.id === emailId);
               setEmailThread(thread);
               processEmailAttachments(thread);
               if (email) {
@@ -287,7 +226,7 @@ const EmailDetail: React.FC = () => {
           } else {
             setSelectedEmail(email);
             // Load the thread
-            const thread = await getEmailThread(email.gapiMessage.threadId!);
+            const thread = await getEmailThread(email.threadId!);
             setEmailThread(thread);
             processEmailAttachments(thread);
           }
@@ -299,6 +238,7 @@ const EmailDetail: React.FC = () => {
         }
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailId, setSelectedEmail, navigate]);
 
   // Mark as read/unread handler
@@ -309,22 +249,22 @@ const EmailDetail: React.FC = () => {
       // Mark as read
       updated = {
         ...selectedEmail,
-        labelIds: selectedEmail.labelIds.filter(l => l !== 'UNREAD'),
-        isRead: true
+        labelIds: (selectedEmail.labelIds || []).filter(l => l !== 'UNREAD'),
+        // isRead: true // No longer assign non-existent property
       };
       setIsReadLocal(true);
       updateEmailInContext(updated);
-      await markEmailsAsRead([selectedEmail.id]);
+      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id]);
     } else {
       // Mark as unread
       updated = {
         ...selectedEmail,
-        labelIds: [...selectedEmail.labelIds, 'UNREAD'],
-        isRead: false
+        labelIds: [...(selectedEmail.labelIds || []), 'UNREAD'],
+        // isRead: false // No longer assign non-existent property
       };
       setIsReadLocal(false);
       updateEmailInContext(updated);
-      await markEmailsAsUnread([selectedEmail.id]);
+      if (selectedEmail.id) await markEmailsAsUnread([selectedEmail.id]);
     }
     // Do NOT call setSelectedEmail(updated) here
   };
@@ -429,11 +369,11 @@ const EmailDetail: React.FC = () => {
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="h5" fontWeight="500">
-                  {selectedEmail.subject || '(No subject)'}
+                  {getSubject(selectedEmail) || '(No subject)'}
                 </Typography>
-                <Tooltip title={selectedEmail.isStarred ? "Starred" : "Not starred"}>
+                <Tooltip title={isStarred(selectedEmail) ? "Starred" : "Not starred"}>
                   <IconButton>
-                    {selectedEmail.isStarred ? <StarIcon color="warning" /> : <StarBorderIcon />}
+                    {isStarred(selectedEmail) ? <StarIcon color="warning" /> : <StarBorderIcon />}
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -442,21 +382,21 @@ const EmailDetail: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Avatar sx={{ mr: 2, bgcolor: theme.palette.primary.main }}>
-                    {getInitials(selectedEmail.from.split('<')[0].trim())}
+                    {getInitials(getFrom(selectedEmail).split('<')[0].trim())}
                   </Avatar>
 
                   <Box>
                     <Typography variant="subtitle1" fontWeight="500">
-                      {selectedEmail.from.split('<')[0].trim() || 'Unknown Sender'}
+                      {getFrom(selectedEmail).split('<')[0].trim() || 'Unknown Sender'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      To: {selectedEmail.to?.join(', ') || 'me'}
+                      To: {getTo(selectedEmail).join(', ') || 'me'}
                     </Typography>
                   </Box>
                 </Box>
 
                 <Typography variant="body2" color="text.secondary">
-                  {formatDate(selectedEmail.date)}
+                  {formatDate(new Date(getDate(selectedEmail)))}
                 </Typography>
               </Box>
             </Box>
@@ -473,10 +413,10 @@ const EmailDetail: React.FC = () => {
             </Box>
 
             {/* Display attachments if the selected email has any */}
-            {emailAttachments.has(selectedEmail.id) && (
+            {selectedEmail.id && emailAttachments.has(selectedEmail.id) && (
               <AttachmentList
-                messageId={selectedEmail.id}
-                attachments={emailAttachments.get(selectedEmail.id) || []}
+                messageId={selectedEmail.id!}
+                attachments={emailAttachments.get(selectedEmail.id!) || []}
               />
             )}
           </Paper>
@@ -488,7 +428,7 @@ const EmailDetail: React.FC = () => {
                 {emailThread.length - 1} earlier message{emailThread.length > 2 ? 's' : ''}
               </Typography>
 
-              {emailThread.filter(email => email.id !== selectedEmail.id).map(email => (
+              {emailThread.filter((email: gapi.client.gmail.Message) => email.id !== selectedEmail.id).map((email: gapi.client.gmail.Message) => (
                 <Paper
                   key={email.id}
                   elevation={0}
@@ -501,15 +441,15 @@ const EmailDetail: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Avatar sx={{ mr: 2, bgcolor: theme.palette.primary.main }}>
-                        {getInitials(email.from.split('<')[0].trim())}
+                        {getInitials(getFrom(email).split('<')[0].trim())}
                       </Avatar>
 
                       <Box>
                         <Typography variant="subtitle1" fontWeight="500">
-                          {email.from.split('<')[0].trim()}
+                          {getFrom(email).split('<')[0].trim()}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {formatDate(email.date)}
+                          {formatDate(new Date(getDate(email)))}
                         </Typography>
                       </Box>
                     </Box>
@@ -524,11 +464,11 @@ const EmailDetail: React.FC = () => {
                   </Box>
 
                   {/* Display attachments for thread emails */}
-                  {emailAttachments.has(email.id) && (
+                  {email.id && emailAttachments.has(email.id) && (
                     <Box sx={{ pl: 7, pr: 2 }}>
                       <AttachmentList
-                        messageId={email.id}
-                        attachments={emailAttachments.get(email.id) || []}
+                        messageId={email.id!}
+                        attachments={emailAttachments.get(email.id!) || []}
                       />
                     </Box>
                   )}

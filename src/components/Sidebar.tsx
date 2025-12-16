@@ -18,8 +18,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ReportIcon from '@mui/icons-material/Report';
 import DescriptionIcon from '@mui/icons-material/Description';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useEmailContext } from '../context/EmailContext';
-
+import { useEmailContext } from '../app/ctxEmail';
+import { isRead } from '../helpers/emailParser';
+  
 const ComposeButton = styled(Button)(({ theme }) => ({
   margin: theme.spacing(1),
   borderRadius: theme.shape.borderRadius * 4,
@@ -58,9 +59,17 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  // Count unread emails per category
+  // Count unread emails per category using labelIds and isRead helper
+  const labelMap: Record<string, string> = {
+    'Inbox': 'INBOX',
+    'Sent': 'SENT',
+    'Drafts': 'DRAFT',
+    'Spam': 'SPAM',
+    'Trash': 'TRASH',
+  };
   const getUnreadCount = (category: string) => {
-    return emails.filter(email => email.category === category && !email.isRead).length;
+    const labelId = labelMap[category] || 'INBOX';
+    return emails.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
   };
 
   const handleCategoryClick = (category: string) => {

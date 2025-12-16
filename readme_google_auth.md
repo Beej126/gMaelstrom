@@ -27,7 +27,7 @@ Instructions to generate your Google OAuth Client ID and API Key for use with yo
    1. In "Credentials", click "Create Credentials" > "API key".
    1. Copy the generated API key shown to .env file in step #7
    1. (Optional but recommended) Click "Restrict key" and limit it to the Gmail API and your app's referrer.
-7. In your project root, create rename .env-example file to just .env and add your credentials
+7. copy $/.env-example file to .env and paste in your credentials
    - <mark>**NOTE**: the existing .gitignore safely excludes this file but if you're forking, please MAKE 100% SURE your .env does NOT get committed to your own repo</mark>
    ```
    PUBLIC_GOOGLE_CLIENT_ID=your-client-id-here
