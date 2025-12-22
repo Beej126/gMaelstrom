@@ -1,22 +1,14 @@
-interface EmailItemProps {
-  email: gapi.client.gmail.Message;
-  selected: boolean;
-  onCheckboxClick: (emailId: string, checked: boolean) => void;
-  isChecked: boolean;
-  threadCount: number;
-  labelVisibility: Record<string, boolean>;
-}
-import React, { useState, useEffect } from 'react';
+// Removed unused EmailItemProps interface
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Typography,
   Box,
   Chip,
-  Checkbox,
   useTheme,
   Button,
   CircularProgress
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useEmailContext } from '../app/ctxEmail';
 import {
@@ -25,177 +17,9 @@ import {
   getDate,
   isRead
 } from '../helpers/emailParser';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import ArrowRightIcon from '@mui/icons-material/ArrowRight';
-import { useThemeContext } from '../app/ctxTheme';
+import { useNavigate } from 'react-router-dom';
 
-
-const EmailItem: React.FC<EmailItemProps> = ({
-  email,
-  selected,
-  onCheckboxClick,
-  isChecked,
-  threadCount,
-  labelVisibility
-}) => {
-  const theme = useTheme();
-  const { density, fontSize, fontWeight } = useThemeContext();
-  const navigate = useNavigate();
-  const prettifyLabel = usePrettifyLabel();
-
-  const handleCheckboxClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (email.id) {
-      onCheckboxClick(email.id, !isChecked);
-    }
-  };
-
-  const handleEmailClick = () => {
-    navigate(`/email/${email.id}`);
-  };
-
-  const itemHeight = density === 'condensed' ? '32px' : '40px';
-
-  return (
-    <div
-      tabIndex={0}
-      onClick={handleEmailClick}
-      style={{
-        background: selected ? theme.palette.action.selected : (isRead(email) ? 'transparent' : theme.palette.mode === 'light' ? '#f2f6fc' : '#1a1a1a'),
-        borderBottom: theme.palette.mode === 'light' ? '1px solid #f5f5f5' : '1px solid #333333',
-        height: itemHeight,
-        cursor: 'pointer',
-        outline: selected ? `2px solid ${theme.palette.primary.main}` : undefined,
-        transition: 'background 0.2s',
-        paddingLeft: 8,
-        paddingRight: 8,
-        display: 'contents'
-      }}
-    >
-      {/* Checkbox */}
-      <Checkbox
-        size="small"
-        edge="start"
-        checked={isChecked}
-        onClick={handleCheckboxClick}
-        sx={{
-          gridColumn: 1,
-          p: density === 'condensed' ? 0.3 : 0.5,
-          ml: 0,
-          position: 'relative',
-          top: density === 'condensed' ? '-4px' : '-6px'
-        }}
-      />
-      {/* Labels */}
-      <div style={{ gridColumn: 2, display: 'flex', flexDirection: 'row', gap: 4, overflow: 'hidden' }}>
-        {email.labelIds && email.labelIds.length > 0 && email.labelIds
-          .filter((label: string) => labelVisibility[label] !== false)
-          .map((label: string) => (
-            <Chip
-              key={label}
-              label={prettifyLabel(label)}
-              size="small"
-              sx={{
-                height: 18,
-                fontSize: '0.72rem',
-                bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
-                color: theme.palette.text.primary,
-                px: '0px',
-                borderRadius: 1.5,
-                fontWeight: 500,
-                overflow: 'visible',
-                textOverflow: 'clip',
-                whiteSpace: 'nowrap'
-              }}
-              variant="outlined"
-            />
-          ))}
-      </div>
-      {/* From */}
-      <Typography
-        component="span"
-        sx={{
-          gridColumn: 3,
-            fontSize: fontSize.primary,
-            fontWeight: isRead(email) ? 500 : fontWeight.emailListFrom,
-            color: theme => isRead(email) ? theme.palette.text.secondary : theme.palette.text.primary,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            mr: 1,
-            opacity: isRead(email) ? 0.85 : 1
-        }}
-      >
-          {getFrom(email)}
-      </Typography>
-      {/* Subject and Snippet */}
-      <div style={{ gridColumn: 4, display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        <Typography
-          sx={{
-            mr: 1,
-            fontSize: fontSize.primary,
-              fontWeight: isRead(email) ? 500 : fontWeight.emailListSubject,
-              color: theme => isRead(email) ? theme.palette.text.secondary : theme.palette.text.primary,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              opacity: isRead(email) ? 0.85 : 1
-          }}
-        >
-            {getSubject(email)}
-        </Typography>
-        <Typography
-          sx={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: '50%',
-              opacity: isRead(email) ? 0.7 : 0.8,
-            fontSize: fontSize.secondary,
-            color: 'text.secondary'
-          }}
-        >
-            - {email.snippet}
-        </Typography>
-      </div>
-      {/* Attachment icon */}
-      <div style={{ gridColumn: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {/* Show attachment icon if email has any attachment part */}
-        {email.payload && Array.isArray(email.payload.parts) && email.payload.parts.some((part) => part.filename && part.filename.length > 0) && (
-          <AttachFileIcon
-            fontSize={density === 'condensed' ? 'inherit' : 'small'}
-            sx={{
-              color: theme.palette.mode === 'light' ? '#5f6368' : '#949494',
-              transform: 'rotate(45deg)',
-              flexShrink: 0,
-              ...(density === 'condensed' && { fontSize: '16px' })
-            }}
-          />
-        )}
-      </div>
-      {/* Thread arrow */}
-      <div style={{ gridColumn: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {threadCount > 1 && (
-          <ArrowRightIcon fontSize="small" sx={{ color: theme.palette.mode === 'light' ? '#5f6368' : '#949494' }} />
-        )}
-      </div>
-      {/* Date */}
-      <Typography
-        component="span"
-        sx={{
-          gridColumn: 7,
-          minWidth: '70px',
-          textAlign: 'right',
-          flexShrink: 0,
-          fontSize: fontSize.caption,
-          color: 'text.secondary'
-        }}
-      >
-          {formatDistanceToNow(new Date(getDate(email)), { addSuffix: false })}
-      </Typography>
-    </div>
-  );
-};
+import { mui_DataGrid_Vars } from '../app/MUI.DataGrid.vars';
 
 interface EmailListProps {
   checkedEmails?: Record<string, boolean>;
@@ -211,112 +35,173 @@ const EmailList: React.FC<EmailListProps> = ({ checkedEmails: checkedEmailsProp,
     loading,
     labelVisibility
   } = useEmailContext();
-  // Use controlled checkedEmails if provided, otherwise internal state
+
+  const navigate = useNavigate();
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
   const checkedEmails = checkedEmailsProp ?? internalCheckedEmails;
   const setCheckedEmails = setCheckedEmailsProp ?? internalSetCheckedEmails;
   const theme = useTheme();
+  const prettifyLabel = usePrettifyLabel();
 
-  // Initialize checkedEmails from email data
+  // Well-defined row height for DataGrid
+  const rowHeight = 26; // Set to desired tightness (e.g., 36px)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
   useEffect(() => {
-    const initialChecked: Record<string, boolean> = {};
-    emails.forEach((email: gapi.client.gmail.Message) => {
-      if (email.id) initialChecked[email.id] = false;
-    });
-    setCheckedEmails(initialChecked);
-  }, [emails]);
+    function updatePageSize() {
+      const available = window.innerHeight - 250; // adjust for header, padding, etc.
+      const rows = Math.max(10, Math.floor((available - mui_DataGrid_Vars['data-grid-header-height'] - mui_DataGrid_Vars['data-grid-footer-height']) / rowHeight));
+      setPaginationModel((prev) => ({ ...prev, pageSize: rows }));
+    }
+    updatePageSize();
+    window.addEventListener('resize', updatePageSize);
+    return () => window.removeEventListener('resize', updatePageSize);
+  }, [rowHeight]);
 
-  // Ensure checkedEmails always has all visible email IDs as keys
-  useEffect(() => {
-    if (!checkedEmailsProp || !setCheckedEmailsProp) return;
-    const newChecked: Record<string, boolean> = { ...checkedEmails };
-    let changed = false;
-    emails.forEach((email: gapi.client.gmail.Message) => {
-      if (email.id && !(email.id in newChecked)) {
-        newChecked[email.id] = false;
-        changed = true;
-      }
-    });
-    // Remove any keys for emails no longer in the list
-    Object.keys(newChecked).forEach(id => {
-      if (!emails.find(e => e.id === id)) {
-        delete newChecked[id];
-        changed = true;
-      }
-    });
-    if (changed) setCheckedEmails(newChecked);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emails, selectedEmail]);
+  // DataGrid columns
+  const columns = useMemo<GridColDef[]>(() => [
+    {
+      field: 'checkbox',
+      headerName: '',
+      width: 40,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams) => (
+        <input
+          type="checkbox"
+          checked={!!checkedEmails[params.row.id]}
+          onChange={e => setCheckedEmails(prev => ({ ...prev, [params.row.id]: e.target.checked }))}
+          style={{ cursor: 'pointer' }}
+          aria-label="Select email"
+        />
+      ),
+      resizable: false
+    },
+    {
+      field: 'from',
+      headerName: 'From',
+      width: 130,
+      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => getFrom(row),
+      resizable: true
+    },
+    {
+      field: 'subject',
+      headerName: 'Subject',
+      width: 320,
+      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => getSubject(row),
+      resizable: true
+    },
+    {
+      field: 'attachment',
+      headerName: 'Attachment',
+      width: 32,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams<gapi.client.gmail.Message>) => (
+        params.row?.payload?.parts?.some(part=> part.filename && part.filename.length > 0) ? (
+          <span title="Has attachment">📎</span>
+        ) : null
+      ),
+      resizable: false
+    },
+    {
+      field: 'thread',
+      headerName: 'Thread',
+      width: 32,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams<gapi.client.gmail.Message & { threadCount?: number }>) => (
+        params.row && params.row.threadCount && params.row.threadCount > 1 ? <span title="Threaded">→</span> : null
+      ),
+      resizable: false
+    },
+    {
+      field: 'date',
+      headerName: 'Date',
+      width: 110,
+      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => formatDistanceToNow(getDate(row)),
+      resizable: true
+    },
+    {
+      field: 'labels',
+      headerName: 'Labels',
+      width: 120,
+      renderCell: (params: GridRenderCellParams) => (
+        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
+          {params.row.labelIds?.filter((label: string) => labelVisibility[label] !== false).map((label: string) => (
+            <Chip key={label} label={prettifyLabel(label)} size="small" sx={{ height: 18, fontSize: '0.72rem', bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444', color: theme.palette.text.primary, px: '0px', borderRadius: 1.5, fontWeight: 500, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }} variant="outlined" />
+          ))}
+        </Box>
+      ),
+      resizable: true
+    }
+  ], [checkedEmails, setCheckedEmails, labelVisibility, prettifyLabel, theme]);
 
-  const handleCheckboxClick = (emailId: string, checked: boolean) => {
-    setCheckedEmails(prev => ({
-      ...prev,
-      [emailId]: checked
-    }));
-  };
+  // Prepare rows for DataGrid
+  const rows = useMemo(() => emails.map(email => ({
+    ...email,
+    id: email.id,
+    threadCount: emails.filter((e) => e.threadId && email.threadId && e.threadId === email.threadId).length
+  })), [emails]);
 
-  const handleLoadMore = () => {
-    loadMoreEmails();
-  };
+  const handleRowClick = useCallback((params: GridRowParams) => {
+    navigate(`/email/${params.row.id}`);
+  }, [navigate]);
 
   return (
-    <>
-      <div
-        key={emails.map(e => e.id + ((e.labelIds || []).includes('UNREAD') ? 'u' : 'r')).join(',') + (selectedEmail ? selectedEmail.id : '')}
-        style={{ width: '100%', display: 'grid', gridTemplateColumns: 'max-content max-content max-content 1fr 32px 40px 90px', columnGap: "5px", paddingTop: "6px", paddingRight: '0.5em' }}
-      >
-        {/* Header row for accessibility (optional) */}
-        {/* <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '32px minmax(80px, max-content) 180px 1fr 32px 40px 90px', fontWeight: 600, fontSize: 14, color: '#888', padding: '0 8px' }}> ... </div> */}
-        {emails.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center', gridColumn: '1 / -1' }}>
-            <Typography variant="body1" color="text.secondary">
-              No emails found
-            </Typography>
-          </Box>
-        ) : (
-          emails.map((email) => (
-            <EmailItem
-              key={email.id}
-              email={email}
-              selected={selectedEmail?.id === email.id}
-              onCheckboxClick={handleCheckboxClick}
-              isChecked={!!(email.id && checkedEmails[email.id])}
-              threadCount={emails.filter((e) => e.threadId && email.threadId && e.threadId === email.threadId).length}
-              labelVisibility={labelVisibility}
-            />
-          ))
-        )}
-        {/* Load More button */}
-        {hasMoreEmails && (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              p: 2,
-              borderTop: `1px solid ${theme.palette.divider}`,
-              gridColumn: '1 / -1'
-            }}
+    <Box sx={{ width: '100%', height: '100%', minHeight: 300 }}>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        pagination
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        pageSizeOptions={[paginationModel.pageSize]}
+        autoHeight={false}
+        onRowClick={handleRowClick}
+        loading={loading}
+        disableRowSelectionOnClick
+        checkboxSelection={false}
+        getRowClassName={(params: GridRowClassNameParams<gapi.client.gmail.Message>) => {
+          if (!params.row) return '';
+          if (params.row.id === selectedEmail?.id) return 'Mui-selected';
+          return isRead(params.row) ? 'email-read' : 'email-unread';
+        }}
+        rowHeight={rowHeight}
+        sx={{
+          border: 0,
+          '& .MuiDataGrid-columnSeparator': { cursor: 'col-resize' },
+          '& .MuiDataGrid-cell': { cursor: 'pointer' },
+        }}
+        slots={{
+          noRowsOverlay: () => (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">No emails found</Typography>
+            </Box>
+          ),
+        }}
+        disableColumnMenu={false}
+        disableColumnSelector={false}
+        disableDensitySelector={false}
+        // Enable horizontal scroll if needed
+        hideFooterSelectedRowCount
+      />
+      {hasMoreEmails && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <Button
+            onClick={loadMoreEmails}
+            disabled={loading}
+            sx={{ textTransform: 'none', minWidth: '150px' }}
+            variant="outlined"
+            size="small"
           >
-            <Button
-              onClick={handleLoadMore}
-              disabled={loading}
-              sx={{
-                textTransform: 'none',
-                minWidth: '150px'
-              }}
-              variant="outlined"
-              size="small"
-            >
-              {loading ? (
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-              ) : (
-                'Load older emails'
-              )}
-            </Button>
-          </Box>
-        )}
-      </div>
-    </>
+            {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : 'Load older emails'}
+          </Button>
+        </Box>
+      )}
+    </Box>
   );
 };
 
@@ -360,3 +245,16 @@ const usePrettifyLabel = () => {
 };
 
 export default EmailList;
+
+// Add the following CSS to your global styles or a relevant CSS/SCSS file:
+//
+// .email-read .MuiDataGrid-cell {
+//   font-weight: 500;
+//   opacity: 0.85;
+//   color: var(--mui-palette-text-secondary, #888);
+// }
+// .email-unread .MuiDataGrid-cell {
+//   font-weight: 700;
+//   opacity: 1;
+//   color: var(--mui-palette-text-primary, #222);
+// }

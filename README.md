@@ -32,6 +32,7 @@ attachments | required an incredible amount of handling logic... email attachmen
 
 ## Latest To-Do's 📝
 - once a reasonable baseline is achieved i'll move into typical github issues
+1. please record for all time that i don't like calling methods "handleXyz", i prefer "onXyz", please rename all of them across the app
 1. google api calls have extra unecessary calls to eliminate - there's 429 errors (too many requests) when switching between inbox and trash
 1. in header.tsx break each menu out into a separate .tsx file, for example the "settings  menu", "profile menu", etc
 1. there's a mild read/unread transition bug... click into unread email, it should auto flip to read, but then manually flip it back to unread and return to email list, then go back into it and it will NOT auto flip to read at this point, fun =)

@@ -23,7 +23,7 @@ import { isRead } from '../helpers/emailParser';
   
 const ComposeButton = styled(Button)(({ theme }) => ({
   margin: theme.spacing(1),
-  borderRadius: theme.shape.borderRadius * 4,
+  borderRadius: theme.shape.borderRadius,
   padding: theme.spacing(1, 3),
   textTransform: 'none',
   boxShadow: 'none',

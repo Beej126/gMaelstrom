@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "rsbuild dev --open",
+    "prebuild": "node src/scripts/export-sass-vars.js",
     "build": "rsbuild build",
     "check": "biome check --write",
     "format": "prettier --write .",
@@ -16,6 +17,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "@mui/x-data-grid": "^8.22.1",
     "date-fns": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -43,7 +45,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
     "prettier": "^3.5.3",
-    "sass": "^1.89.2",
+    "sass": "^1.97.1",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.29.0",
     "wait-on": "^8.0.3"

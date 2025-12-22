@@ -1,8 +1,16 @@
 // Extract the 'From' field from a Gmail message
-export const getFrom = (message: gapi.client.gmail.Message): string => {
+export const getFrom = (message?: gapi.client.gmail.Message | null): string => {
+  if (!message) return '';
   const headers = message.payload?.headers || [];
   const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
-  return fromHeader?.value || '';
+  if (!fromHeader?.value) return '';
+
+  // Extract the display name (pretty portion) before <...>
+  // Example: '"John Doe" <john@example.com>' => John Doe
+  // Example: 'John Doe <john@example.com>' => John Doe
+  // Example: 'john@example.com' => john@example.com
+  const match = fromHeader.value.match(/^["' ]*(.*?)["' ]*(<.*>)$/);
+  return match && match[1] ? match[1].trim() : fromHeader.value.trim();
 };
 
 // Extract the 'To' field from a Gmail message
@@ -15,14 +23,16 @@ export const getTo = (message: gapi.client.gmail.Message): string[] => {
 };
 
 // Extract the 'Subject' field from a Gmail message
-export const getSubject = (message: gapi.client.gmail.Message): string => {
+export const getSubject = (message?: gapi.client.gmail.Message | null): string => {
+  if (!message) return '';
   const headers = message.payload?.headers || [];
   const subjectHeader = headers.find(h => h.name?.toLowerCase() === 'subject');
   return subjectHeader?.value || '';
 };
 
 // Extract the date from a Gmail message (as ISO string)
-export const getDate = (message: gapi.client.gmail.Message): string => {
+export const getDate = (message?: gapi.client.gmail.Message | null): string => {
+  if (!message) return '';
   const headers = message.payload?.headers || [];
   const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date');
   if (!dateHeader?.value) return '';
@@ -32,7 +42,8 @@ export const getDate = (message: gapi.client.gmail.Message): string => {
 };
 
 // Check if a Gmail message is read
-export const isRead = (message: gapi.client.gmail.Message): boolean => {
+export const isRead = (message?: gapi.client.gmail.Message | null): boolean => {
+  if (!message) return true;
   return !(message.labelIds || []).includes('UNREAD');
 };
 
@@ -100,22 +111,37 @@ export const decodeBase64 = (data: string): string => {
 // Helper function to sanitize HTML content for safe rendering
 export const sanitizeHtmlContent = (html: string): string => {
   if (!html) return '';
-  
+
   // Remove potentially dangerous script tags
   let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Handle mailto: links to open in a new tab 
+
+  // Fix meta tag content attributes: replace ';' with ',' for key-value pairs and remove empty pairs
+  sanitized = sanitized.replace(/(<meta[^>]*content=["'])([^"'>]+)(["'][^>]*>)/gi, (_unused, p1, p2, p3) => {
+    let parts = p2.split(/[,;]/).map((part: string) => part.trim());
+    // Remove empty key-value pairs (e.g., width=; or =value)
+    parts = parts.filter((part: string) => {
+      if (!part) return false;
+      const [key, value] = part.split('=');
+      if (!key || !key.trim()) return false;
+      if (value !== undefined && !value.trim()) return false;
+      return true;
+    });
+    const fixed = parts.join(', ');
+    return p1 + fixed + p3;
+  });
+
+  // Handle mailto: links to open in a new tab
   sanitized = sanitized.replace(
     /href=["']mailto:([^"']+)["']/gi,
     'href="mailto:$1" rel="noopener noreferrer"'
   );
-  
+
   // Handle external links to open in a new tab
   sanitized = sanitized.replace(
     /href=["'](http[s]?:\/\/[^"']+)["']/gi,
     'href="$1" target="_blank" rel="noopener noreferrer"'
   );
-  
+
   // Don't replace CID references with placeholders here
   // They should be replaced with actual image data using replaceInlineAttachments
   
