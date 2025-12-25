@@ -4,11 +4,9 @@ import { signIn, isUserAuthenticated } from '../app/GAuthApi';
 import { Button, Box, Typography, Container, Paper, CircularProgress, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { toast } from 'react-toastify';
 import GMaelstromIcon from './gMaelstromLogoSvg';
-import { useEmailContext } from '../app/ctxEmail';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { fetchEmails } = useEmailContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -105,11 +103,6 @@ const LoginPage: React.FC = () => {
         await new Promise(res => setTimeout(res, 100));
       }
       if (authed) {
-        const emails = await fetchEmails();
-        if (!emails || emails.length === 0) {
-          await new Promise(res => setTimeout(res, 500));
-          await fetchEmails();
-        }
         navigate('/');
       } else {
         setError('Authentication failed. Please try again.');

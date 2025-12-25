@@ -1,5 +1,6 @@
 import { refreshGmailAccessToken } from './GAuthApi';
 import { getGmailAccessToken } from './GToken';
+import { gmailApiBatchFetch } from './gmailApiBatchFetch';
 
 
 // Helper for Gmail API requests
@@ -44,38 +45,53 @@ const gmailApiFetch = async (endpoint: string, options: RequestInit = {}, retry 
 // Fetch emails with optional pagination and label filtering
 export const getEmails = async (
   pageToken?: string,
-  labelId?: string
-): Promise<{ emails: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken: string | null }> => {
+  labelId?: string,
+  options?: { maxResults?: number }
+): Promise<{ emails: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken: string | null; total: number }> => {
   try {
     if (!getGmailAccessToken()) {
       throw new Error('No access token available. Please sign in.');
     }
     // Use labelIds for folder filtering (Inbox, Sent, Spam, Trash, etc.)
+    const maxResults = options?.maxResults ?? 50;
     const params = new URLSearchParams({
-      maxResults: '50',
+      maxResults: String(maxResults),
       ...(pageToken ? { pageToken } : {}),
       ...(labelId ? { labelIds: labelId } : {}),
     });
     const data = await gmailApiFetch(`messages?${params.toString()}`);
     const messages = data.messages || [];
     const nextPageToken = data.nextPageToken || null;
+    const total = typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0;
+    if (!messages.length) return { emails: [], nextPageToken, total };
 
-    if (!messages.length) return { emails: [], nextPageToken };
-
-    // Fetch message metadata in batch (using format=minimal for efficiency)
-    const emailPromises = messages.map(async (message: { id: string; threadId: string }) => {
-      // Only fetch minimal fields for list view
-      const meta = await gmailApiFetch(`messages/${message.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`);
-      return {
+    // Batch fetch message metadata for all messages in this page
+    const messageIds = messages.map((m: { id: string }) => m.id);
+    const batchResults = await gmailApiBatchFetch(messageIds);
+    // Only include valid message objects (must have id)
+    const emails = batchResults
+      .filter(
+        (meta): meta is {
+          id: string;
+          threadId: string;
+          snippet: string;
+          labelIds: string[];
+          payload?: gapi.client.gmail.MessagePart;
+        } =>
+          !!meta &&
+          typeof meta.id === 'string' &&
+          typeof meta.threadId === 'string' &&
+          typeof meta.snippet === 'string' &&
+          Array.isArray(meta.labelIds)
+      )
+      .map(meta => ({
         id: meta.id,
         threadId: meta.threadId,
         snippet: meta.snippet,
-        labelIds: meta.labelIds || [],
-        payload: meta.payload, // contains headers for From, Subject, Date
-      };
-    });
-    const emails = await Promise.all(emailPromises);
-    return { emails, nextPageToken };
+        labelIds: meta.labelIds,
+        payload: meta.payload,
+      }));
+    return { emails, nextPageToken, total };
   } catch (error) {
     console.error('Error fetching emails:', error);
     throw error;

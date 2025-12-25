@@ -1,16 +1,16 @@
+console.log('[MainLayout] render');
 import React, { useEffect, useState } from 'react';
-import { Box, CircularProgress, Typography, Button, Snackbar, Alert, useTheme, IconButton, Tooltip, Checkbox } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { Box, Typography, Snackbar, Alert, useTheme, IconButton, Tooltip, Checkbox } from '@mui/material';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
 import { useEmailContext } from './ctxEmail';
-import { markEmailsAsUnread } from './GmailApi';
+import { markEmailsAsUnread } from './gmailApi';
 import './MainLayout.css';
 
 const MainLayout: React.FC = () => {
-  const { fetchEmails, loading, error, refreshing, selectedCategory } = useEmailContext();
+  const { error, selectedCategory } = useEmailContext();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const theme = useTheme();
 
@@ -44,9 +44,6 @@ const MainLayout: React.FC = () => {
     }
   }, [error]);
 
-  const handleRefresh = () => {
-    fetchEmails();
-  };
 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
@@ -60,7 +57,7 @@ const MainLayout: React.FC = () => {
     try {
       await markEmailsAsUnread(selectedIds);
       setCheckedEmails({}); // Clear selection
-      await fetchEmails(); // Refresh list
+      // EmailList should handle refresh logic
     } catch {
       setSnackbarOpen(true);
     }
@@ -131,23 +128,9 @@ const MainLayout: React.FC = () => {
                 {/* Add more icon buttons here in the future */}
               </Box>
             </Typography>
-            <Button 
-              startIcon={<RefreshIcon />}
-              onClick={handleRefresh}
-              disabled={refreshing || loading}
-              sx={{ ml: 2 }}
-            >
-              Refresh
-            </Button>
           </div>
           
-          {loading && !refreshing ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100% - 48px)' }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
-          )}
+          <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
         </div>
       </div>
 

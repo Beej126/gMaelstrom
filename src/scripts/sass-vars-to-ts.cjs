@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-require-imports */
 // Modern SCSS variable extraction using regex
 // No external packages required
 

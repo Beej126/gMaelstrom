@@ -12,3 +12,7 @@ $data-grid-footer-height: 52px;
   max-height: $data-grid-footer-height !important;
   height: $data-grid-footer-height !important;
 }
+
+.MuiDataGrid-scrollbar {
+  display: none !important;
+}

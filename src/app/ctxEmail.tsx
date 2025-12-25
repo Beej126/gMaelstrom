@@ -1,7 +1,8 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
-import { getEmails, getGmailLabels } from './GmailApi';
+import { getEmails, getGmailLabels } from './gmailApi';
 import { isUserAuthenticated } from './GAuthApi';
 // import { Email } from '../types/email';
+
 
 interface EmailContextType {
   emails: gapi.client.gmail.Message[];
@@ -9,9 +10,8 @@ interface EmailContextType {
   error: string | null;
   selectedEmail: gapi.client.gmail.Message | null;
   setSelectedEmail: (email: gapi.client.gmail.Message | null) => void;
-  fetchEmails: () => Promise<gapi.client.gmail.Message[]>;
+  fetchEmails: (page: number, pageSize: number) => Promise<void>;
   loadMoreEmails: () => Promise<void>;
-  hasMoreEmails: boolean;
   categories: string[];
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
@@ -27,6 +27,11 @@ interface EmailContextType {
   updateEmailInContext: (email: gapi.client.gmail.Message) => void;
   getCachedEmail: (id: string) => gapi.client.gmail.Message | null;
   setCachedEmail: (email: gapi.client.gmail.Message) => void;
+  totalEmails: number;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  pageSize: number;
+  setPageSize: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -43,22 +48,30 @@ interface EmailProviderProps {
   children: ReactNode;
 }
 
+
 export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
-  const [emails, setEmails] = useState<gapi.client.gmail.Message[]>([]);
-  // In-memory cache for full email details
-  const emailCache = useRef<{ [id: string]: gapi.client.gmail.Message }>({});
+  // Flat cache for all emails (by absolute index)
+  const [emailCache, setEmailCache] = useState<Array<gapi.client.gmail.Message | undefined>>([]);
+  // Expose emails as a filtered version of emailCache (no undefined)
+  const emails: gapi.client.gmail.Message[] = emailCache.filter((e): e is gapi.client.gmail.Message => !!e);
+  // Gmail API uses pageToken, so we track tokens for each page
+  const [pageTokens, setPageTokens] = useState<Array<string | null>>([null]);
+  const [totalEmails, setTotalEmails] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(50);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [refreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
-
-  // Helper to get/set full email details in cache
-  const getCachedEmail = (id: string) => emailCache.current[id] || null;
-  const setCachedEmail = (email: gapi.client.gmail.Message) => {
-    if (email && email.id) emailCache.current[email.id] = email;
-  };
   const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
   const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
+
+  // Helper to get/set full email details in cache (by id)
+  const emailDetailsCache = useRef<{ [id: string]: gapi.client.gmail.Message }>({});
+  const getCachedEmail = (id: string) => emailDetailsCache.current[id] || null;
+  const setCachedEmail = (email: gapi.client.gmail.Message) => {
+    if (email && email.id) emailDetailsCache.current[email.id] = email;
+  };
 
   // Initialize combineThreads from localStorage or default to false
   const [combineThreads, setCombineThreads] = useState<boolean>(() => {
@@ -66,8 +79,8 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     return savedValue ? savedValue === 'true' : false;
   });
 
-  const [pageToken, setPageToken] = useState<string | null>(null);
-  const [hasMoreEmails, setHasMoreEmails] = useState<boolean>(true);
+  // Removed unused pageToken and setPageToken
+  // Removed unused hasMoreEmails and setHasMoreEmails
 
   // Initialize labelVisibility from localStorage
   const [labelVisibility, setLabelVisibility] = useState<Record<string, boolean>>(() => {
@@ -113,46 +126,27 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     fetchLabels();
   }, []);
 
-  // In fetchEmails and loadMoreEmails, use the correct labelIds for each category
-  const fetchEmails = useCallback(async (): Promise<gapi.client.gmail.Message[]> => {
-    if (!isUserAuthenticated()) {
-      setEmails([]);
+  // New: fetchEmails(page, pageSize) for true server-side paging and flat cache
+  const fetchEmails = useCallback(async (page: number, pageSize: number): Promise<void> => {
+    console.log('[fetchEmails] called', { page, pageSize, selectedCategory, pageTokens, loading });
+    const authed = isUserAuthenticated();
+    console.log('[fetchEmails] isUserAuthenticated:', authed, 'loading', loading);
+    if (!authed) {
+      setEmailCache([]);
+      setTotalEmails(0);
       setLoading(false);
-      return [];
-    }
-
-    setRefreshing(true);
-    try {
-      // Map category to Gmail labelId
-      const labelMap: Record<string, string> = {
-        'Inbox': 'INBOX',
-        'Sent': 'SENT',
-        'Drafts': 'DRAFT',
-        'Spam': 'SPAM',
-        'Trash': 'TRASH',
-      };
-      const labelId = labelMap[selectedCategory] || 'INBOX';
-      const result = await getEmails(undefined, labelId);
-      setEmails(result.emails);
-      setPageToken(result.nextPageToken);
-      setHasMoreEmails(!!result.nextPageToken);
-      setError(null);
-      return result.emails;
-    } catch (err) {
-      setError(`Failed to fetch emails: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      console.error('Error fetching emails:', err);
-      return [];
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [selectedCategory]);
-
-  const loadMoreEmails = useCallback(async () => {
-    if (!pageToken || !isUserAuthenticated()) {
       return;
     }
-
+    // Check cache: only skip fetch if all emails for this page are present AND the page is within totalEmails
+    const start = page * pageSize;
+    const end = start + pageSize;
+    const cacheSlice = emailCache.slice(start, end);
+    const cacheHit = cacheSlice.length === pageSize && cacheSlice.every(e => !!e) && end <= totalEmails;
+    if (cacheHit) {
+      console.log('[fetchEmails] cache hit for page', page);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // Map category to Gmail labelId
@@ -164,101 +158,71 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
         'Trash': 'TRASH',
       };
       const labelId = labelMap[selectedCategory] || 'INBOX';
-      const result = await getEmails(pageToken, labelId);
-      setEmails(prevEmails => [...prevEmails, ...result.emails]);
-      setPageToken(result.nextPageToken);
-      setHasMoreEmails(!!result.nextPageToken);
+      // Use pageTokens to get the correct pageToken for this page
+      const token = pageTokens[page] || null;
+      // If we don't have a token for this page, fetch previous pages to get it
+      while (pageTokens.length <= page) {
+        // Fetch previous page to get nextPageToken
+        const prevToken = pageTokens[pageTokens.length - 1];
+        const prevResult = await getEmails(prevToken || undefined, labelId, { maxResults: pageSize });
+        setPageTokens(tokens => [...tokens, prevResult.nextPageToken || null]);
+      }
+      // Now fetch the actual page
+      const result = await getEmails(token || undefined, labelId, { maxResults: pageSize });
+      setTotalEmails(result.total);
+      // Fill the cache at the correct indices
+      setEmailCache(prev => {
+        const newCache = [...prev];
+        const start = page * pageSize;
+        for (let i = 0; i < result.emails.length; ++i) {
+          newCache[start + i] = result.emails[i];
+        }
+        return newCache;
+      });
+      setError(null);
     } catch (err) {
-      setError(`Failed to load more emails: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      console.error('Error loading more emails:', err);
+      setError(`Failed to fetch emails: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTotalEmails(0);
+      console.error('Error fetching emails:', err);
     } finally {
       setLoading(false);
     }
-  }, [pageToken, selectedCategory]);
+  }, [selectedCategory, pageTokens, loading]);
+
+  // Deprecated: loadMoreEmails (no-op for flat cache)
+  const loadMoreEmails = useCallback(async () => {}, []);
 
   useEffect(() => {
     // Only try to fetch emails if user is authenticated
-    if (isUserAuthenticated()) {
-      fetchEmails();
-    } else {
-      // Clear emails when not authenticated
-      setEmails([]);
+    if (!isUserAuthenticated()) {
+      setEmailCache([]);
+      setTotalEmails(0);
       setLoading(false);
     }
   }, [fetchEmails]);
 
-  // Reset when changing categories
-  useEffect(() => {
-    if (isUserAuthenticated()) {
-      fetchEmails();
-    }
-  }, [fetchEmails]);
-
-  // Filter emails based on selected category and label
-  const filteredEmails = emails.filter(email => {
-      if (selectedCategory === 'Inbox') {
-        return (email.labelIds || []).includes('INBOX');
-      } else if (selectedCategory === 'Sent') {
-        return (email.labelIds || []).includes('SENT');
-      } else if (selectedCategory === 'Drafts') {
-        return (email.labelIds || []).includes('DRAFT');
-      } else if (selectedCategory === 'Spam') {
-        return (email.labelIds || []).includes('SPAM');
-      } else if (selectedCategory === 'Trash') {
-        return (email.labelIds || []).includes('TRASH');
-      }
-      // fallback: show all
-      return true;
-  });
-
-  // If combineThreads is enabled, group emails by threadId
-  const processedEmails = combineThreads
-    ? Object.values(
-        filteredEmails.reduce((threads, email) => {
-          const threadId = email.threadId;
-          if (!threadId) return threads;
-          if (!threads[threadId]) {
-            threads[threadId] = email;
-          } else {
-            // Use getDate helper for comparison
-            const getDate = (msg: gapi.client.gmail.Message) => {
-              const headers = msg.payload?.headers || [];
-              const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date');
-              return dateHeader?.value ? new Date(dateHeader.value) : new Date(0);
-            };
-            if (getDate(email) > getDate(threads[threadId])) {
-              threads[threadId] = email;
-            }
-            // Check for attachments
-            const hasAttachments = (msg: gapi.client.gmail.Message) => {
-              return !!(msg.payload && Array.isArray(msg.payload.parts) && msg.payload.parts.some((part: gapi.client.gmail.MessagePart) => part.filename && part.filename.length > 0));
-            };
-            if (hasAttachments(email) && !hasAttachments(threads[threadId])) {
-              threads[threadId] = email;
-            }
-          }
-          return threads;
-        }, {} as Record<string, gapi.client.gmail.Message>)
-      )
-    : filteredEmails;
-
-  const updateEmailInContext = (updatedEmail: gapi.client.gmail.Message) => {
-    setEmails(prevEmails =>
-      prevEmails.map((email: gapi.client.gmail.Message) =>
-        email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
-      )
-    );
+  
+  // Helper to get a page of emails from the cache (for DataGrid)
+  const getPageEmails = (page: number, pageSize: number): gapi.client.gmail.Message[] => {
+    const start = page * pageSize;
+    return emailCache.slice(start, start + pageSize).filter((e): e is gapi.client.gmail.Message => !!e);
   };
 
-  const value = {
-    emails: processedEmails,
+  const updateEmailInContext = (updatedEmail: gapi.client.gmail.Message) => {
+    setEmailCache(prev => prev.map((email) =>
+      email && email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
+    ));
+  };
+
+  const value: EmailContextType & { getPageEmails: (page: number, pageSize: number) => gapi.client.gmail.Message[] } = {
+    emails,
+    getPageEmails,
     loading,
     error,
     selectedEmail,
     setSelectedEmail,
     fetchEmails,
     loadMoreEmails,
-    hasMoreEmails,
     categories,
     selectedCategory,
     setSelectedCategory,
@@ -273,7 +237,12 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({ children }) => {
     setDynamicLabelNameMap,
     updateEmailInContext,
     getCachedEmail,
-    setCachedEmail
+    setCachedEmail,
+    totalEmails,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize
   };
 
   return <EmailContext.Provider value={value}>{children}</EmailContext.Provider>;

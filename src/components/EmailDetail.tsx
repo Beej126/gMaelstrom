@@ -24,8 +24,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
 import { useEmailContext } from '../app/ctxEmail';
-import { getEmailById } from '../app/GmailApi';
-import { getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/GmailApi';
+import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/gmailApi';
 // import { Email } from '../types/email';
 import {
   extractHtmlContent,

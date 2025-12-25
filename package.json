@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "rsbuild dev --open",
-    "prebuild": "node src/scripts/export-sass-vars.js",
+    "prebuild": "node src/scripts/sass-vars-to-ts.cjs",
     "build": "rsbuild build",
     "check": "biome check --write",
     "format": "prettier --write .",
@@ -39,6 +39,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "@types/react-toastify": "^4.0.2",
+    "cypress": "^15.8.1",
     "dotenv": "^16.5.0",
     "eslint": "^9.23.0",
     "eslint-plugin-react": "^7.37.4",
