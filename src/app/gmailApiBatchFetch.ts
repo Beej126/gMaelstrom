@@ -1,6 +1,6 @@
 // Batch fetch Gmail message metadata for a list of message IDs
 // Returns an array of message objects (with the same fields as before)
-import { getGmailAccessToken } from './GToken';
+import { getAuthedUser } from './gAuthApi';
 
 
 // Helper to sleep for ms milliseconds
@@ -10,7 +10,7 @@ export const gmailApiBatchFetch = async (
   messageIds: string[],
   fields: string = 'id,threadId,snippet,labelIds,payload(headers,parts)'
 ): Promise<gapi.client.gmail.Message[]> => {
-  if (!getGmailAccessToken()) throw new Error('No access token available. Please sign in.');
+  const token = (await getAuthedUser())?.accessToken;
   const url = 'https://gmail.googleapis.com/batch';
   const BATCH_SIZE = 10;
   const DELAY_MS = 300;
@@ -32,7 +32,7 @@ export const gmailApiBatchFetch = async (
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${getGmailAccessToken()}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': `multipart/mixed; boundary=${boundary}`,
         'Accept': 'application/json',
       },

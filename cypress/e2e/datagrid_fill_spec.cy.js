@@ -15,9 +15,7 @@ describe('DataGrid fills vertical space', () => {
     };
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('gMaelstrom_accessToken', token);
-        win.localStorage.setItem('gMaelstrom_isAuthenticated', 'true');
-        win.localStorage.setItem('gMaelstrom_user', JSON.stringify(user));
+        win.localStorage.setItem('gMaelstrom_authedUser', JSON.stringify({ accessToken: token, user }));
       }
     });
   });

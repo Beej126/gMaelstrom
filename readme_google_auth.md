@@ -1,4 +1,4 @@
-Instructions to generate your Google OAuth Client ID and API Key for use with your Gmail app:
+Your personal Google Authentication requires one time setup:
 
 1. Go to Google Cloud Console
    1. Visit: https://console.cloud.google.com/

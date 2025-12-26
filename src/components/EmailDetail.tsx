@@ -23,8 +23,8 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
-import { useEmailContext } from '../app/ctxEmail';
-import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead, markEmailsAsUnread } from '../app/gmailApi';
+import { useApiDataCache } from '../app/ctxApiDataCache';
+import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead } from '../app/gMailApi';
 // import { Email } from '../types/email';
 import {
   extractHtmlContent,
@@ -141,7 +141,7 @@ const getInitials = (name: string) => {
 
 const EmailDetail: React.FC = () => {
   const { emailId } = useParams<{ emailId: string }>();
-  const { selectedEmail, setSelectedEmail, updateEmailInContext, getCachedEmail, setCachedEmail } = useEmailContext();
+  const { selectedEmail, setSelectedEmail, updatePageEmail: updateEmailInContext, getCachedEmail, setCachedEmail } = useApiDataCache();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [emailThread, setEmailThread] = useState<gapi.client.gmail.Message[]>([]);
@@ -170,7 +170,7 @@ const EmailDetail: React.FC = () => {
       // setSelectedEmail(updated); // REMOVE THIS LINE
       updateEmailInContext(updated);
       setIsReadLocal(true);
-      if (selectedEmail.id) markEmailsAsRead([selectedEmail.id]);
+      if (selectedEmail.id) markEmailsAsRead([selectedEmail.id], true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail?.id]);
@@ -241,7 +241,7 @@ const EmailDetail: React.FC = () => {
       };
       setIsReadLocal(true);
       updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id]);
+      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id], true);
     } else {
       // Mark as unread
       updated = {
@@ -251,7 +251,7 @@ const EmailDetail: React.FC = () => {
       };
       setIsReadLocal(false);
       updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailsAsUnread([selectedEmail.id]);
+      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id], false);
     }
     // Do NOT call setSelectedEmail(updated) here
   };

@@ -1,18 +1,20 @@
-console.log('[MainLayout] render');
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Snackbar, Alert, useTheme, IconButton, Tooltip, Checkbox } from '@mui/material';
+import { Box, Typography, useTheme, IconButton, Tooltip, Checkbox, Alert } from '@mui/material';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from '../components/Sidebar';
 import EmailList from '../components/EmailList';
 import Header from '../components/Header';
-import { useEmailContext } from './ctxEmail';
-import { markEmailsAsUnread } from './gmailApi';
-import './MainLayout.css';
+import { useApiDataCache } from './ctxApiDataCache';
+import { markEmailsAsRead } from './gMailApi';
+import './MainLayout.scss';
+import { useUser } from './gAuthApi';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 const MainLayout: React.FC = () => {
-  const { error, selectedCategory } = useEmailContext();
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const { selectedCategory } = useApiDataCache();
   const theme = useTheme();
+  const user = useUser();
 
   // State for checked emails, lifted up from EmailList
   const [checkedEmails, setCheckedEmails] = useState<Record<string, boolean>>({});
@@ -20,6 +22,11 @@ const MainLayout: React.FC = () => {
   const allEmailIds = Object.keys(checkedEmails);
   const allChecked = allEmailIds.length > 0 && allEmailIds.every(id => checkedEmails[id]);
   const someChecked = allEmailIds.some(id => checkedEmails[id]) && !allChecked;
+
+  const [google_auth_readme_md, setMd] = useState('');
+  useEffect(() => {
+    fetch('/readme_google_auth.md').then(res => res.text()).then(setMd);
+  }, []);
 
   // Set CSS variables based on theme
   useEffect(() => {
@@ -37,30 +44,15 @@ const MainLayout: React.FC = () => {
     }
   }, [theme.palette.background.default, theme.palette.background.paper, theme.palette.divider, theme.palette.mode, theme.palette.primary.main]);
 
-  // Show error snackbar when there's an error
-  useEffect(() => {
-    if (error) {
-      setSnackbarOpen(true);
-    }
-  }, [error]);
-
-
-  const handleSnackbarClose = () => {
-    setSnackbarOpen(false);
-  };
 
   const handleMarkAsUnread = async () => {
     const selectedIds = Object.entries(checkedEmails)
       .filter(([_, checked]) => checked)
       .map(([id]) => id);
     if (!selectedIds.length) return;
-    try {
-      await markEmailsAsUnread(selectedIds);
-      setCheckedEmails({}); // Clear selection
-      // EmailList should handle refresh logic
-    } catch {
-      setSnackbarOpen(true);
-    }
+
+    await markEmailsAsRead(selectedIds, false);
+    setCheckedEmails({}); // Clear selection
   };
 
   const handleCheckAll = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,12 +71,12 @@ const MainLayout: React.FC = () => {
         <Sidebar />
         <div className="email-content">
           <div className="email-header">
-            <Typography 
-              variant="h6" 
-              component="div" 
-              sx={{ 
-                flexGrow: 1, 
-                display: 'flex', 
+            <Typography
+              variant="h6"
+              component="div"
+              sx={{
+                flexGrow: 1,
+                display: 'flex',
                 alignItems: 'center',
                 color: theme => theme.palette.mode === 'light' ? '#222' : theme.palette.text.primary,
                 fontWeight: 600
@@ -129,21 +121,22 @@ const MainLayout: React.FC = () => {
               </Box>
             </Typography>
           </div>
-          
-          <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
+
+          {user?.authFailed ? (<>
+            <Alert severity="error" >
+              Sign in error. Please refresh to try again.
+            </Alert>
+
+            <div className="google-auth-readme-markdown-fill-scroll">
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{google_auth_readme_md}</ReactMarkdown>
+            </div>
+          </>) :
+
+            <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
+          }
         </div>
       </div>
 
-      <Snackbar 
-        open={snackbarOpen} 
-        autoHideDuration={6000} 
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

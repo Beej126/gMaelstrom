@@ -1,33 +1,28 @@
-
 import RefreshIcon from '@mui/icons-material/Refresh';
-// Extend Window interface for __EMAILGRID_DEBUG__
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Chip, useTheme } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
-import { useEmailContext } from '../app/ctxEmail';
+import { useApiDataCache } from '../app/ctxApiDataCache';
 import { getFrom, getSubject, getDate, isRead } from '../helpers/emailParser';
 import { useNavigate } from 'react-router-dom';
-import { mui_DataGrid_Vars } from '../app/MUI.DataGrid.vars';
+
+const rowHeight = 26;
 
 // to pass debug info to Cypress tests
 declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    __EMAILGRID_DEBUG__?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Cypress?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cy?: any;
+    [index: string]: any;
   }
 }
 
 // Cypress cy.task logging for debug output in tests
-const cypressLog = (msg: string) => {
-  if (window.Cypress && window.cy && window.cy.task) {
-    window.cy.task('log', msg);
-  }
-};
+// const cypressLog = (msg: string) => {
+//   if (window.Cypress && window.cy && window.cy.task) {
+//     window.cy.task('log', msg);
+//   }
+// };
 
 
 const EmailList: React.FC<{
@@ -35,25 +30,9 @@ const EmailList: React.FC<{
   setCheckedEmails?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }> = props => {
 
-  const rowHeight = 26; // Set to desired tightness (e.g., 36px)
-  const headerHeight = mui_DataGrid_Vars.dataGridHeaderHeight;
-  const footerHeight = mui_DataGrid_Vars.dataGridFooterHeight;
+  const cache = useApiDataCache();
 
   const [refreshing, setRefreshing] = useState(false);
-
-  const {
-    getPageEmails,
-    fetchEmails,
-    selectedEmail,
-    loading,
-    labelVisibility,
-    totalEmails,
-    currentPage,
-    setCurrentPage,
-    pageSize,
-    setPageSize
-  } = useEmailContext() as ReturnType<typeof useEmailContext> & { getPageEmails: (page: number, pageSize: number) => gapi.client.gmail.Message[] };
-
   const navigate = useNavigate();
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
   const checkedEmails = props.checkedEmails ?? internalCheckedEmails;
@@ -62,36 +41,58 @@ const EmailList: React.FC<{
 
   // Use the computed available height for both container and DataGrid
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
-  // const [rowsToShow, setRowsToShow] = useState<number>(10);
-
-  // Sync DataGrid pagination with context
-  const [paginationModel, setPaginationModel] = useState({ page: currentPage, pageSize });
-
 
   // Diagnostic: Log DataGrid DOM element heights to Cypress
-  useEffect(() => {
-    if (
-      typeof window !== 'undefined' &&
-      window.Cypress &&
-      gridContainerRef.current &&
-      typeof containerHeight === 'number'
-    ) {
-      const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-      const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
-      const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
-      const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
-      cypressLog('[DIAG] containerHeight: ' + containerHeight);
-      if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
-      if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
-      if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
-      if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
-    }
-  }, [containerHeight]);
+  // useEffect(() => {
+  //   if (
+  //     typeof window !== 'undefined' &&
+  //     window.Cypress &&
+  //     gridContainerRef.current &&
+  //     typeof containerHeight === 'number'
+  //   ) {
+  //     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+  //     const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
+  //     const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
+  //     const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
+  //     cypressLog('[DIAG] containerHeight: ' + containerHeight);
+  //     if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
+  //     if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
+  //     if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
+  //     if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
+  //   }
+  // }, [containerHeight]);
 
 
+  // Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
+  // useEffect(() => {
+  //   if (
+  //     typeof window !== 'undefined' &&
+  //     window.Cypress &&
+  //     gridContainerRef.current &&
+  //     typeof containerHeight === 'number'
+  //   ) {
+  //     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+  //     if (gridRoot) {
+  //       const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
+  //       const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
+  //       const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
+  //       const body = gridRoot.querySelector('.MuiDataGrid-main');
+  //       window.__EMAILGRID_DEBUG__ = {
+  //         containerHeight,
+  //         gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
+  //         virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
+  //         footerHeight: footer ? footer.clientHeight : undefined,
+  //         headerHeight: header ? header.clientHeight : undefined,
+  //         bodyHeight: body ? body.clientHeight : undefined,
+  //       };
+  //       cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
+  //     }
+  //   }
+  // }, [containerHeight]);
+
   useEffect(() => {
+
     // Use ResizeObserver on .email-content for robust sizing
-    let observer: ResizeObserver | undefined;
     const updatePageSizeAndHeight = () => {
       // Find the main content container
       const mainContent = document.querySelector('.MuiDataGrid-mainContent');
@@ -106,44 +107,31 @@ const EmailList: React.FC<{
       const available = headerRowClient.clientHeight - topContainer.clientHeight;
       // Calculate max whole rows that fit
       const rows = Math.max(10, Math.floor(available / rowHeight));
-      setPageSize(rows);
-      setPaginationModel((prev) => prev.pageSize === rows ? prev : { ...prev, pageSize: rows });
-      // Set container height to headerRowClient height
+      cache.setPageSize(rows);
       setContainerHeight(headerRowClient.clientHeight);
     };
+
     updatePageSizeAndHeight();
+
     const gridParent = document.querySelector('.email-content');
-    if (gridParent && typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => {
-        updatePageSizeAndHeight();
-      });
-      observer.observe(gridParent as HTMLElement);
-    }
-    return () => {
-      if (observer && gridParent) observer.unobserve(gridParent as HTMLElement);
-    };
-  }, [rowHeight, setPageSize, headerHeight, footerHeight, totalEmails]);
+    const observer = new ResizeObserver(updatePageSizeAndHeight);
+    observer.observe(gridParent as HTMLElement);
 
+    return () => observer.unobserve(gridParent as HTMLElement);
 
-  // Fetch page when pagination changes
-  useEffect(() => {
-    console.log('[EmailList] useEffect pagination', paginationModel);
-    fetchEmails(paginationModel.page, paginationModel.pageSize);
-    if (currentPage !== paginationModel.page) setCurrentPage(paginationModel.page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, fetchEmails, setCurrentPage, currentPage]);
+  }, []);
+
 
 
   const prettifyLabel = useCallback((labelId: string): string => {
-    // Prefer dynamic label name from context, but prettify if it looks like a system label
-    if (typeof labelVisibility === 'object' && labelId in labelVisibility) {
-      // If labelVisibility has a name mapping, use it (not always true)
-      // But we don't have dynamicLabelNameMap here, so just prettify
-    }
+    // Try to find the label name from context.labels
+    const found = Object.values(cache.labels).find(l => l.id === labelId);
+    if (found) return found.name;
     let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
     label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
     return label;
-  }, [labelVisibility]);
+  }, [cache.labels]);
 
 
   const columns = useMemo<GridColDef[]>(() => [
@@ -219,173 +207,104 @@ const EmailList: React.FC<{
       field: 'labels',
       headerName: 'Labels',
       width: 120,
-      renderCell: (params: GridRenderCellParams) => (
-        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
-          {params.row.labelIds?.filter((label: string) => labelVisibility[label] !== false).map((label: string) => (
-            <Chip key={label} label={prettifyLabel(label)} size="small" sx={{ height: 18, fontSize: '0.72rem', bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444', color: theme.palette.text.primary, px: '0px', borderRadius: 1.5, fontWeight: 500, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }} variant="outlined" />
-          ))}
-        </Box>
-      ),
+      renderCell: (params: GridRenderCellParams) => {
+        // Only show labels that are visible in context.labels
+        const visibleLabelIds = params.row.labelIds?.filter((labelId: string) => {
+          const found = Object.values(cache.labels).find(l => l.id === labelId);
+          return found ? found.visible !== false : true;
+        }) ?? [];
+        return (
+          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
+            {visibleLabelIds.map((label: string) => (
+              <Chip key={label} label={prettifyLabel(label)} size="small" sx={{ height: 18, fontSize: '0.72rem', bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444', color: theme.palette.text.primary, px: '0px', borderRadius: 1.5, fontWeight: 500, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }} variant="outlined" />
+            ))}
+          </Box>
+        );
+      },
       resizable: true
     }
-  ], [checkedEmails, setCheckedEmails, labelVisibility, prettifyLabel, theme]);
+  ], [checkedEmails, setCheckedEmails, cache.labels, prettifyLabel, theme]);
+
 
   // Prepare rows for DataGrid, pad to always match pageSize
   const rows = useMemo(() => {
-    const pageEmails = getPageEmails(paginationModel.page, paginationModel.pageSize);
+    const pageEmails = cache.getPageEmails(cache.currentPage, cache.pageSize);
     const baseRows = pageEmails.map((email: gapi.client.gmail.Message) => ({
       ...email,
       id: email.id,
       threadCount: pageEmails.filter((e: gapi.client.gmail.Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
     }));
-    if (baseRows.length < paginationModel.pageSize) {
+    if (baseRows.length < cache.pageSize) {
       // Pad with empty rows to always fill the grid
-      const emptyRows = Array.from({ length: paginationModel.pageSize - baseRows.length }, (_, i) => ({ id: `empty-${i}`, isPlaceholder: true }));
+      const emptyRows = Array.from({ length: cache.pageSize - baseRows.length }, (_, i) => ({ id: `empty-${i}`, isPlaceholder: true }));
       return [...baseRows, ...emptyRows];
     }
     return baseRows;
-  }, [getPageEmails, paginationModel.page, paginationModel.pageSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cache.getPageEmails, cache.currentPage, cache.pageSize]);
 
   const handleRowClick = useCallback((params: GridRowParams) => {
     navigate(`/email/${params.row.id}`);
   }, [navigate]);
 
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchEmails(0, pageSize);
+    await cache.fetchEmails(0, cache.pageSize);
     setRefreshing(false);
   };
 
-
-
-  // Use 100% height to fit parent, let parent control the height
-  // Ref for the grid container
-  const gridContainerRef = useRef<HTMLDivElement>(null);
-  const pageSizeRef = useRef(pageSize);
-  const paginationModelRef = useRef(paginationModel);
-  // Keep refs in sync
-  useEffect(() => { pageSizeRef.current = pageSize; }, [pageSize]);
-  useEffect(() => { paginationModelRef.current = paginationModel; }, [paginationModel]);
-
-  // Compute grid height based on the container's clientHeight
-  useEffect(() => {
-    function updatePageSize() {
-      let available = 0;
-      // Use window.innerHeight minus header/footer heights for accurate available space
-      // Header: 64px (main header), Email header: 48px, plus any parent padding/margins if present
-      const mainHeader = 64;
-      const emailHeader = 48;
-      available = window.innerHeight - mainHeader - emailHeader;
-      // Subtract fudge factor to avoid overflow
-      const fudge = 40;
-      const rows = Math.max(10, Math.floor((available - headerHeight - footerHeight - fudge) / rowHeight));
-      // Expose debug info for Cypress
-      if (typeof window !== 'undefined') {
-        window.__EMAILGRID_DEBUG__ = {
-          available,
-          headerHeight,
-          footerHeight,
-          rowHeight,
-          fudge,
-          rows
-        };
-      }
-      // Only update if value actually changes
-      if (rows !== pageSizeRef.current) {
-        setPageSize(rows);
-      }
-      if (paginationModelRef.current.pageSize !== rows) {
-        setPaginationModel((prev) => prev.pageSize === rows ? prev : { ...prev, pageSize: rows });
-      }
-    }
-    // Initial sizing
-    updatePageSize();
-    // Stable handler for resize
-    const handleResize = () => {
-      updatePageSize();
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-    // Only run on mount/unmount
-  }, [headerHeight, footerHeight, rowHeight, setPageSize]);
-
-
-  // (No longer needed: containerHeight is set in the above effect)
-
-  // Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
-  useEffect(() => {
-    if (
-      typeof window !== 'undefined' &&
-      window.Cypress &&
-      gridContainerRef.current &&
-      typeof containerHeight === 'number'
-    ) {
-      const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-      if (gridRoot) {
-        const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
-        const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
-        const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
-        const body = gridRoot.querySelector('.MuiDataGrid-main');
-        window.__EMAILGRID_DEBUG__ = {
-          containerHeight,
-          gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
-          virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
-          footerHeight: footer ? footer.clientHeight : undefined,
-          headerHeight: header ? header.clientHeight : undefined,
-          bodyHeight: body ? body.clientHeight : undefined,
-        };
-        cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
-      }
-    }
-  }, [containerHeight]);
 
   return (
     <Box sx={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
         <button
           onClick={handleRefresh}
-          disabled={refreshing || loading}
+          disabled={refreshing || cache.loading}
           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 16px', borderRadius: 4, border: 'none', background: '#1976d2', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
         >
           <RefreshIcon fontSize="small" /> Refresh
         </button>
       </Box>
       <div
-        ref={gridContainerRef}
+        // ref={gridContainerRef}
         style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <DataGrid
           rows={rows}
           columns={columns}
-          pagination
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[paginationModel.pageSize]}
-          rowCount={totalEmails}
+          paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}
+          onPaginationModelChange={({ page, pageSize }) => {
+            cache.setPageSize(pageSize);
+            if (page !== cache.currentPage) cache.setCurrentPage(page);
+          }}
+          pageSizeOptions={[cache.pageSize]}
+          rowCount={cache.totalEmails}
           paginationMode="server"
           autoHeight={false}
           onRowClick={handleRowClick}
-          loading={loading}
+          loading={cache.loading}
           disableRowSelectionOnClick
           checkboxSelection={false}
           getRowClassName={(params: GridRowClassNameParams<gapi.client.gmail.Message>) => {
             if (!params.row) return '';
-            if (params.row.id === selectedEmail?.id) return 'Mui-selected';
+            if (params.row.id === cache.selectedEmail?.id) return 'Mui-selected';
             return isRead(params.row) ? 'email-read' : 'email-unread';
           }}
           rowHeight={rowHeight}
           sx={{
             border: 0,
             height: containerHeight ? `${containerHeight}px` : '100%',
-            minHeight: 0,
-            overflow: 'hidden',
-            '::-webkit-scrollbar': { display: 'none' },
-            scrollbarWidth: 'none',
-            '& .MuiDataGrid-virtualScroller': {
-              overflowY: 'hidden !important',
+            minHeight: 300,
+            background: 'var(--email-content-bg)',
+            '.MuiDataGrid-footerContainer': {
+              background: 'var(--email-header-bg)',
+              borderTop: '1px solid var(--border-color)',
             },
-            '& .MuiDataGrid-columnSeparator': { cursor: 'col-resize' },
-            '& .MuiDataGrid-cell': { cursor: 'pointer' },
+            '.MuiDataGrid-columnHeaders': {
+              background: 'var(--email-header-bg)',
+              borderBottom: '1px solid var(--border-color)',
+            },
           }}
         />
       </div>

@@ -1,0 +1,6 @@
+{
+  "recommendations": [
+    "blueglassblock.better-json5", // nugget: for viewing pnpm's package.json5 which !FINALLY! supports comments 🚀
+    "dbaeumer.vscode-eslint"
+  ]
+}

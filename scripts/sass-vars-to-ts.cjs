@@ -1,10 +1,12 @@
+/* eslint-disable no-undef */
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Modern SCSS variable extraction using regex
 // No external packages required
 
 const fs = require('fs');
 const path = require('path');
 
-const scssPath = path.resolve(__dirname, '../app/MUI.DataGrid.scss');
+const scssPath = path.resolve(__dirname, '../src/app/MUI.DataGrid.scss');
 const scssContent = fs.readFileSync(scssPath, 'utf8');
 
 // Regex to match simple SCSS variables: $var: value;

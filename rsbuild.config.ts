@@ -29,5 +29,8 @@ export default defineConfig({
   html: {
     title: 'gMaelstrom',
     favicon: './public/favicon.svg',
+    meta: [
+      { name: 'google-identity-services-enable-fedcm', content: 'true' }
+    ],
   },
 });

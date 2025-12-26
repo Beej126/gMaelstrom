@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const scssPath = path.resolve(__dirname, '../app/MUI.DataGrid.scss');
+const scssPath = path.resolve(__dirname, '../src/app/MUI.DataGrid.scss');
 const scssContent = fs.readFileSync(scssPath, 'utf8');
 
 // Regex to match simple SCSS variables: $var: value;
@@ -30,6 +30,6 @@ while ((match = varRegex.exec(scssContent)) !== null) {
 }
 
 const tsContent = `// Auto-generated from SCSS by export-sass-vars.cjs\nexport const mui_DataGrid_Vars = ${JSON.stringify(gridVars, null, 2)} as const;\nexport type MUI_DataGrid_Vars = typeof mui_DataGrid_Vars;\n`;
-fs.writeFileSync(path.resolve(__dirname, '../app/MUI.DataGrid.vars.ts'), tsContent);
-console.log('TypeScript file written to src/app/MUI.DataGrid.vars.ts');
+fs.writeFileSync(path.resolve(__dirname, '../src/app/MUI.DataGrid.vars.ts'), tsContent);
+console.log('TypeScript file written to $/src/app/MUI.DataGrid.vars.ts');
 

@@ -34,6 +34,15 @@ attachments | required an incredible amount of handling logic... email attachmen
 - once a reasonable baseline is achieved i'll move into typical github issues
 1. please record for all time that i don't like calling methods "handleXyz", i prefer "onXyz", please rename all of them across the app
 1. google api calls have extra unecessary calls to eliminate - there's 429 errors (too many requests) when switching between inbox and trash
+
+1. Improved Email Threading: While you have basic thread support with the thread count chip, you could enhance this by showing threaded conversations in the email detail view.
+1. Search Functionality: Add a search bar to filter emails by sender, subject, or content.
+1. Labels and Categories: Implement Gmail-like labels for better email organization.
+1. Responsive Design Improvements: Ensure the application works well on mobile devices.
+1. Performance Optimizations: For handling large numbers of emails, consider implementing virtualized lists.
+1. Offline Support: Add offline capabilities with service workers.
+1. Email Composition: Add a full-featured email composition interface.
+
 1. in header.tsx break each menu out into a separate .tsx file, for example the "settings  menu", "profile menu", etc
 1. there's a mild read/unread transition bug... click into unread email, it should auto flip to read, but then manually flip it back to unread and return to email list, then go back into it and it will NOT auto flip to read at this point, fun =)
 1. have the email detail land in the same space as the email list versus taking over the whole page

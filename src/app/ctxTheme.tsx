@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles, useMediaQuery } from '@mui/material';
-import { Theme as _Theme, ThemeOptions as _ThemeOptions } from '@mui/material/styles';
 
 // Interface for font size settings based on density
 interface FontSizeSettings {

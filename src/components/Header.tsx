@@ -30,23 +30,18 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ForumIcon from '@mui/icons-material/Forum';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import { getUser, signOut, refreshGmailAccessToken } from '../app/GAuthApi';
+import { getAuthedUser, signOut, useUser } from '../app/gAuthApi';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningIcon from '@mui/icons-material/Warning';
 import { useThemeContext } from '../app/ctxTheme';
-import { useEmailContext } from '../app/ctxEmail';
+import { useApiDataCache } from '../app/ctxApiDataCache';
 import GMaelstromIcon from './gMaelstromLogoSvg';
+import LabelSettingsDialog from './LabelSettingsDialog';
 import { toast } from 'react-toastify';
 
-const onRefreshToken = () => {
-  refreshGmailAccessToken()
-    .then(() => {
-      toast.success('Gmail API access token refreshed!');
-    })
-    .catch((err) => {
-      toast.error('Failed to refresh token: ' + err.message);
-    });
-};
+const onRefreshToken = () => getAuthedUser(true)
+  .then(() => toast.success('Gmail API access token refreshed!'))
+  .catch(err => toast.error(err.message)); 
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -93,25 +88,12 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 const Header: React.FC = () => {
   const theme = useTheme();
   const { mode, toggleTheme, density, setDensity } = useThemeContext();
-  const emailContext = useEmailContext();
-  const { combineThreads, setCombineThreads } = emailContext;
+  const cache = useApiDataCache();
+  const [labelSettingsOpen, setLabelSettingsOpen] = useState(false);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const user = getUser();
-  // Helper to get initials from user's name or email
-  const getInitials = (name?: string, email?: string) => {
-    const base = name && name.trim() ? name : (email || '');
-    if (!base) return 'U';
-    const parts = base.trim().split(/\s+|\./); // split on space or dot
-    if (parts.length === 1) {
-      return parts[0].charAt(0).toUpperCase();
-    }
-    return (
-      parts[0].charAt(0).toUpperCase() +
-      parts[parts.length - 1].charAt(0).toUpperCase()
-    );
-  };
+  const user = useUser();
 
   const onProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setProfileAnchorEl(event.currentTarget);
@@ -129,11 +111,7 @@ const Header: React.FC = () => {
     setSettingsAnchorEl(null);
   };
 
-  const onSignOut = () => {
-    signOut().then(() => {
-      window.location.href = '/login';
-    });
-  };
+  const onSignOut = () => signOut().then(window.location.reload);
 
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -141,8 +119,7 @@ const Header: React.FC = () => {
 
   const onSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Implement search functionality here
-    console.log('Search for:', searchQuery);
+    toast.info("TBD =)");
   };
 
   // Theme toggle separately from menu item click
@@ -160,7 +137,7 @@ const Header: React.FC = () => {
   // Combine threads toggle
   const onCombineThreadsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     event.stopPropagation();
-    setCombineThreads(!combineThreads);
+    cache.setCombineThreads(!cache.combineThreads);
   };
 
   // Un-ignore all warnings
@@ -251,18 +228,18 @@ const Header: React.FC = () => {
             </IconButton>
           </Tooltip> */}
 
-          <Tooltip title={user?.getName() || 'User'}>
+          <Tooltip title={user?.name || 'User'}>
             <IconButton
               size="large"
               edge="end"
               aria-haspopup="true"
               onClick={onProfileMenuOpen}
             >
-              {user?.getImageUrl() ? (
-                <Avatar src={user.getImageUrl()} alt={user.getName() || user?.getEmail() || 'User'} />
+              {user?.picture ? (
+                <Avatar src={user.picture} alt={user.name || user.email || 'User'} />
               ) : (
                 <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
-                  {getInitials(user?.getName(), user?.getEmail())}
+                  {user?.initials || '??'}
                 </Avatar>
               )}
             </IconButton>
@@ -351,7 +328,7 @@ const Header: React.FC = () => {
         </MenuItem>
         <Divider sx={{ my: 0, minHeight: 0 }} />
         <MenuItem
-          onClick={() => setCombineThreads(!combineThreads)}
+          onClick={() => cache.setCombineThreads(!cache.combineThreads)}
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -366,14 +343,14 @@ const Header: React.FC = () => {
             <ListItemText>Combine Threads</ListItemText>
           </Box>
           <Switch
-            checked={combineThreads}
+            checked={cache.combineThreads}
             onChange={onCombineThreadsChange}
             onClick={(e) => e.stopPropagation()}
           />
         </MenuItem>
         <Divider sx={{ my: 0, minHeight: 0 }} />
         <MenuItem
-          onClick={() => { emailContext.setLabelSettingsOpen(true); onSettingsMenuClose(); }}
+          onClick={() => { setLabelSettingsOpen(true); onSettingsMenuClose(); }}
           sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}
         >
           <ListItemIcon>
@@ -381,6 +358,8 @@ const Header: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Label Settings</ListItemText>
         </MenuItem>
+        {/* Host the Label Settings Dialog here, controlled by local state */}
+        <LabelSettingsDialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} />
         <Divider sx={{ my: 0, minHeight: 0 }} />
         <MenuItem
           onClick={onUnignoreAllWarnings}
@@ -412,13 +391,13 @@ const Header: React.FC = () => {
         }}
       >
         <Box sx={{ px: 2, py: 1 }}>
-          <Typography variant="subtitle1">{user?.getName()}</Typography>
-          <Typography variant="body2" color="text.secondary">{user?.getEmail()}</Typography>
+          <Typography variant="subtitle1">{user?.name}</Typography>
+          <Typography variant="body2" color="text.secondary">{user?.email}</Typography>
         </Box>
         <Divider />
         <MenuItem
           component="a"
-          href={user?.getEmail() ? `https://myaccount.google.com/?authuser=${encodeURIComponent(user.getEmail())}` : 'https://myaccount.google.com'}
+          href={user?.email ? `https://myaccount.google.com/?authuser=${encodeURIComponent(user.email)}` : 'https://myaccount.google.com'}
           target="_blank"
           rel="noopener noreferrer"
           onClick={onProfileMenuClose}
@@ -441,6 +420,9 @@ const Header: React.FC = () => {
           <ListItemText>Refresh Auth Token</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Host the Label Settings Dialog here, controlled by context */}
+      <LabelSettingsDialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} />
     </AppBar>
   );
 };

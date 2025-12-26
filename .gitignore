@@ -1,14 +1,10 @@
 #secrets
 .env
 
-# Local
-.DS_Store
-*.local
-*.log*
-
 # Dist
 node_modules
 dist/
 
-# IDE
-.idea
+package-lock.json
+package.json
+public/readme_google_auth.md

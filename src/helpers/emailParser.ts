@@ -362,8 +362,8 @@ export const replaceInlineAttachments = async (
   // Debug console log to show if there are any remaining cid: references
   const remainingCids = result.match(/src=["']cid:[^"']+["']/gi);
   if (remainingCids && remainingCids.length > 0) {
-    console.log('Remaining unresolved CID references:', remainingCids);
-    console.log('Available content IDs:', Object.keys(attachments));
+    // console.log('Remaining unresolved CID references:', remainingCids);
+    // console.log('Available content IDs:', Object.keys(attachments));
   }
   
   return result;
