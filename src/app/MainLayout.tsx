@@ -127,7 +127,7 @@ const MainLayout: React.FC = () => {
               Sign in error. Please refresh to try again.
             </Alert>
 
-            <div className="google-auth-readme-markdown-fill-scroll">
+            <div className="google-auth-readme">
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{google_auth_readme_md}</ReactMarkdown>
             </div>
           </>) :

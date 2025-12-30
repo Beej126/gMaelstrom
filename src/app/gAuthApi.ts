@@ -25,7 +25,8 @@ export type AuthedUser = Required<Pick<TokenPayload, "name" | "given_name" | "fa
 
 let authedUser: AuthedUser | null = null;
 /**
- * sets global getAuthedUser() regardless of returns .authedFailed = true if sign-in fails/cancelled to give specifically timed indicator (via useUser hook) for UI to display failure
+ * sets global getAuthedUser() regardless of success/fail
+ * returns .authedFailed = true if sign-in fails/cancelled to provide specifically timed indicator (via useUser hook) for UI to display failure
  * Returns the current authed user when succeeds
  * throws exception on error so the calling stack immediately dies, code callers based on success, no "if failed" checks
  * pass refreshToken=true to force a token refresh
