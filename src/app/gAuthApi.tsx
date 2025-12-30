@@ -60,11 +60,11 @@ let signInPromise: Promise<void> | null = null;
  * Stores user profile and access token in localStorage.
  */
 const ensureSignedIn = async (): Promise<void> => {
-
-    if (signInPromise) return signInPromise;
+    
+     if (signInPromise) return signInPromise;
 
     signInPromise = (async () => {
-        // 1. Load GIS script and initialize
+        // 1. Load GIS script if needed
         if (!window.google?.accounts?.id) {
             await new Promise<void>((resolve, reject) => {
                 if (!GOOGLE_CLIENT_ID) {
@@ -77,34 +77,35 @@ const ensureSignedIn = async (): Promise<void> => {
                 }
                 const script = document.createElement('script');
                 script.src = 'https://accounts.google.com/gsi/client';
-                script.onload = () => {
-                    try {
-                        window.google.accounts.id.initialize({
-                            client_id: GOOGLE_CLIENT_ID,
-                            callback: () => { } // no-op
-                        });
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                script.onerror = () => {
-                    reject(new Error("Failed to load Google Identity Services"));
-                };
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
                 document.body.appendChild(script);
             });
         }
 
-        // 2. Prompt for sign-in
+        // 2. Initialize GIS with credential callback
+        let resolved = false;
         await new Promise<void>((resolve, reject) => {
-
-            // window.google.accounts.id.prompt() is googles "one-tap" prompt, just a floating button without requiring any creds input or redirects
-            window.google.accounts.id.prompt((notification: google.accounts.id.PromptMomentNotification) => {
-                // FedCM-compliant: use notification.momentType (Federated Credential Management)
-                (async () => {
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                callback: async (response: google.accounts.id.CredentialResponse | any) => {
                     try {
-                        if (notification.momentType === 'skipped' || notification.momentType === 'not_displayed') {
-                            // **** Fallback: show popup and get token ****
+                        console.log('[gAuthApi] One Tap callback response:', response);
+                        if (response.credential) {
+                            try {
+                                const profile = JSON.parse(atob(response.credential.split('.')[1]));
+                                console.log('[gAuthApi] Decoded profile:', profile);
+                                const token = await getToken();
+                                setAuthedUser({ authFailed: false, accessToken: token, ...profile });
+                                resolved = true;
+                                resolve();
+                            } catch (parseErr) {
+                                console.error('[gAuthApi] Error decoding credential:', parseErr);
+                                throw parseErr;
+                            }
+                        } else {
+                            console.warn('[gAuthApi] No credential in response, triggering fallback popup. Full response:', response);
                             const token = await getToken();
                             const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
                                 headers: { Authorization: `Bearer ${token}` }
@@ -112,28 +113,22 @@ const ensureSignedIn = async (): Promise<void> => {
                             if (!res.ok) throw new Error('Failed to fetch user profile');
                             const profile = await res.json();
                             setAuthedUser({ authFailed: false, accessToken: token, ...profile });
+                            resolved = true;
                             resolve();
-                        } else if (notification.momentType === 'display') {
-                            // One-tap: decode JWT, then get token
-                            window.google.accounts.id.initialize({
-                                client_id: GOOGLE_CLIENT_ID,
-                                callback: async (response: google.accounts.id.CredentialResponse) => {
-                                    try {
-                                        const profile = JSON.parse(atob(response.credential.split('.')[1]));
-                                        const token = await getToken();
-                                        setAuthedUser({ authFailed: false, accessToken: token, ...profile });
-                                        resolve();
-                                    } catch (err) {
-                                        reject(err);
-                                    }
-                                }
-                            });
                         }
-                        // else: handle other momentTypes if needed
                     } catch (err) {
+                        console.error('[gAuthApi] Error in One Tap callback:', err);
                         reject(err);
                     }
-                })();
+                }
+            });
+            // 3. Show One Tap prompt
+            window.google.accounts.id.prompt((notification: google.accounts.id.PromptMomentNotification) => {
+                // Optionally handle notification.momentType for UI/UX, but do not re-initialize or process credentials here
+                // If user dismisses, the callback above will handle fallback
+                if (!resolved && (notification.momentType === 'skipped' || notification.momentType === 'not_displayed')) {
+                    // Fallback will be triggered in the callback above
+                }
             });
         });
     })();

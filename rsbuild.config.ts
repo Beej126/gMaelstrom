@@ -3,6 +3,8 @@ import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginSvgr } from '@rsbuild/plugin-svgr';
 import { pluginTypeCheck } from "@rsbuild/plugin-type-check";
 import { pluginSass } from '@rsbuild/plugin-sass';
+import fs from 'fs';
+import path from 'path';
 
 export default defineConfig({
   source: {
@@ -23,6 +25,10 @@ export default defineConfig({
   ],
 
   server: {
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, 'localhost-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, 'localhost-cert.pem')),      
+    },
     port: 3500,
   },
 

@@ -8,3 +8,5 @@ dist/
 package-lock.json
 package.json
 public/readme_google_auth.md
+
+*.pem

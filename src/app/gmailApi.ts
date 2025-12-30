@@ -1,5 +1,5 @@
 import { getAuthedUser } from './gAuthApi';
-import { gmailApiBatchFetch } from './gmailApiBatchFetch';
+import { gmailApiBatchFetch } from './gMailApiBatchFetch';
 import { toast } from 'react-toastify';
 
 

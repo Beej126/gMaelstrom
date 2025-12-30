@@ -17,7 +17,7 @@ function Test-SemVer {
 }
 
 function checkInstall(
-    [string] $checkName,
+    [string[]] $checkNames,
     [string] $reason,
     [ScriptBlock] $installCommand,
     [string] $versionMin,
@@ -25,9 +25,10 @@ function checkInstall(
     [string] $versionParmName = "--version",
     [bool] $restart = $false
 ) {
-    if (!(Get-Command $checkName -ErrorAction SilentlyContinue)) { 
+    
+    if (!($checkNames | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue })) {
         $Host.UI.RawUI.FlushInputBuffer()
-        Write-Host "`n'$checkName' is not in path. purpose: $purpose. Attempt install? (y/n)" -NoNewline
+        Write-Host "`n'$checkNames' is not in path. purpose: $purpose. Attempt install? (y/n)" -NoNewline
         if ($Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character -ne "y") { echo "  aborting."; exit }
 
         & $installCommand
@@ -41,12 +42,12 @@ function checkInstall(
 
     if ($versionMin) {
 
-        $versionOutput = & $checkName $versionParmName 2>&1
+        $versionOutput = & $checkNames $versionParmName 2>&1
         $checkVersion = ($versionOutput | Select-String -Pattern '\d+(\.\d+)+').Matches[0].Value
 
         if (!(Test-SemVer -MinVersion $versionMin -CheckVersion $checkVersion)) {
 
-            Write-Host "$checkName currently $checkVersion, must be >= $versionMin." -NoNewline
+            Write-Host "$checkNames currently $checkVersion, must be >= $versionMin." -NoNewline
 
             if ($upgradeCommand) {
                 Write-Host "` Attempt upgrade? (y/n)" -NoNewline
@@ -78,8 +79,31 @@ checkInstall "node" "everybody loves raymond =)" `
     { nvm install latest; nvm use latest } `
     -versionMin "25" { }
 
-checkInstall "pnpm" "much improved package manager. for one we get jsonc comments in package.json!! =)" `
+checkInstall "pnpm" "much improved package manager. e.g. finally jsonc comments in package.json, yay!! =)" `
     { npm install -g pnpm }
+
+checkInstall "openssl" "for local https dev server cert gen" `
+    { winget install -e --id Git.Git --interactive --accept-source-agreements --accept-package-agreements } `
+    -restart $true
+
+if (!(Test-Path "localhost-key.pem") -or !(Test-Path "localhost-cert.pem")) {
+    Write-Host "`nGenerating self-signed certs for https dev server..."
+    & openssl req -x509 -newkey rsa:4096 -sha256 -days 825 -nodes `
+        -keyout localhost-key.pem `
+        -out localhost-cert.pem `
+        -subj "/CN=localhost" `
+        -addext "subjectAltName=DNS:localhost"
+}
+
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("localhost-cert.pem")
+if (!(Get-ChildItem -Path Cert:\LocalMachine\Root | Where-Object { $_.Thumbprint -eq $cert.Thumbprint })) {
+
+    checkInstall @("sudo", "gsudo") "elevation for adding cert to trusted store" `
+        { winget install --id gerardog.gsudo } `
+        -restart $true
+
+    gsudo Import-Certificate -FilePath .\localhost-cert.pem -CertStoreLocation Cert:\LocalMachine\Root
+}
 
 Write-Host "Environment check complete. Starting dev runtime..."
 pnpm run dev

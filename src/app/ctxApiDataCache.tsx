@@ -88,7 +88,7 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(-1);
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing] = useState<boolean>(false);
   const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
   const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
