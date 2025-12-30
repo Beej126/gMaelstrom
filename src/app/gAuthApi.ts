@@ -79,7 +79,7 @@ const oAuth = async (): Promise<void> => {
 
         // 2. Google "choose account" popup OAuth flow to get a Gmail access token and user profile
         const token = await getToken();
-        
+
         const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -96,7 +96,7 @@ const oAuth = async (): Promise<void> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     catch (ex: any) {
         setAuthedUser({ authFailed: true, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
-        throw new Error(`Sign-in failed: ${ex.message}`);
+        throw ex;
     } finally {
         signInPromise = null;
     }
