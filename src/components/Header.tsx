@@ -111,7 +111,7 @@ const Header: React.FC = () => {
     setSettingsAnchorEl(null);
   };
 
-  const onSignOut = () => signOut().then(window.location.reload);
+  const onSignOut = () => signOut();
 
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);

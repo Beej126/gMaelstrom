@@ -14,17 +14,6 @@ Your personal Google Authentication requires one time setup:
    1. Contact Info: your email
    1. Finish: [x] "I agree..." checkbox 
    1. <kbd>Create</kbd> button
-1. <kbd>Create OAuth client</kbd> button: https://console.cloud.google.com/auth/clients/create
-   1. Application type: **Web application**
-   1. Name: **gMaelstrom**
-   1. Authorized JavaScript origins:
-      - **https://localhost:3500** for dev runtime
-      - **https://localhost** for build runtime
-   1. Authorized redirect URIs: { not needed, leave empty }
-   1. <kbd>Create</kbd> button
-   1. <mark>*** Copy the "Client ID" shown to .env file in project ***</mark>
-   1. <kbd>OK</kbd> button
-   (now on the "OAuth 2.0 Client IDs" page)
 1. Define required gmail "scopes": https://console.cloud.google.com/auth/scopes
    1. <kbd>Add or remove scopes</kbd> button
    1. Add these to the "Your restricted scopes" at the bottom:
@@ -37,19 +26,37 @@ Your personal Google Authentication requires one time setup:
    1. select **gmail api** 
    1. and select it again on the next page
    1. <kbd>Enable</kbd> button
+1. <kbd>Create OAuth client</kbd> button: https://console.cloud.google.com/auth/clients/create
+   1. Application type: **Web application**
+   1. Name: **gMaelstrom**
+   1. Authorized JavaScript origins:
+      - **https://localhost:3500** for dev runtime
+      - **https://localhost** for build runtime
+   1. Authorized redirect URIs: { not needed, leave empty }
+   1. <kbd>Create</kbd> button
+   1. <mark>*** Copy the "Client ID" shown to .env file in project ***</mark>
+      ```
+      PUBLIC_GOOGLE_CLIENT_ID=your-client-id-here
+      ```
+   1. <kbd>OK</kbd> button
+   (now on the "OAuth 2.0 Client IDs" page)
+1. If you had to choose **EXERNAL** Audience above
+   1. under "APIs & Services" > "Credentials" > "OAth 2.0 Client ID" link
+   1. Click "Audience"
+   1. Make sure "Publishing status" is set to "Testing"
+   1. and add the main gmail address you wish to login under to "Test users" at the bottom
+
+---
+### realized API Key is not needed for gmail api calls
+
+The API key is typically required for Google services that use public, unauthenticated access (like Maps, some public APIs, or client-side JavaScript libraries). For Gmail and most Google Identity flows in a secure web app, only the OAuth Client ID is actually used for authentication and authorization.
+
+<s>
+
 1. Create an API Key (<kbd>Credentials</kbd> tab on the left): https://console.cloud.google.com/apis/credentials
    1. <kbd>Create credentials</kbd> button at the top
    1. \> <kbd>API key</kbd> option
    1. <mark>*** Copy the generated API key shown to .env file ***</mark>
    1. Optional but consider adding restrictions > <kbd>Edit API key</kbd>
-1. copy $/.env-example file to .env and paste in your credentials
-   - <mark>**NOTE**: the existing .gitignore safely excludes this file but if you're forking, please MAKE 100% SURE your .env does NOT get committed to your own repo</mark>
-   ```
-   PUBLIC_GOOGLE_CLIENT_ID=your-client-id-here
-   PUBLIC_GOOGLE_API_KEY=your-api-key-here
-   ```
-1. If you had to choose **EXERNAL** Audience above
-   1. again under "APIs & Services" > "Credentials" > "OAth 2.0 Client ID" link
-   1. Click "Audience"
-   1. Make sure "Publishing status" is set to "Testing"
-   1. and add the main gmail address you wish to login under to "Test users" at the bottom
+
+</s>

@@ -4,7 +4,6 @@ import { TokenPayload } from 'google-auth-library';
 // import { toast } from "react-toastify";
 
 const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
-const API_KEY = import.meta.env.PUBLIC_GOOGLE_API_KEY;
 
 export function useUser() {
     const [user, setUser] = useState<AuthedUser>();
@@ -42,7 +41,7 @@ export const getAuthedUser = async (refreshToken: boolean = false): Promise<Auth
     if (authedUser?.accessToken) return authedUser;
 
     // Try to sign in
-    await ensureSignedIn(); //calls setAuthedUser internally, so after await, authedUser will be populated for sure
+    await oAuth(); //calls setAuthedUser internally, so after await, authedUser will be populated for sure
     return authedUser!;
 };
 
@@ -53,26 +52,21 @@ const setAuthedUser = (authed: AuthedUser | null) => {
 };
 
 // --- GIS Initialization and Sign-In ---
+
+// We do NOT use Google One Tap here because this app always needs Gmail API access, which requires a full OAuth access token and user consent for Gmail scopes.
+// One Tap only provides an ID token and cannot grant Gmail API access without the popup.
 let signInPromise: Promise<void> | null = null;
 
-/**
- * Ensures GIS is loaded and user is signed in. Handles both one-tap and fallback popup flows.
- * Stores user profile and access token in localStorage.
- */
-const ensureSignedIn = async (): Promise<void> => {
-    
-     if (signInPromise) return signInPromise;
+const oAuth = async (): Promise<void> => {
+    if (signInPromise) return signInPromise;
 
     signInPromise = (async () => {
+
         // 1. Load GIS script if needed
-        if (!window.google?.accounts?.id) {
+        if (!window.google?.accounts?.oauth2) {
             await new Promise<void>((resolve, reject) => {
                 if (!GOOGLE_CLIENT_ID) {
-                    reject(new Error("Google Client ID is not populated. Environment variables might not be loading correctly."));
-                    return;
-                }
-                if (!API_KEY) {
-                    reject(new Error("Google API Key is not populated. Environment variables might not be loading correctly."));
+                    reject(new Error("Google Client ID is not populated in .env file. see setup instructions (readme_google_auth.md)"));
                     return;
                 }
                 const script = document.createElement('script');
@@ -83,65 +77,27 @@ const ensureSignedIn = async (): Promise<void> => {
             });
         }
 
-        // 2. Initialize GIS with credential callback
-        let resolved = false;
-        await new Promise<void>((resolve, reject) => {
-            window.google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                callback: async (response: google.accounts.id.CredentialResponse | any) => {
-                    try {
-                        console.log('[gAuthApi] One Tap callback response:', response);
-                        if (response.credential) {
-                            try {
-                                const profile = JSON.parse(atob(response.credential.split('.')[1]));
-                                console.log('[gAuthApi] Decoded profile:', profile);
-                                const token = await getToken();
-                                setAuthedUser({ authFailed: false, accessToken: token, ...profile });
-                                resolved = true;
-                                resolve();
-                            } catch (parseErr) {
-                                console.error('[gAuthApi] Error decoding credential:', parseErr);
-                                throw parseErr;
-                            }
-                        } else {
-                            console.warn('[gAuthApi] No credential in response, triggering fallback popup. Full response:', response);
-                            const token = await getToken();
-                            const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            if (!res.ok) throw new Error('Failed to fetch user profile');
-                            const profile = await res.json();
-                            setAuthedUser({ authFailed: false, accessToken: token, ...profile });
-                            resolved = true;
-                            resolve();
-                        }
-                    } catch (err) {
-                        console.error('[gAuthApi] Error in One Tap callback:', err);
-                        reject(err);
-                    }
-                }
-            });
-            // 3. Show One Tap prompt
-            window.google.accounts.id.prompt((notification: google.accounts.id.PromptMomentNotification) => {
-                // Optionally handle notification.momentType for UI/UX, but do not re-initialize or process credentials here
-                // If user dismisses, the callback above will handle fallback
-                if (!resolved && (notification.momentType === 'skipped' || notification.momentType === 'not_displayed')) {
-                    // Fallback will be triggered in the callback above
-                }
-            });
+        // 2. Google "choose account" popup OAuth flow to get a Gmail access token and user profile
+        const token = await getToken();
+        
+        const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
         });
+        if (!res.ok) {
+            throw new Error('Failed to fetch user profile');
+        }
+        const profile = await res.json();
+        setAuthedUser({ authFailed: false, accessToken: token, ...profile });
     })();
 
     try {
-        await signInPromise
+        await signInPromise;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     catch (ex: any) {
         setAuthedUser({ authFailed: true, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
         throw new Error(`Sign-in failed: ${ex.message}`);
-    }
-    finally {
+    } finally {
         signInPromise = null;
     }
 };
@@ -164,10 +120,7 @@ const getToken = () => new Promise<string>((resolve, reject) => {
             'email'
         ].join(' '),
         callback: (tr: google.accounts.oauth2.TokenResponse) => resolve(tr.access_token),
-        error_callback: (err: google.accounts.oauth2.ClientConfigError) => {
-            // potential err.type's ['popup_closed', 'popup_failed_to_open']
-            reject(new Error(err.type));
-        }
+        error_callback: (err: google.accounts.oauth2.ClientConfigError) => reject(new Error(err.type))
     }).requestAccessToken();
 });
 
@@ -176,14 +129,12 @@ const getToken = () => new Promise<string>((resolve, reject) => {
 /**
  * Signs out the user and clears authentication state.
  */
-export const signOut = (): Promise<void> => {
-    return new Promise((resolve) => {
-        if (window.google?.accounts?.id) {
-            window.google.accounts.id.disableAutoSelect();
-        }
-        setAuthedUser(null);
-        resolve();
-    });
+export const signOut = () => {
+    if (window.google?.accounts?.id) {
+        window.google.accounts.id.disableAutoSelect();
+    }
+    setAuthedUser(null);
+    window.location.reload();
 };
 
 
