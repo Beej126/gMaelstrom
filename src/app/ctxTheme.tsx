@@ -139,10 +139,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   // Get current font size settings based on density
   const fontSize = FONT_SIZES[density];
 
-  // Update localStorage when mode changes
+  // Update localStorage when dark mode changes
   useEffect(() => {
     localStorage.setItem('gMaelstrom_themeMode', mode);
-    // Also set CSS variables for components that use MainLayout.css
+    // set CSS variables corresponding to dark mode (defined in AppLayout.css)
     if (mode === 'dark') {
       document.documentElement.style.setProperty('--email-content-bg', '#121212');
       document.documentElement.style.setProperty('--email-header-bg', '#1e1e1e');
@@ -211,9 +211,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           }
       ),
     },
-    typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    },
+    //roboto is the default for MUI, keeping in case ever want to change
+    // typography: {
+    //   fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    // },
     components: {
       MuiButtonBase: {
         styleOverrides: {

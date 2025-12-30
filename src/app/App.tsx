@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ApiDataCacheProvider } from './ctxApiDataCache';
 import { ThemeProvider } from './ctxTheme';
-import MainLayout from './MainLayout';
+import AppLayout from './AppLayout';
 import EmailDetail from '../components/EmailDetail';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -14,7 +14,6 @@ const App: React.FC = () => {
     <ThemeProvider>
       <ApiDataCacheProvider>
         <Router>
-          <div className="app">
             <ToastContainer
               style={{ width: "unset" }}
               toastStyle={{ width: "unset" }}
@@ -31,12 +30,11 @@ const App: React.FC = () => {
             />
             
             <Routes>
-              <Route path="/" element={<MainLayout />}/>
+              <Route path="/" element={<AppLayout />}/>
               <Route path="/email/:emailId" element={<EmailDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
-          </div>
         </Router>
       </ApiDataCacheProvider>
     </ThemeProvider>

@@ -17,7 +17,11 @@
     /* type checking */
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true // Ensures consistent casing in imports
   },
-  "include": ["src", "env.d.ts"]
+  "include": ["src"],
+  "files": ["src/app/app.d.ts"] // apparently typescript is hardwired to respect globals.d.ts 
+                                // and even though we already include everything under src,
+                                // we still have to explicitly call out something other than globals.d.ts !?!?
 }

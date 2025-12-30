@@ -1,53 +1,22 @@
 @import './MUI.DataGrid.scss';
 
-// Variables
-$primary-bg: #121212;
-$secondary-bg: #1e1e1e;
-$text-light: #ffffff;
-$text-opacity: 0.87;
-$primary-blue: #2196f3;
-$error-red: #f44336;
-$border-radius: 8px;
-$scrollbar-track: #2c2c2c;
-$scrollbar-thumb: #555;
-$scrollbar-thumb-hover: #777;
 
-:root {
-  --toastify-text-color-warning: black;
-  // --toastify-container-width: unset;
-  // --toastify-toast-width: unset;
-}
+// :root {
+//   --toastify-text-color-warning: black;
+//   // --toastify-container-width: unset;
+//   // --toastify-toast-width: unset;
+// }
 
-// Base styles
-body {
-    margin: 0;
-    font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    overflow: hidden;
-    color: $text-light;
-    background-color: $primary-bg;
-}
 
-* {
-    box-sizing: border-box;
-}
 
-// Custom scrollbar
+// Any customization to ::-webkit-scrollbar triggers the custom rendering path.
+// Browsers like Chrome and Edge switch from the native OS scrollbar to a custom-drawn one.
+// This disables the default platform appearance and features,
+// so you lose the native look and get a simplified, stylable scrollbar instead.
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-
-    &-track {
-        background: $scrollbar-track;
-    }
+    width: 16px;
 
     &-thumb {
-        background: $scrollbar-thumb;
-        border-radius: 4px;
-
-        &:hover {
-            background: $scrollbar-thumb-hover;
-        }
+        background: #555;
     }
 }

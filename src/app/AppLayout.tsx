@@ -6,12 +6,12 @@ import EmailList from '../components/EmailList';
 import Header from '../components/Header';
 import { useApiDataCache } from './ctxApiDataCache';
 import { markEmailsAsRead } from './gMailApi';
-import './MainLayout.scss';
+import './AppLayout.scss';
 import { useUser } from './gAuthApi';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 
-const MainLayout: React.FC = () => {
+const AppLayout: React.FC = () => {
   const { selectedCategory } = useApiDataCache();
   const theme = useTheme();
   const user = useUser();
@@ -141,4 +141,4 @@ const MainLayout: React.FC = () => {
   );
 };
 
-export default MainLayout;
+export default AppLayout;

@@ -4,16 +4,14 @@
 
 // --- Google API TypeScript type definitions ---
 // These provide type safety for gapi, gapi.client, and Gmail API objects used in the app
-/// <reference types="gapi" />
-/// <reference types="gapi.client" />
 /// <reference types="gapi.client.gmail-v1" />
 
 
-// --- ImportMeta interface for environment variables ---
-// Ensures TypeScript recognizes import.meta.env usage for environment variables
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+// // --- ImportMeta interface for environment variables ---
+// // Ensures TypeScript recognizes import.meta.env usage for environment variables
+// interface ImportMeta {
+//   readonly env: ImportMetaEnv;
+// }
 
 
 // --- SVG module declaration for React ---
@@ -29,9 +27,9 @@ declare module '*.svg' {
     className?: string;
   }>;
 
-  // Default export for importing SVG as a URL string
-  const src: string;
-  export default src;
+  // // Default export for importing SVG as a URL string
+  // const src: string;
+  // export default src;
 }
 
 interface Expando {
