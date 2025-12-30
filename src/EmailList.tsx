@@ -3,8 +3,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Chip, useTheme } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
-import { useApiDataCache } from '../app/ctxApiDataCache';
-import { getFrom, getSubject, getDate, isRead } from '../helpers/emailParser';
+import { useApiDataCache } from './ctxApiDataCache';
+import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import { useNavigate } from 'react-router-dom';
 
 const rowHeight = 26;

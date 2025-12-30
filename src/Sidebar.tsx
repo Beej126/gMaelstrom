@@ -18,8 +18,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ReportIcon from '@mui/icons-material/Report';
 import DescriptionIcon from '@mui/icons-material/Description';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useApiDataCache } from '../app/ctxApiDataCache';
-import { isRead } from '../helpers/emailParser';
+import { useApiDataCache } from './ctxApiDataCache';
+import { isRead } from './helpers/emailParser';
 import { toast } from 'react-toastify';
 
 const ComposeButton = styled(Button)(({ theme }) => ({

@@ -23,8 +23,8 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
-import { useApiDataCache } from '../app/ctxApiDataCache';
-import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead } from '../app/gMailApi';
+import { useApiDataCache } from './ctxApiDataCache';
+import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead } from './gMailApi';
 // import { Email } from '../types/email';
 import {
   extractHtmlContent,
@@ -41,8 +41,8 @@ import {
   isRead,
   isStarred,
   hasAttachments
-} from '../helpers/emailParser';
-import AttachmentList from '../components/AttachmentList';
+} from './helpers/emailParser';
+import AttachmentList from './AttachmentList';
 import styles from './EmailDetail.module.scss';
 
 // Separate component for email content

@@ -46,7 +46,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({
   toggleTheme,
   onThemeToggle,
   density,
-  setDensity,
+  // setDensity,
   onDensityChange,
   combineThreads,
   setCombineThreads,

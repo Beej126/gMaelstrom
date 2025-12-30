@@ -1,4 +1,4 @@
-import { getFromStorage, saveToStorage } from "../helpers/browserStorage";
+import { getFromStorage, saveToStorage } from "./helpers/browserStorage";
 import { useEffect, useState } from "react";
 import { TokenPayload } from 'google-auth-library';
 // import { toast } from "react-toastify";

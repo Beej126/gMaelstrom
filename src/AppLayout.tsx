@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, useTheme, IconButton, Tooltip, Checkbox, Alert } from '@mui/material';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
-import Sidebar from '../components/Sidebar';
-import EmailList from '../components/EmailList';
-import Header from '../components/Header';
+import Sidebar from './Sidebar';
+import EmailList from './EmailList';
+import Header from './Header';
 import { useApiDataCache } from './ctxApiDataCache';
 import { markEmailsAsRead } from './gMailApi';
 import './AppLayout.scss';

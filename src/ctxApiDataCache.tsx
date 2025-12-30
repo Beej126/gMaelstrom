@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
 import { getEmails, getGmailLabels, gmail_Label } from './gMailApi';
-import { getFromStorage } from '../helpers/browserStorage';
+import { getFromStorage } from './helpers/browserStorage';
 
 
 const genLabelDisplayName = (labelRawName: string): string => {

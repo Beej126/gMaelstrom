@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ApiDataCacheProvider } from './ctxApiDataCache';
 import { ThemeProvider } from './ctxTheme';
 import AppLayout from './AppLayout';
-import EmailDetail from '../components/EmailDetail';
+import EmailDetail from './EmailDetail';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';

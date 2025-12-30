@@ -9,7 +9,7 @@ import path from 'path';
 export default defineConfig({
   source: {
     entry: {
-      index: './src/app/index.tsx',
+      index: './src/index.tsx',
     },
   },
 

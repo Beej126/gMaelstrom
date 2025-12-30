@@ -8,7 +8,7 @@ import {
     Box
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useApiDataCache } from '../app/ctxApiDataCache';
+import { useApiDataCache } from './ctxApiDataCache';
 
 
 const LabelSettingsDialog: React.FC<{
