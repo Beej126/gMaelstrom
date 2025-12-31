@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
 import { getEmails, getGmailLabels, gmail_Label } from './gMailApi';
-import { getFromStorage } from './helpers/browserStorage';
+import { useSettings } from './ctxSettings';
 
 
 const genLabelDisplayName = (labelRawName: string): string => {
@@ -12,7 +12,6 @@ const genLabelDisplayName = (labelRawName: string): string => {
 
 const ApiDataCacheContext = createContext<{
   loading: boolean;
-  refreshing: boolean;
 
   fetchEmails: (page: number, pageSize: number) => Promise<void>;
   emails: gapi.client.gmail.Message[];
@@ -39,9 +38,6 @@ const ApiDataCacheContext = createContext<{
 
   pageSize: number;
   setPageSize: React.Dispatch<React.SetStateAction<number>>;
-
-  combineThreads: boolean;
-  setCombineThreads: (combine: boolean) => void;
 
 } | undefined>(undefined);
 
@@ -76,12 +72,17 @@ export type ExtendedLabel = gmail_Label & {
 
 export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ children }) => {
 
+  const settings = useSettings();
+
   // Category state must be declared before useEffect that uses it
   const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
+
   // Flat cache for all emails (by absolute index)
   const [emailCache, setEmailCache] = useState<Array<gapi.client.gmail.Message | undefined>>([]);
+
   // Expose emails as a filtered version of emailCache (no undefined)
   const emails: gapi.client.gmail.Message[] = emailCache.filter((e): e is gapi.client.gmail.Message => !!e);
+
   // Gmail API uses pageToken, so we track tokens for each page
   const [pageTokens, setPageTokens] = useState<Array<string | null>>([null]);
   const [totalEmails, setTotalEmails] = useState<number>(0);
@@ -89,10 +90,8 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   const [pageSize, setPageSize] = useState<number>(-1);
 
   const [loading, setLoading] = useState<boolean>(false);
-  const [refreshing] = useState<boolean>(false);
   const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
   const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
-  // (removed duplicate declaration)
 
   // Helper to get/set full email details in cache (by id)
   const emailDetailsCache = useRef<{ [id: string]: gapi.client.gmail.Message }>({});
@@ -100,12 +99,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   const setCachedEmail = (email: gapi.client.gmail.Message) => {
     if (email && email.id) emailDetailsCache.current[email.id] = email;
   };
-
-  // Initialize combineThreads from localStorage or default to false
-  const [combineThreads, setCombineThreads] = useState<boolean>(() => {
-    const savedValue = localStorage.getItem('gMaelstrom_combineThreads');
-    return savedValue ? savedValue === 'true' : false;
-  });
 
 
   const [labels, setLabels] = useState<Record<string, ExtendedLabel>>({});
@@ -123,9 +116,9 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
     getGmailLabels().then(gmailLabels => {
-      const vis = getFromStorage<Record<string, boolean>>('gMaelstrom_labelVisibility') ?? {};
-      setLabels(buildLabelRecord(gmailLabels, vis));
+      setLabels(buildLabelRecord(gmailLabels, settings.labelVisibility));
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist only {id: visible} to localStorage when labels change
@@ -136,13 +129,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   }, [labels]);
 
 
-
-  // Update localStorage when combineThreads changes
-  useEffect(() => {
-    localStorage.setItem('gMaelstrom_combineThreads', combineThreads.toString());
-  }, [combineThreads]);
-
-  // (removed duplicate/old labelVisibility effect and getGmailLabels usage)
 
 
   useEffect(() => {
@@ -232,7 +218,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
 
   return <ApiDataCacheContext.Provider value={({
     loading,
-    refreshing,
 
     fetchEmails,
     emails,
@@ -256,10 +241,7 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     currentPage,
     setCurrentPage,
     pageSize,
-    setPageSize,
-
-    combineThreads,
-    setCombineThreads,
+    setPageSize
   })}
   >{children}</ApiDataCacheContext.Provider>;
 };

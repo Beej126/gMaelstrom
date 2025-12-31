@@ -1,6 +1,6 @@
 Your personal Google Authentication requires one time setup:
 
-1. Google Cloud Console > Create Project: https://console.cloud.google.com/projectcreate
+1. Create Project in Google Cloud Console: https://console.cloud.google.com/projectcreate
    1. Project name: **gMaelstrom**
    1. Project ID: {take the default or change if you like}
    1. Location: {your peference - selecting "No organization" is fine}
@@ -9,14 +9,14 @@ Your personal Google Authentication requires one time setup:
    1. <kbd>Get started</kbd> button
    1. App Information 
       1. App name: **gMaelstrom**
-      1. User support email: {your preferred email address, it doesn't get used for anything here}
-   1. Audience: **Internal** if you can, otherwise we'll make External work below
-   1. Contact Info: your email
+      1. User support email: {your preferred email address, it doesn't get used for anything}
+   1. Audience: **Internal** if you can (belong to Google Workspace), otherwise we'll make External work below
+   1. Contact Info: {your email}
    1. Finish: [x] "I agree..." checkbox 
    1. <kbd>Create</kbd> button
 1. Define required gmail "scopes": https://console.cloud.google.com/auth/scopes
    1. <kbd>Add or remove scopes</kbd> button
-   1. Add these to the "Your restricted scopes" at the bottom:
+   1. Add these to "Your restricted scopes" at the bottom:
       ```
       ./auth/gmail.readonly
       ./auth/gmail.modify

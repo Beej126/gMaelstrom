@@ -7,13 +7,6 @@
 /// <reference types="gapi.client.gmail-v1" />
 
 
-// // --- ImportMeta interface for environment variables ---
-// // Ensures TypeScript recognizes import.meta.env usage for environment variables
-// interface ImportMeta {
-//   readonly env: ImportMetaEnv;
-// }
-
-
 // --- SVG module declaration for React ---
 // Allows importing SVGs as React components and as URLs
 declare module '*.svg' {

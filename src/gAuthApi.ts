@@ -1,6 +1,9 @@
-import { getFromStorage, saveToStorage } from "./helpers/browserStorage";
+import { getFromSessionStorage, saveToSessionStorage } from "./helpers/browserStorage";
 import { useEffect, useState } from "react";
 import { TokenPayload } from 'google-auth-library';
+import { STORAGE_KEY_PREFIX } from "./ctxSettings";
+import { loadScript } from "./helpers/loadScript";
+import { fetchAuthedJson } from "./helpers/getJson";
 // import { toast } from "react-toastify";
 
 const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
@@ -24,6 +27,7 @@ export type AuthedUser = Required<Pick<TokenPayload, "name" | "given_name" | "fa
 };
 
 let authedUser: AuthedUser | null = null;
+const AUTHED_USER_STORAGE_KEY = STORAGE_KEY_PREFIX + 'authedUser';
 /**
  * sets global getAuthedUser() regardless of success/fail
  * returns .authedFailed = true if sign-in fails/cancelled to provide specifically timed indicator (via useUser hook) for UI to display failure
@@ -34,61 +38,62 @@ let authedUser: AuthedUser | null = null;
  */
 export const getAuthedUser = async (refreshToken: boolean = false): Promise<AuthedUser> => {
 
+
     if (refreshToken) setAuthedUser({ authFailed: false, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
 
     if (authedUser?.accessToken) return authedUser;
 
-    authedUser = getFromStorage<AuthedUser>('gMaelstrom_authedUser');
+    authedUser = getFromSessionStorage<AuthedUser>(AUTHED_USER_STORAGE_KEY);
     if (authedUser?.accessToken) return authedUser;
 
     // Try to sign in
-    await oAuth(); //calls setAuthedUser internally, so after await, authedUser will be populated for sure
+    await DoOAuth(); //calls setAuthedUser internally, so after await, authedUser will be populated for sure
     return authedUser!;
 };
 
 const setAuthedUser = (authed: AuthedUser | null) => {
     if (authed) authed.initials = (authed.given_name.charAt(0) + authed.family_name.charAt(0)).toUpperCase();
     authedUser = authed;
-    saveToStorage('gMaelstrom_authedUser', { ...authed, authFailed: false }); //never save failed to storage so page refresh always retries =)
+    saveToSessionStorage(AUTHED_USER_STORAGE_KEY, { ...authed, authFailed: false }); //never save failed to storage so page refresh always retries =)
 };
 
 // --- GIS Initialization and Sign-In ---
+
+declare global {
+    interface Window {
+        //sucks we can't really declare .google as optional because typescript **merges** the NON OPTIONAL global @types/google.accounts declaration with it, erasing the optionality arrg!!
+        gsiApi?: {
+            oauth2: typeof google.accounts.oauth2;
+            id: typeof google.accounts.id;
+        }
+        google: never; //hiding so not used accidentally versus gsiApi
+    }
+}
 
 // We do NOT use Google One Tap here because this app always needs Gmail API access, which requires a full OAuth access token and user consent for Gmail scopes.
 // One Tap only provides an ID token and cannot grant Gmail API access without the popup.
 let signInPromise: Promise<void> | null = null;
 
-const oAuth = async (): Promise<void> => {
+const DoOAuth = async (): Promise<void> => {
+
     if (signInPromise) return signInPromise;
 
     signInPromise = (async () => {
 
-        // 1. Load GIS script if needed
-        if (!window.google?.accounts?.oauth2) {
-            await new Promise<void>((resolve, reject) => {
-                if (!GOOGLE_CLIENT_ID) {
-                    reject(new Error("Google Client ID is not populated in .env file. see setup instructions (readme_google_auth.md)"));
-                    return;
-                }
-                const script = document.createElement('script');
-                script.src = 'https://accounts.google.com/gsi/client';
-                script.onload = () => resolve();
-                script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
-                document.body.appendChild(script);
-            });
+        if (!GOOGLE_CLIENT_ID) {
+            throw new Error("Google Client ID is not populated in .env file. see setup instructions (readme_google_auth.md)");
         }
 
-        // 2. Google "choose account" popup OAuth flow to get a Gmail access token and user profile
+        // Load GIS script
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const goog = () => window.google as unknown as any; // see Window.google declaration above for why
+        await loadScript(() => goog(), 'https://accounts.google.com/gsi/client');
+        window.gsiApi = { oauth2: goog().accounts.oauth2, id: goog().accounts.id };
+
+        // popup Google "choose account" OAuth flow to get Gmail access token and user profile
         const token = await getToken();
 
-        const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-            throw new Error('Failed to fetch user profile');
-        }
-        const profile = await res.json();
-        setAuthedUser({ authFailed: false, accessToken: token, ...profile });
+        setAuthedUser({ authFailed: false, accessToken: token, ...await fetchAuthedJson('https://openidconnect.googleapis.com/v1/userinfo', token) });
     })();
 
     try {
@@ -108,11 +113,7 @@ const oAuth = async (): Promise<void> => {
  * Requests a Gmail OAuth2 access token using GIS. Returns the token string.
  */
 const getToken = () => new Promise<string>((resolve, reject) => {
-    if (!window.google?.accounts?.oauth2) {
-        reject(new Error('Google OAuth2 not initialized'));
-        return;
-    }
-    window.google.accounts.oauth2.initTokenClient({
+    window.gsiApi?.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: [
             'https://www.googleapis.com/auth/gmail.readonly',
@@ -131,18 +132,7 @@ const getToken = () => new Promise<string>((resolve, reject) => {
  * Signs out the user and clears authentication state.
  */
 export const signOut = () => {
-    if (window.google?.accounts?.id) {
-        window.google.accounts.id.disableAutoSelect();
-    }
+    window.gsiApi?.id.disableAutoSelect();
     setAuthedUser(null);
     window.location.reload();
 };
-
-
-declare global {
-    interface Window {
-        google: {
-            accounts: typeof google.accounts;
-        };
-    }
-}

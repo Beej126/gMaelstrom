@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles, useMediaQuery } from '@mui/material';
+import React, { createContext, useContext, useEffect } from 'react';
+import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles} from '@mui/material';
+import { useSettings } from './ctxSettings';
 
 // Interface for font size settings based on density
 interface FontSizeSettings {
@@ -26,7 +27,6 @@ declare module '@mui/material/styles' {
   }
 }
 
-type ThemeMode = 'light' | 'dark';
 type DensityMode = 'sparse' | 'condensed';
 
 // Interface for font size settings based on density
@@ -47,14 +47,8 @@ interface FontWeightSettings {
 }
 
 interface ThemeContextType {
-  mode: ThemeMode;
-  toggleTheme: () => void;
-  setMode: (mode: ThemeMode) => void;
-  density: DensityMode;
-  setDensity: (density: DensityMode) => void;
   fontSize: FontSizeSettings;
   fontWeight: FontWeightSettings;
-  setEmailListFontWeight: (type: 'from' | 'subject', value: number) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -97,118 +91,52 @@ const DEFAULT_FONT_WEIGHTS: FontWeightSettings = {
 };
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Call useMediaQuery at the top level
-  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
 
-  // Check if user has a preference stored in local storage
-  const getInitialMode = (): ThemeMode => {
-    const savedMode = localStorage.getItem('gMaelstrom_themeMode');
-    if (savedMode === 'light' || savedMode === 'dark') {
-      return savedMode;
-    }
-    // Use the already-evaluated prefersDarkMode value
-    return prefersDarkMode ? 'dark' : 'light';
-  };
-  
-  const getInitialDensity = (): DensityMode => {
-    const savedDensity = localStorage.getItem('gMaelstrom_densityMode');
-    if (savedDensity === 'sparse' || savedDensity === 'condensed') {
-      return savedDensity;
-    }
-    // Default to sparse
-    return 'sparse';
-  };
+  const settings = useSettings();
 
-  // Get initial font weight settings from local storage
-  const getInitialFontWeights = (): FontWeightSettings => {
-    try {
-      const savedFontWeights = localStorage.getItem('gMaelstrom_fontWeights');
-      if (savedFontWeights) {
-        return { ...DEFAULT_FONT_WEIGHTS, ...JSON.parse(savedFontWeights) };
-      }
-    } catch (error) {
-      console.error('Error parsing font weight settings', error);
-    }
-    return DEFAULT_FONT_WEIGHTS;
-  };
-
-  const [mode, setMode] = useState<ThemeMode>(getInitialMode);
-  const [density, setDensity] = useState<DensityMode>(getInitialDensity);
-  const [fontWeight, setFontWeight] = useState<FontWeightSettings>(getInitialFontWeights);
-  
-  // Get current font size settings based on density
-  const fontSize = FONT_SIZES[density];
+  const fontWeight = DEFAULT_FONT_WEIGHTS;
+  const fontSize = FONT_SIZES[settings.density];
 
   // Update localStorage when dark mode changes
   useEffect(() => {
-    localStorage.setItem('gMaelstrom_themeMode', mode);
-    // set CSS variables corresponding to dark mode (defined in AppLayout.css)
-    if (mode === 'dark') {
-      document.documentElement.style.setProperty('--email-content-bg', '#121212');
-      document.documentElement.style.setProperty('--email-header-bg', '#1e1e1e');
-      document.documentElement.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.12)');
-      document.documentElement.style.setProperty('--email-content-a', '#afafff');
-    } else {
-      document.documentElement.style.setProperty('--email-content-bg', '#f5f5f5');
-      document.documentElement.style.setProperty('--email-header-bg', '#ffffff');
-      document.documentElement.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.12)');
-    }
-  }, [mode]);
-  
-  // Update localStorage when density changes
-  useEffect(() => {
-    localStorage.setItem('gMaelstrom_densityMode', density);
-  }, [density]);
+    document.documentElement.style.setProperty('--email-content-bg', settings.darkMode ? '#121212' : '#f5f5f5');
+    document.documentElement.style.setProperty('--email-header-bg', settings.darkMode ? '#1e1e1e' : '#ffffff');
+    document.documentElement.style.setProperty('--border-color', settings.darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
+    document.documentElement.style.setProperty('--email-content-a', settings.darkMode ? '#afafff' : null);
+  }, [settings.darkMode]);
 
-  // Update localStorage when font weights change
-  useEffect(() => {
-    localStorage.setItem('gMaelstrom_fontWeights', JSON.stringify(fontWeight));
-  }, [fontWeight]);
-
-  // Toggle between light and dark mode
-  const toggleTheme = () => {
-    setMode(prevMode => (prevMode === 'light' ? 'dark' : 'light'));
-  };
-
-  // Update emailList font weights
-  const setEmailListFontWeight = (type: 'from' | 'subject', value: number) => {
-    setFontWeight(prev => ({
-      ...prev,
-      [`emailList${type.charAt(0).toUpperCase() + type.slice(1)}`]: value
-    }));
-  };
 
   // Create theme based on current mode and density
   const theme = createTheme({
     palette: {
-      mode,
-      ...(mode === 'dark' 
+      mode: settings.darkMode ? 'dark' : 'light',
+      ...(settings.darkMode
         ? {
-            // Dark mode colors
-            primary: {
-              main: '#2196f3',
-            },
-            secondary: {
-              main: '#f50057',
-            },
-            background: {
-              default: '#121212',
-              paper: '#1e1e1e',
-            },
-          }
+          // Dark mode colors
+          primary: {
+            main: '#2196f3',
+          },
+          secondary: {
+            main: '#f50057',
+          },
+          background: {
+            default: '#121212',
+            paper: '#1e1e1e',
+          },
+        }
         : {
-            // Light mode colors
-            primary: {
-              main: '#1976d2',
-            },
-            secondary: {
-              main: '#dc004e',
-            },
-            background: {
-              default: '#ffffff',
-              paper: '#ffffff',
-            },
-          }
+          // Light mode colors
+          primary: {
+            main: '#1976d2',
+          },
+          secondary: {
+            main: '#dc004e',
+          },
+          background: {
+            default: '#ffffff',
+            paper: '#ffffff',
+          },
+        }
       ),
     },
     //roboto is the default for MUI, keeping in case ever want to change
@@ -249,7 +177,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     },
     // Custom properties that can be accessed via theme.customProps
     customProps: {
-      density,
+      density: settings.density,
       fontSize,
       fontWeight,
     },
@@ -280,15 +208,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   );
 
   return (
-    <ThemeContext.Provider value={{ 
-      mode, 
-      toggleTheme, 
-      setMode, 
-      density, 
-      setDensity, 
+    <ThemeContext.Provider value={{
       fontSize,
-      fontWeight,
-      setEmailListFontWeight
+      fontWeight
     }}>
       <StyledEngineProvider injectFirst>
         <MuiThemeProvider theme={theme}>
