@@ -10,13 +10,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
 
 export function useUser() {
     const [user, setUser] = useState<AuthedUser>();
-    useEffect(() => {
-        getAuthedUser()
-            // .catch(ex => {
-            //     toast.error(ex.message);
-            // })
-            .finally(() => setUser(authedUser!));
-    }, []);
+    useEffect(() => { getAuthedUser().finally(() => setUser(authedUser!)); }, []);
     return user;
 }
 
@@ -37,7 +31,6 @@ const AUTHED_USER_STORAGE_KEY = STORAGE_KEY_PREFIX + 'authedUser';
  * attempts sign-in flow if necessary to re-authenticate
  */
 export const getAuthedUser = async (refreshToken: boolean = false): Promise<AuthedUser> => {
-
 
     if (refreshToken) setAuthedUser({ authFailed: false, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
 
