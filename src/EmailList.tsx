@@ -7,23 +7,7 @@ import { useApiDataCache } from './ctxApiDataCache';
 import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import { useNavigate } from 'react-router-dom';
 
-const rowHeight = 26;
-
-// to pass debug info to Cypress tests
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [index: string]: any;
-  }
-}
-
-// Cypress cy.task logging for debug output in tests
-// const cypressLog = (msg: string) => {
-//   if (window.Cypress && window.cy && window.cy.task) {
-//     window.cy.task('log', msg);
-//   }
-// };
-
+const emailRowHeight = 26;
 
 const EmailList: React.FC<{
   checkedEmails?: Record<string, boolean>;
@@ -31,82 +15,36 @@ const EmailList: React.FC<{
 }> = props => {
 
   const cache = useApiDataCache();
-
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
   const checkedEmails = props.checkedEmails ?? internalCheckedEmails;
   const setCheckedEmails = props.setCheckedEmails ?? internalSetCheckedEmails;
   const theme = useTheme();
-
-  // Use the computed available height for both container and DataGrid
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
-
-  // Diagnostic: Log DataGrid DOM element heights to Cypress
-  // useEffect(() => {
-  //   if (
-  //     typeof window !== 'undefined' &&
-  //     window.Cypress &&
-  //     gridContainerRef.current &&
-  //     typeof containerHeight === 'number'
-  //   ) {
-  //     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-  //     const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
-  //     const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
-  //     const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
-  //     cypressLog('[DIAG] containerHeight: ' + containerHeight);
-  //     if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
-  //     if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
-  //     if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
-  //     if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
-  //   }
-  // }, [containerHeight]);
-
-
-  // Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
-  // useEffect(() => {
-  //   if (
-  //     typeof window !== 'undefined' &&
-  //     window.Cypress &&
-  //     gridContainerRef.current &&
-  //     typeof containerHeight === 'number'
-  //   ) {
-  //     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-  //     if (gridRoot) {
-  //       const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
-  //       const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
-  //       const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
-  //       const body = gridRoot.querySelector('.MuiDataGrid-main');
-  //       window.__EMAILGRID_DEBUG__ = {
-  //         containerHeight,
-  //         gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
-  //         virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
-  //         footerHeight: footer ? footer.clientHeight : undefined,
-  //         headerHeight: header ? header.clientHeight : undefined,
-  //         bodyHeight: body ? body.clientHeight : undefined,
-  //       };
-  //       cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
-  //     }
-  //   }
-  // }, [containerHeight]);
 
   useEffect(() => {
 
     // Use ResizeObserver on .email-content for robust sizing
     const updatePageSizeAndHeight = () => {
+
       // Find the main content container
       const mainContent = document.querySelector('.MuiDataGrid-mainContent');
       if (!mainContent) return;
+
       // Get the immediate child (header_row_client)
       const headerRowClient = mainContent.firstElementChild as HTMLElement | null;
       if (!headerRowClient) return;
+
       // Get the top container (header)
       const topContainer = mainContent.querySelector('.MuiDataGrid-topContainer') as HTMLElement | null;
       if (!topContainer) return;
+
       // Calculate available height for rows
       const available = headerRowClient.clientHeight - topContainer.clientHeight;
+
       // Calculate max whole rows that fit
-      const rows = Math.max(10, Math.floor(available / rowHeight));
+      const rows = Math.max(10, Math.floor(available / emailRowHeight));
       cache.setPageSize(rows);
       setContainerHeight(headerRowClient.clientHeight);
     };
@@ -208,22 +146,33 @@ const EmailList: React.FC<{
       headerName: 'Labels',
       width: 120,
       renderCell: (params: GridRenderCellParams) => {
-        // Only show labels that are visible in context.labels
-        const visibleLabelIds = params.row.labelIds?.filter((labelId: string) => {
-          const found = Object.values(cache.labels).find(l => l.id === labelId);
-          return found ? found.visible !== false : true;
-        }) ?? [];
+
         return (
           <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
-            {visibleLabelIds.map((label: string) => (
-              <Chip key={label} label={prettifyLabel(label)} size="small" sx={{ height: 18, fontSize: '0.72rem', bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444', color: theme.palette.text.primary, px: '0px', borderRadius: 1.5, fontWeight: 500, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }} variant="outlined" />
+            {params.row.labelIds?.map((label: string) => (
+              <Chip key={label} label={prettifyLabel(label)}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 18,
+                  fontSize: '0.72rem',
+                  bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
+                  color: theme.palette.text.primary,
+                  px: '0px',
+                  borderRadius: 1.5,
+                  fontWeight: 500,
+                  overflow: 'visible',
+                  textOverflow: 'clip',
+                  whiteSpace: 'nowrap'
+                }}
+              />
             ))}
           </Box>
         );
       },
       resizable: true
     }
-  ], [checkedEmails, setCheckedEmails, cache.labels, prettifyLabel, theme]);
+  ], [checkedEmails, setCheckedEmails, prettifyLabel, theme]);
 
 
   // Prepare rows for DataGrid, pad to always match pageSize
@@ -291,7 +240,7 @@ const EmailList: React.FC<{
             if (params.row.id === cache.selectedEmail?.id) return 'Mui-selected';
             return isRead(params.row) ? 'email-read' : 'email-unread';
           }}
-          rowHeight={rowHeight}
+          rowHeight={emailRowHeight}
           sx={{
             border: 0,
             height: containerHeight ? `${containerHeight}px` : '100%',
@@ -313,3 +262,67 @@ const EmailList: React.FC<{
 };
 
 export default EmailList;
+
+// to pass debug info to Cypress tests
+// declare global {
+//   interface Window {
+//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+//     [index: string]: any;
+//   }
+// }
+
+// Cypress cy.task logging for debug output in tests
+// const cypressLog = (msg: string) => {
+//   if (window.Cypress && window.cy && window.cy.task) {
+//     window.cy.task('log', msg);
+//   }
+// };
+
+// Diagnostic: Log DataGrid DOM element heights to Cypress
+// useEffect(() => {
+//   if (
+//     typeof window !== 'undefined' &&
+//     window.Cypress &&
+//     gridContainerRef.current &&
+//     typeof containerHeight === 'number'
+//   ) {
+//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+//     const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
+//     const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
+//     const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
+//     cypressLog('[DIAG] containerHeight: ' + containerHeight);
+//     if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
+//     if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
+//     if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
+//     if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
+//   }
+// }, [containerHeight]);
+
+
+// Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
+// useEffect(() => {
+//   if (
+//     typeof window !== 'undefined' &&
+//     window.Cypress &&
+//     gridContainerRef.current &&
+//     typeof containerHeight === 'number'
+//   ) {
+//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+//     if (gridRoot) {
+//       const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
+//       const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
+//       const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
+//       const body = gridRoot.querySelector('.MuiDataGrid-main');
+//       window.__EMAILGRID_DEBUG__ = {
+//         containerHeight,
+//         gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
+//         virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
+//         footerHeight: footer ? footer.clientHeight : undefined,
+//         headerHeight: header ? header.clientHeight : undefined,
+//         bodyHeight: body ? body.clientHeight : undefined,
+//       };
+//       cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
+//     }
+//   }
+// }, [containerHeight]);
+

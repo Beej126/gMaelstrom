@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  AppBar,
+  // AppBar,
   Toolbar,
   Typography,
   InputBase,
@@ -29,34 +29,20 @@ const Search = styled('div')(({ theme }) => ({
       ? alpha(theme.palette.common.white, 0.25)
       : alpha(theme.palette.common.black, 0.1),
   },
-  width: '100%',
-  [theme.breakpoints.up('sm')]: {
-    marginLeft: theme.spacing(1),
-    width: 'auto',
-  },
 }));
 
 const SearchIconWrapper = styled('div')(({ theme }) => ({
   padding: theme.spacing(0, 2),
   height: '100%',
   position: 'absolute',
-  pointerEvents: 'none',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
 }));
 
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
+const SearchInput = styled(InputBase)(({ theme }) => ({
   '& .MuiInputBase-input': {
     padding: theme.spacing(1, 1, 1, 0),
-    // vertical padding + font size from searchIcon
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '40ch',
-    },
   },
 }));
 
@@ -75,58 +61,40 @@ const Header: React.FC = () => {
 
 
   return (
-    <AppBar
-      position="static"
-      color="default"
-      elevation={1}
-      sx={{
-        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.background.default,
-        borderBottom: `1px solid ${theme.palette.divider}`
-      }}
-    >
-      <Toolbar>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <GMaelstromIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
-          <Typography
-            variant="h6"
-            noWrap
-            component="div"
-            sx={{ display: { xs: 'none', sm: 'block' } }}
-          >
-            gMaelstrom
-          </Typography>
-        </Box>
+    <Toolbar>
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <GMaelstromIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+        <Typography variant="h6">
+          gMaelstrom
+        </Typography>
+      </Box>
 
-        <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
-          <Search>
-            <SearchIconWrapper>
-              <SearchIcon />
-            </SearchIconWrapper>
-            <StyledInputBase
-              placeholder="Search mail…"
-              inputProps={{ 'aria-label': 'search' }}
-              value={searchQuery}
-              onChange={onSearchChange}
-              fullWidth
-            />
-          </Search>
-        </Box>
+      <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
+        <Search>
+          <SearchIconWrapper>
+            <SearchIcon />
+          </SearchIconWrapper>
+          <SearchInput
+            placeholder="Search mail…"
+            inputProps={{ 'aria-label': 'search' }}
+            value={searchQuery}
+            onChange={onSearchChange}
+            fullWidth
+          />
+        </Search>
+      </Box>
 
-        <Box sx={{ display: 'flex' }}>
+      <Tooltip title="Help">
+        <IconButton sx={{ mx: -0.75 }} size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
+          <HelpOutlineIcon />
+        </IconButton>
+      </Tooltip>
 
-          <Tooltip title="Help">
-            <IconButton size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
-              <HelpOutlineIcon />
-            </IconButton>
-          </Tooltip>
+      <MenuSettings />
 
-          <MenuSettings />
+      <MenuProfile />
 
-          <MenuProfile />
-
-        </Box>
-      </Toolbar>
-    </AppBar>
+    </Toolbar>
   );
 };
 

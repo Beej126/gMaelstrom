@@ -10,7 +10,6 @@ import {
   Tooltip,
   IconButton,
   Avatar,
-  useTheme,
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -18,7 +17,6 @@ import { useUser, signOut } from './gAuthApi';
 
 const ProfileMenu: React.FC = _ => {
 
-  const theme = useTheme();
   const user = useUser();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -33,18 +31,19 @@ const ProfileMenu: React.FC = _ => {
 
   return <>
 
-    <Tooltip title={user?.name || 'User'}>
+    <Tooltip title={user?.name ?? 'Please sign in'}>
       <IconButton
+        sx={{ mx: -0.75 }}
         size="large"
         edge="end"
         aria-haspopup="true"
         onClick={onOpen}
       >
         {user?.picture ? (
-          <Avatar src={user.picture} alt={user.name || user.email || 'User'} />
+          <Avatar src={user.picture} alt={user.name ?? user.email} />
         ) : (
-          <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
-            {user?.initials || '??'}
+          <Avatar >
+            {user?.initials ?? '??'}
           </Avatar>
         )}
       </IconButton>
@@ -70,9 +69,8 @@ const ProfileMenu: React.FC = _ => {
 
       <MenuItem
         component="a"
-        href={user?.email ? `https://myaccount.google.com/?authuser=${encodeURIComponent(user.email)}` : 'https://myaccount.google.com'}
+        href={'https://myaccount.google.com'}
         target="_blank"
-        rel="noopener noreferrer"
         onClick={onClose}
       >
         <ListItemIcon>

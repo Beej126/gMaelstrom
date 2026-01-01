@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, useTheme, IconButton, Tooltip, Checkbox, Alert } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip, Checkbox, Alert } from '@mui/material';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import Sidebar from './Sidebar';
 import EmailList from './EmailList';
@@ -13,7 +13,6 @@ import rehypeRaw from 'rehype-raw';
 
 const AppLayout: React.FC = () => {
   const { selectedCategory } = useApiDataCache();
-  const theme = useTheme();
   const user = useUser();
 
   // State for checked emails, lifted up from EmailList
@@ -24,25 +23,7 @@ const AppLayout: React.FC = () => {
   const someChecked = allEmailIds.some(id => checkedEmails[id]) && !allChecked;
 
   const [google_auth_readme_md, setMd] = useState('');
-  useEffect(() => {
-    fetch('/readme_google_auth.md').then(res => res.text()).then(setMd);
-  }, []);
-
-  // Set CSS variables based on theme
-  useEffect(() => {
-    if (theme.palette.mode === 'dark') {
-      document.documentElement.style.setProperty('--email-content-bg', theme.palette.background.default);
-      document.documentElement.style.setProperty('--email-header-bg', theme.palette.background.paper);
-      document.documentElement.style.setProperty('--border-color', theme.palette.divider);
-      document.documentElement.style.setProperty('--resize-handle-color', `${theme.palette.primary.main}40`);
-      document.documentElement.style.setProperty('--email-content-a', '#afafff');
-    } else {
-      document.documentElement.style.setProperty('--email-content-bg', '#f5f5f5');
-      document.documentElement.style.setProperty('--email-header-bg', '#ffffff');
-      document.documentElement.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.12)');
-      document.documentElement.style.setProperty('--resize-handle-color', `${theme.palette.primary.main}40`);
-    }
-  }, [theme.palette.background.default, theme.palette.background.paper, theme.palette.divider, theme.palette.mode, theme.palette.primary.main]);
+  useEffect(() => { fetch('/readme_google_auth.md').then(res => res.text()).then(setMd); }, []);
 
 
   const handleMarkAsUnread = async () => {
