@@ -99,10 +99,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   // Update localStorage when dark mode changes
   useEffect(() => {
-    document.documentElement.style.setProperty('--email-content-bg', settings.darkMode ? '#121212' : '#f5f5f5');
+    document.documentElement.style.setProperty('--email-list-container-bg', settings.darkMode ? '#121212' : '#f5f5f5');
     document.documentElement.style.setProperty('--email-header-bg', settings.darkMode ? '#1e1e1e' : '#ffffff');
     document.documentElement.style.setProperty('--border-color', settings.darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
-    document.documentElement.style.setProperty('--email-content-a', settings.darkMode ? '#afafff' : null);
+    document.documentElement.style.setProperty('--email-list-container-a', settings.darkMode ? '#afafff' : null);
   }, [settings.darkMode]);
 
 

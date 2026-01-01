@@ -335,7 +335,7 @@ const EmailDetail: React.FC = () => {
       </Paper>
 
       {/* Email content */}
-      <div className='email-content'>
+      <div className='email-list-container'>
         <Box
           sx={{
             flexGrow: 1,

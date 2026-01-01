@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
 import {
-  // AppBar,
-  Toolbar,
-  Typography,
   InputBase,
   IconButton,
   Box,
@@ -57,43 +54,40 @@ const Header: React.FC = () => {
     toast.info("TBD =)");
   };
 
+  return <>
 
-  return (
-    <Toolbar>
+    <Tooltip title="gMaelstrom">
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <GMaelstromIcon sx={{ mr: 1, color: 'rgb(33, 150, 243)' }} />
-        <Typography variant="h6">
-          gMaelstrom
-        </Typography>
       </Box>
+    </Tooltip>
 
-      <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
-        <Search>
-          <SearchIconWrapper>
-            <SearchIcon />
-          </SearchIconWrapper>
-          <SearchInput
-            placeholder="Search mail…"
-            inputProps={{ 'aria-label': 'search' }}
-            value={searchQuery}
-            onChange={onSearchChange}
-            fullWidth
-          />
-        </Search>
-      </Box>
+    <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
+      <Search>
+        <SearchIconWrapper>
+          <SearchIcon />
+        </SearchIconWrapper>
+        <SearchInput
+          placeholder="Search mail…"
+          inputProps={{ 'aria-label': 'search' }}
+          value={searchQuery}
+          onChange={onSearchChange}
+          fullWidth
+        />
+      </Search>
+    </Box>
 
-      <Tooltip title="Help">
-        <IconButton sx={{ mx: -0.75 }} size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
-          <HelpOutlineIcon />
-        </IconButton>
-      </Tooltip>
+    <Tooltip title="Help">
+      <IconButton sx={{ mx: -0.75 }} size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
+        <HelpOutlineIcon />
+      </IconButton>
+    </Tooltip>
 
-      <MenuSettings />
+    <MenuSettings />
 
-      <MenuProfile />
+    <MenuProfile />
 
-    </Toolbar>
-  );
+  </>;
 };
 
 export default Header;

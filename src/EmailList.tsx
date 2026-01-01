@@ -1,30 +1,63 @@
-import RefreshIcon from '@mui/icons-material/Refresh';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Box } from '@mui/material';
+import { Box, Checkbox, IconButton, Tooltip, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
-import { useApiDataCache } from './ctxApiDataCache';
-import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import { useNavigate } from 'react-router-dom';
+import { useApiDataCache } from './ctxApiDataCache';
+import { markEmailsAsRead } from './gMailApi';
+import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const emailRowHeight = 26;
 
-const EmailList: React.FC<{
-  checkedEmails?: Record<string, boolean>;
-  setCheckedEmails?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-}> = props => {
+const EmailList: React.FC = _ => {
 
   const cache = useApiDataCache();
-  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
-  const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
-  const checkedEmails = props.checkedEmails ?? internalCheckedEmails;
-  const setCheckedEmails = props.setCheckedEmails ?? internalSetCheckedEmails;
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
+
+  const [checkedEmailIds, setCheckedEmailIds] = useState<Record<string, boolean>>({});
+  const anyChecked = Object.values(checkedEmailIds).some(Boolean);
+  const allEmailIds = Object.keys(checkedEmailIds);
+  const allChecked = allEmailIds.length > 0 && allEmailIds.every(id => checkedEmailIds[id]);
+  const someChecked = allEmailIds.some(id => checkedEmailIds[id]) && !allChecked;
+
+  const { selectedLabelId: selectedCategory } = useApiDataCache();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onMarkAsUnread = async () => {
+    const selectedIds = Object.entries(checkedEmailIds)
+      .filter(([_, checked]) => checked)
+      .map(([id]) => id);
+    if (!selectedIds.length) return;
+
+    await markEmailsAsRead(selectedIds, false);
+    setCheckedEmailIds({}); // Clear selection
+  };
+
+
+  const onRefreshEmails = async () => {
+    setRefreshing(true);
+    await cache.fetchEmails(0, cache.pageSize);
+    setRefreshing(false);
+  };
+
+
+  const onRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
+    navigate(`/email/${params.row.id}`);
+  }, [navigate]);
+
+  const onCheckAll = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const newChecked: Record<string, boolean> = {};
+    for (const id of allEmailIds) newChecked[id] = event.target.checked;
+    setCheckedEmailIds(newChecked);
+  }, [allEmailIds]);
 
   useEffect(() => {
 
-    // Use ResizeObserver on .email-content for robust sizing
+    // Use ResizeObserver on .email-list-container for robust sizing
     const updatePageSizeAndHeight = () => {
 
       // Find the main content container
@@ -50,7 +83,7 @@ const EmailList: React.FC<{
 
     updatePageSizeAndHeight();
 
-    const gridParent = document.querySelector('.email-content');
+    const gridParent = document.querySelector('.email-list-container');
     const observer = new ResizeObserver(updatePageSizeAndHeight);
     observer.observe(gridParent as HTMLElement);
 
@@ -63,18 +96,28 @@ const EmailList: React.FC<{
     {
       field: 'checkbox',
       headerName: '',
+      renderHeader: () => <Checkbox
+        size="small"
+        checked={allChecked}
+        indeterminate={someChecked}
+        onChange={onCheckAll}
+        inputProps={{ 'aria-label': 'Select all emails' }}
+        sx={{ p: 0, mr: 1 }}
+      />,
       width: 40,
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams) => (
-        <input
-          type="checkbox"
-          checked={!!checkedEmails[params.row.id]}
-          onChange={e => setCheckedEmails(prev => ({ ...prev, [params.row.id]: e.target.checked }))}
-          style={{ cursor: 'pointer' }}
-          aria-label="Select email"
-        />
+        <Box onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={!!checkedEmailIds[params.row.id]}
+            onChange={e => setCheckedEmailIds(prev => ({ ...prev, [params.row.id]: e.target.checked }))}
+            style={{ cursor: 'pointer' }}
+            aria-label="Select email"
+          />
+        </Box>
       ),
       resizable: false
     },
@@ -95,6 +138,7 @@ const EmailList: React.FC<{
     {
       field: 'attachment',
       headerName: 'Attachment',
+      renderHeader: () => <AttachFileIcon fontSize="small" titleAccess="Attachment" />,
       width: 32,
       sortable: false,
       filterable: false,
@@ -142,13 +186,12 @@ const EmailList: React.FC<{
       },
       resizable: true
     }
-  ], [cache.labels, checkedEmails, setCheckedEmails]);
+  ], [allChecked, cache.labels, checkedEmailIds, onCheckAll, someChecked]);
 
 
   interface GridRowModel extends gapi.client.gmail.Message { threadCount?: number };
 
-  // Prepare rows for DataGrid, pad to always match pageSize
-  const rows = useMemo(() => {
+  const gridRows = useMemo(() => {
     const pageEmails = cache.getPageEmails(cache.currentPage, cache.pageSize);
     return pageEmails.map((email: gapi.client.gmail.Message): GridRowModel => ({
       ...email,
@@ -157,30 +200,53 @@ const EmailList: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache.getPageEmails, cache.currentPage, cache.pageSize]);
 
-  const handleRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
-    navigate(`/email/${params.row.id}`);
-  }, [navigate]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await cache.fetchEmails(0, cache.pageSize);
-    setRefreshing(false);
-  };
+  return <>
+    <Box sx={{ display: 'flex', my: "2px" }}>
 
-  return (
-    <Box sx={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing || cache.loading}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 16px', borderRadius: 4, border: 'none', background: '#1976d2', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
+      <Tooltip title="Refresh emails">
+        <IconButton sx={{ mx: '0 3em 0 0' }} size="large" onClick={onRefreshEmails} aria-label="Refresh emails" disabled={refreshing || cache.loading}>
+          <RefreshIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', }}>
+        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+          {selectedCategory}
+        </Typography>
+
+        <Box
+          sx={{
+            ml: '1em', px: 1, borderRadius: 2,
+            border: theme => `2px solid ${theme.palette.divider}`,
+            bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
+          }}
         >
-          <RefreshIcon fontSize="small" /> Refresh
-        </button>
+          <Tooltip title="Mark as Unread" disableInteractive>
+            <span>
+              <IconButton
+                aria-label="Mark as Unread"
+                size="small"
+                onClick={onMarkAsUnread}
+                disabled={!anyChecked}
+              >
+                <MarkEmailUnreadIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          {/* Add more icon buttons here in the future */}
+
+        </Box>
       </Box>
-      <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      
+    </Box>
+
+    <Box className='email-list-container' sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <DataGrid
-          rows={rows}
+          disableColumnFilter={true}
+          sortingOrder={[]}
+          rows={gridRows}
           columns={columns}
           paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}
           onPaginationModelChange={({ page, pageSize }) => {
@@ -191,7 +257,7 @@ const EmailList: React.FC<{
           rowCount={cache.totalEmails}
           paginationMode="server"
           autoHeight={false}
-          onRowClick={handleRowClick}
+          onRowClick={onRowClick}
           loading={cache.loading}
           disableRowSelectionOnClick
           checkboxSelection={false}
@@ -205,7 +271,7 @@ const EmailList: React.FC<{
             border: 0,
             height: containerHeight ? `${containerHeight}px` : '100%',
             minHeight: 300,
-            background: 'var(--email-content-bg)',
+            background: 'var(--email-list-container-bg)',
             '.MuiDataGrid-footerContainer': {
               background: 'var(--email-header-bg)',
               borderTop: '1px solid var(--border-color)',
@@ -216,9 +282,8 @@ const EmailList: React.FC<{
             },
           }}
         />
-      </div>
     </Box>
-  );
+  </>;
 };
 
 export default EmailList;

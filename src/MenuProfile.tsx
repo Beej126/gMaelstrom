@@ -83,7 +83,7 @@ const ProfileMenu: React.FC = _ => {
         <ListItemIcon>
           <LogoutIcon fontSize="small" />
         </ListItemIcon>
-        <ListItemText>Sign {user ? 'out' : 'in'}</ListItemText>
+        <ListItemText>Sign {!user?.authFailed ? 'out' : 'in'}</ListItemText>
       </MenuItem>
       
     </Menu>

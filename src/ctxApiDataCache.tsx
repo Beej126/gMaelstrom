@@ -3,7 +3,17 @@ import { getEmails, getGmailLabels, gmail_Label } from './gMailApi';
 import { SettingName } from './ctxSettings';
 import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
 import { arrayToRecord } from './helpers/typeHelpers';
+import InboxIcon from '@mui/icons-material/Inbox';
+import SendIcon from '@mui/icons-material/Send';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReportIcon from '@mui/icons-material/Report';
+import DescriptionIcon from '@mui/icons-material/Description';
 
+export type ExtendedLabel = gmail_Label & {
+  displayName: string;
+  visible: boolean;
+  icon?: React.ReactNode;
+};
 
 const genLabelDisplayName = (labelRawName: string): string => {
   let displayName = labelRawName.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
@@ -11,6 +21,21 @@ const genLabelDisplayName = (labelRawName: string): string => {
   return displayName;
 };
 
+const mainLabelIcons: Record<string, React.ReactNode> = { 
+  'INBOX': <InboxIcon/> ,
+  'SENT': <SendIcon/>,
+  'DRAFT': <DescriptionIcon/>,
+  'SPAM': <ReportIcon/>,
+  'TRASH': <DeleteIcon/>
+};
+
+const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, boolean>) =>
+  arrayToRecord(gLabels.map(l => ({
+    ...l,
+    displayName: genLabelDisplayName(l.name),
+    visible: labelVis[l.id] !== false,
+    icon: mainLabelIcons[l.id] 
+  })), 'id');
 
 const ApiDataCacheContext = createContext<{
   loading: boolean;
@@ -29,9 +54,8 @@ const ApiDataCacheContext = createContext<{
   labels?: Record<string, ExtendedLabel>;
   setLabels: (labels: Record<string, ExtendedLabel>) => void;
 
-  categories: string[];
-  selectedCategory: string;
-  setSelectedCategory: (category: string) => void;
+  selectedLabelId: string;
+  setSelectedLabelId: (labelId: string) => void;
 
   totalEmails: number;
 
@@ -57,25 +81,10 @@ interface ApiDataCacheProviderProps {
 }
 
 
-const labelMap: Record<string, string> = {
-  'Inbox': 'INBOX',
-  'Sent': 'SENT',
-  'Drafts': 'DRAFT',
-  'Spam': 'SPAM',
-  'Trash': 'TRASH',
-};
-
-// ExtendedLabel merges Gmail label data with visibility
-export type ExtendedLabel = gmail_Label & {
-  displayName: string;
-  visible: boolean
-};
-
-
 export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ children }) => {
 
   // Category state must be declared before useEffect that uses it
-  const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
+  const [selectedLabelId, setSelectedLabelId] = useState<string>('Inbox');
 
   // Flat cache for all emails (by absolute index)
   const [emailCache, setEmailCache] = useState<Array<gapi.client.gmail.Message | undefined>>([]);
@@ -91,7 +100,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
 
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
-  const [categories] = useState<string[]>(['Inbox', 'Sent', 'Drafts', 'Spam', 'Trash']);
 
   // Helper to get/set full email details in cache (by id)
   const emailDetailsCache = useRef<{ [id: string]: gapi.client.gmail.Message }>({});
@@ -100,17 +108,7 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     if (email && email.id) emailDetailsCache.current[email.id] = email;
   };
 
-
   const [labels, setLabels] = useState<Record<string, ExtendedLabel>>();
-
-  // Helper to build Record<string, ExtendedLabel> from array
-  const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, boolean>) => 
-    arrayToRecord(gLabels.map(l => ({
-      ...l,
-      displayName: genLabelDisplayName(l.name),
-      visible: labelVis[l.id] !== false
-    })), 'id');
-
 
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
@@ -125,6 +123,7 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   // Persist only {id: visible} to localStorage when labels change
   useEffect(() => {
     const vis: Record<string, boolean> = {};
+    arrayToRecord(Object.values(labels || {}), 'id');
     for (const l of Object.values(labels ?? {})) vis[l.id] = !!l.visible;
     saveToLocalStorage(SettingName.LABEL_VISIBILITY, vis);
   }, [labels]);
@@ -134,7 +133,7 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     setPageTokens([null]);
     setTotalEmails(0);
     setCurrentPage(0);
-  }, [selectedCategory]);
+  }, [selectedLabelId]);
 
 
   const fetchEmails = useCallback(async (page: number, pageSize: number): Promise<void> => {
@@ -155,8 +154,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     setLoading(true);
 
     try {
-      // Map category to Gmail labelId
-      const labelId = labelMap[selectedCategory] || 'INBOX';
       // Use pageTokens to get the correct pageToken for this page
       const token = pageTokens[page] || null;
 
@@ -164,12 +161,12 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
       while (pageTokens.length <= page) {
         // Fetch previous page to get nextPageToken
         const prevToken = pageTokens[pageTokens.length - 1];
-        const prevResult = await getEmails(prevToken || undefined, labelId, { maxResults: pageSize });
+        const prevResult = await getEmails(prevToken || undefined, selectedLabelId, { maxResults: pageSize });
         setPageTokens(tokens => [...tokens, prevResult.nextPageToken || null]);
       }
 
       // Now fetch the actual page
-      const result = await getEmails(token || undefined, labelId, { maxResults: pageSize });
+      const result = await getEmails(token || undefined, selectedLabelId, { maxResults: pageSize });
       setTotalEmails(result.total);
 
       // Fill the cache at the correct indices
@@ -192,14 +189,14 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, pageTokens]);
+  }, [selectedLabelId, pageTokens]);
 
 
   // const lastFetchRef = useRef<{ page: number; pageSize: number; selectedCategory: string }>({ page: -1, pageSize: -1, selectedCategory: '' });
 
   useEffect(() => { fetchEmails(currentPage, pageSize); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentPage, pageSize, selectedCategory]
+    [currentPage, pageSize, selectedLabelId]
   );
 
   // Helper to get a page of emails from the cache (for DataGrid)
@@ -231,9 +228,8 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     labels,
     setLabels,
 
-    categories,
-    selectedCategory,
-    setSelectedCategory,
+    selectedLabelId,
+    setSelectedLabelId,
 
     totalEmails,
     currentPage,
