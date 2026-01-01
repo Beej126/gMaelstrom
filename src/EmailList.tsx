@@ -1,6 +1,6 @@
 import RefreshIcon from '@mui/icons-material/Refresh';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Box, Chip, useTheme } from '@mui/material';
+import { Box } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useApiDataCache } from './ctxApiDataCache';
@@ -20,7 +20,6 @@ const EmailList: React.FC<{
   const [internalCheckedEmails, internalSetCheckedEmails] = useState<Record<string, boolean>>({});
   const checkedEmails = props.checkedEmails ?? internalCheckedEmails;
   const setCheckedEmails = props.setCheckedEmails ?? internalSetCheckedEmails;
-  const theme = useTheme();
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -60,18 +59,6 @@ const EmailList: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-
-  const prettifyLabel = useCallback((labelId: string): string => {
-    // Try to find the label name from context.labels
-    const found = Object.values(cache.labels).find(l => l.id === labelId);
-    if (found) return found.name;
-    let label = labelId.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-    label = label.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-    return label;
-  }, [cache.labels]);
-
-
   const columns = useMemo<GridColDef[]>(() => [
     {
       field: 'checkbox',
@@ -95,14 +82,14 @@ const EmailList: React.FC<{
       field: 'from',
       headerName: 'From',
       width: 130,
-      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => getFrom(row),
+      valueGetter: (_unused: never, row: GridRowModel) => getFrom(row),
       resizable: true
     },
     {
       field: 'subject',
       headerName: 'Subject',
       width: 320,
-      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => getSubject(row),
+      valueGetter: (_unused: never, row: GridRowModel) => getSubject(row),
       resizable: true
     },
     {
@@ -126,7 +113,7 @@ const EmailList: React.FC<{
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<gapi.client.gmail.Message & { threadCount?: number }>) => (
+      renderCell: (params: GridRenderCellParams<GridRowModel>) => (
         params.row && params.row.threadCount && params.row.threadCount > 1 ? <span title="Threaded">→</span> : null
       ),
       resizable: false
@@ -135,7 +122,7 @@ const EmailList: React.FC<{
       field: 'date',
       headerName: 'Date',
       width: 110,
-      valueGetter: (_unused: never, row: gapi.client.gmail.Message & { threadCount?: number }) => {
+      valueGetter: (_unused: never, row: GridRowModel) => {
         const date = getDate(row);
         return date ? formatDistanceToNow(date) : '';
       },
@@ -149,60 +136,36 @@ const EmailList: React.FC<{
 
         return (
           <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
-            {params.row.labelIds?.map((label: string) => (
-              <Chip key={label} label={prettifyLabel(label)}
-                size="small"
-                variant="outlined"
-                sx={{
-                  height: 18,
-                  fontSize: '0.72rem',
-                  bgcolor: theme.palette.mode === 'light' ? '#e0e0e0' : '#444',
-                  color: theme.palette.text.primary,
-                  px: '0px',
-                  borderRadius: 1.5,
-                  fontWeight: 500,
-                  overflow: 'visible',
-                  textOverflow: 'clip',
-                  whiteSpace: 'nowrap'
-                }}
-              />
-            ))}
+            {params.row.labelIds?.map((labelId: string) => cache.labels?.[labelId]?.displayName).sort().join(', ')}
           </Box>
         );
       },
       resizable: true
     }
-  ], [checkedEmails, setCheckedEmails, prettifyLabel, theme]);
+  ], [cache.labels, checkedEmails, setCheckedEmails]);
 
+
+  interface GridRowModel extends gapi.client.gmail.Message { threadCount?: number };
 
   // Prepare rows for DataGrid, pad to always match pageSize
   const rows = useMemo(() => {
     const pageEmails = cache.getPageEmails(cache.currentPage, cache.pageSize);
-    const baseRows = pageEmails.map((email: gapi.client.gmail.Message) => ({
+    return pageEmails.map((email: gapi.client.gmail.Message): GridRowModel => ({
       ...email,
-      id: email.id,
       threadCount: pageEmails.filter((e: gapi.client.gmail.Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
     }));
-    if (baseRows.length < cache.pageSize) {
-      // Pad with empty rows to always fill the grid
-      const emptyRows = Array.from({ length: cache.pageSize - baseRows.length }, (_, i) => ({ id: `empty-${i}`, isPlaceholder: true }));
-      return [...baseRows, ...emptyRows];
-    }
-    return baseRows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache.getPageEmails, cache.currentPage, cache.pageSize]);
 
-  const handleRowClick = useCallback((params: GridRowParams) => {
+  const handleRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
     navigate(`/email/${params.row.id}`);
   }, [navigate]);
-
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await cache.fetchEmails(0, cache.pageSize);
     setRefreshing(false);
   };
-
 
   return (
     <Box sx={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -215,10 +178,7 @@ const EmailList: React.FC<{
           <RefreshIcon fontSize="small" /> Refresh
         </button>
       </Box>
-      <div
-        // ref={gridContainerRef}
-        style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      >
+      <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <DataGrid
           rows={rows}
           columns={columns}

@@ -197,8 +197,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
         sx={{ 
           mt: 2, 
           p: 2, 
-          backgroundColor: theme.palette.background.paper,
-          borderTop: `1px solid ${theme.palette.divider}`
+          borderTop: `1px solid grey`
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>

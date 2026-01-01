@@ -7,7 +7,6 @@ import {
   Typography, 
   Box,
   CircularProgress,
-  useTheme,
   Paper
 } from '@mui/material';
 import { Close as CloseIcon} from '@mui/icons-material';
@@ -27,7 +26,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   attachment, 
   attachmentData
 }) => {
-  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
@@ -158,18 +156,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
         </Box>
       </DialogTitle>
 
-      <DialogContent 
-        sx={{ 
-          p: 0, 
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          backgroundColor: theme.palette.mode === 'dark' ? '#202124' : '#f5f5f5',
-          position: 'relative'
-        }}
-      >
+      <DialogContent sx={{ p: 0 }}>
         {loading && (
           <Box 
             sx={{ 
@@ -191,7 +178,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                 justifyContent: 'center', 
                 p: 2, 
                 borderRadius: 1,
-                boxShadow: theme.shadows[4]
               }}
             >
               <CircularProgress size={30} sx={{ mr: 2 }} />

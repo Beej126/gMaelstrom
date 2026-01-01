@@ -2,7 +2,7 @@
 import { useMediaQuery } from '@mui/material';
 import React, { createContext, useContext } from 'react';
 import { EnumValue, makeStringEnum } from './helpers/typeHelpers';
-import { useStorageState } from './helpers/useStorageState';
+import { useLocalStorageState } from './helpers/useStorageState';
 
 type DensityMode = 'sparse' | 'condensed';
 
@@ -15,9 +15,6 @@ interface SettingsContextType {
 
   combineThreads: boolean;
   setCombineThreads: (combine: boolean) => void;
-
-  labelVisibility: Record<string, boolean>;
-  setLabelVisibility: (visibility: Record<string, boolean>) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -29,19 +26,18 @@ export const useSettings = () => {
 };
 
 export const STORAGE_KEY_PREFIX = "gMaelstrom_";
-export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'LABEL_VISIBILITY'] as const].map(s => STORAGE_KEY_PREFIX + s));
+export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'LABEL_VISIBILITY'] as const]);
 export type SettingNameType = EnumValue<typeof SettingName>;
 
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = props => {
 
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
-  const [darkMode, setDarkMode] = useStorageState<boolean, SettingNameType>(SettingName.DARK_MODE, prefersDarkMode);
+  const [darkMode, setDarkMode] = useLocalStorageState<boolean, SettingNameType>(SettingName.DARK_MODE, prefersDarkMode);
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
-  const [density, setDensity] = useStorageState<DensityMode, SettingNameType>(SettingName.EMAIL_LIST_DENSITY, "sparse");
-  const [combineThreads, setCombineThreads] = useStorageState<boolean, SettingNameType>(SettingName.COMBINE_THREADS, true);
-  const [labelVisibility, setLabelVisibility] = useStorageState<Record<string, boolean>, SettingNameType>(SettingName.LABEL_VISIBILITY, {});
+  const [density, setDensity] = useLocalStorageState<DensityMode, SettingNameType>(SettingName.EMAIL_LIST_DENSITY, "sparse");
+  const [combineThreads, setCombineThreads] = useLocalStorageState<boolean, SettingNameType>(SettingName.COMBINE_THREADS, true);
 
   return (
     <SettingsContext.Provider value={{
@@ -53,10 +49,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = props =
 
       combineThreads,
       setCombineThreads,
-
-      labelVisibility,
-      setLabelVisibility,
-    }}>
+  }}>
       {props.children}
     </SettingsContext.Provider>
   );

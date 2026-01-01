@@ -7,7 +7,6 @@ import {
   IconButton,
   Box,
   Tooltip,
-  useTheme,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
@@ -47,7 +46,6 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
 }));
 
 const Header: React.FC = () => {
-  const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,7 +61,7 @@ const Header: React.FC = () => {
   return (
     <Toolbar>
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <GMaelstromIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+        <GMaelstromIcon sx={{ mr: 1, color: 'rgb(33, 150, 243)' }} />
         <Typography variant="h6">
           gMaelstrom
         </Typography>

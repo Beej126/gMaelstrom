@@ -1,12 +1,20 @@
-export const getFromSessionStorage = <T>(key: string): T | null => {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) as T : null;
-}
+import { STORAGE_KEY_PREFIX } from "../ctxSettings";
 
-export const saveToSessionStorage = (key: string, value: object | string | null) => {
+export const getFromStorage = <T>(key: string, storage: Storage): T | null => {
+    const raw = storage.getItem(STORAGE_KEY_PREFIX + key);
+    return raw ? JSON.parse(raw) as T : null;
+};
+
+export const saveToStorage = (key: string, value: object | string | null, storage: Storage) => {
     if (value) {
-        localStorage.setItem(key, JSON.stringify(value));
+        storage.setItem(STORAGE_KEY_PREFIX + key, JSON.stringify(value));
     } else {
-        localStorage.removeItem(key);
+        storage.removeItem(STORAGE_KEY_PREFIX + key);
     }
 };
+
+export const getFromSessionStorage = <T>(key: string): T | null => getFromStorage<T>(key, sessionStorage);
+export const saveToSessionStorage = (key: string, value: object | string | null) => saveToStorage(key, value, sessionStorage);
+
+export const getFromLocalStorage = <T>(key: string): T | null => getFromStorage<T>(key, localStorage);
+export const saveToLocalStorage = (key: string, value: object | string | null) => saveToStorage(key, value, localStorage);

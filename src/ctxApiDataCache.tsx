@@ -1,6 +1,8 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from 'react';
 import { getEmails, getGmailLabels, gmail_Label } from './gMailApi';
-import { useSettings } from './ctxSettings';
+import { SettingName } from './ctxSettings';
+import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
+import { arrayToRecord } from './helpers/typeHelpers';
 
 
 const genLabelDisplayName = (labelRawName: string): string => {
@@ -24,7 +26,7 @@ const ApiDataCacheContext = createContext<{
   selectedEmail: gapi.client.gmail.Message | null;
   setSelectedEmail: (email: gapi.client.gmail.Message | null) => void;
 
-  labels: Record<string, ExtendedLabel>;
+  labels?: Record<string, ExtendedLabel>;
   setLabels: (labels: Record<string, ExtendedLabel>) => void;
 
   categories: string[];
@@ -72,8 +74,6 @@ export type ExtendedLabel = gmail_Label & {
 
 export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ children }) => {
 
-  const settings = useSettings();
-
   // Category state must be declared before useEffect that uses it
   const [selectedCategory, setSelectedCategory] = useState<string>('Inbox');
 
@@ -101,35 +101,33 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
   };
 
 
-  const [labels, setLabels] = useState<Record<string, ExtendedLabel>>({});
+  const [labels, setLabels] = useState<Record<string, ExtendedLabel>>();
 
   // Helper to build Record<string, ExtendedLabel> from array
-  const buildLabelRecord = (arr: gmail_Label[], vis: Record<string, boolean>): Record<string, ExtendedLabel> => {
-    const rec: Record<string, ExtendedLabel> = {};
-    for (const l of arr) {
-      const displayName = genLabelDisplayName(l.name);
-      rec[displayName] = { ...l, displayName, visible: vis[l.id] !== false };
-    }
-    return rec;
-  };
+  const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, boolean>) => 
+    arrayToRecord(gLabels.map(l => ({
+      ...l,
+      displayName: genLabelDisplayName(l.name),
+      visible: labelVis[l.id] !== false
+    })), 'id');
+
 
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
     getGmailLabels().then(gmailLabels => {
-      setLabels(buildLabelRecord(gmailLabels, settings.labelVisibility));
+      setLabels(buildLabelRecords(
+        gmailLabels,
+        getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
+      ));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist only {id: visible} to localStorage when labels change
   useEffect(() => {
     const vis: Record<string, boolean> = {};
-    for (const l of Object.values(labels)) vis[l.id] = !!l.visible;
-    localStorage.setItem('gMaelstrom_labelVisibility', JSON.stringify(vis));
+    for (const l of Object.values(labels ?? {})) vis[l.id] = !!l.visible;
+    saveToLocalStorage(SettingName.LABEL_VISIBILITY, vis);
   }, [labels]);
-
-
-
 
   useEffect(() => {
     setEmailCache([]);

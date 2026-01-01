@@ -18,7 +18,7 @@ const LabelSettingsDialog: React.FC<{
     const cache = useApiDataCache();
 
     // Get all labels as array, sorted alphabetically by name
-    const sortedLabels = Object.values(cache.labels).sort((a, b) => a.name.localeCompare(b.name));
+    const sortedLabels = Object.values(cache.labels ?? {}).sort((a, b) => a.name.localeCompare(b.name));
 
     // Toggle label visibility by updating the ExtendedLabel.visible property
     const handleToggle = (labelId: string) => {

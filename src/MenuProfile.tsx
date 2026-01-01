@@ -62,7 +62,7 @@ const ProfileMenu: React.FC = _ => {
 
       <Box sx={{ px: 2, py: 1 }}>
         <Typography variant="subtitle1">{user?.name}</Typography>
-        <Typography variant="body2" color="text.secondary">{user?.email}</Typography>
+        <Typography noWrap variant="body2" color="text.secondary">{user?.email}</Typography>
       </Box>
 
       <Divider />
@@ -83,7 +83,7 @@ const ProfileMenu: React.FC = _ => {
         <ListItemIcon>
           <LogoutIcon fontSize="small" />
         </ListItemIcon>
-        <ListItemText>Sign out</ListItemText>
+        <ListItemText>Sign {user ? 'out' : 'in'}</ListItemText>
       </MenuItem>
       
     </Menu>

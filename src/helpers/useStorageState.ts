@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export function useStorageState<TVal, TKey extends string = string>(key: TKey, initial: TVal) {
+export function useLocalStorageState<TVal, TKey extends string = string>(key: TKey, initial: TVal) {
 
   const [state, setState] = useState<TVal>(() => {
     const raw = localStorage.getItem(key);
