@@ -103,17 +103,19 @@ const AppLayout: React.FC = () => {
             </Typography>
           </div>
 
-          {user?.authFailed ? (<>
-            <Alert severity="error" >
-              Sign in error. Please refresh to try again.
-            </Alert>
+          {!user ? undefined :
 
-            <div className="google-auth-readme">
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{google_auth_readme_md}</ReactMarkdown>
-            </div>
-          </>) :
+            user?.authFailed ? (<>
+              <Alert severity="error" >
+                Sign in error. Please refresh to try again.
+              </Alert>
 
-            <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
+              <div className="google-auth-readme">
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{google_auth_readme_md}</ReactMarkdown>
+              </div>
+            </>) :
+
+              <EmailList checkedEmails={checkedEmails} setCheckedEmails={setCheckedEmails} />
           }
         </div>
       </div>
