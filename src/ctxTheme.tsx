@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect } from 'react';
-import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles} from '@mui/material';
+import React, { createContext, useContext } from 'react';
+import { createTheme, ThemeProvider as MuiThemeProvider, CssBaseline, StyledEngineProvider, GlobalStyles } from '@mui/material';
 import { useSettings } from './ctxSettings';
 
 // Interface for font size settings based on density
@@ -61,9 +61,6 @@ export const useThemeContext = () => {
   return context;
 };
 
-interface ThemeProviderProps {
-  children: React.ReactNode;
-}
 
 // Define font size settings for each density mode
 const FONT_SIZES = {
@@ -90,20 +87,17 @@ const DEFAULT_FONT_WEIGHTS: FontWeightSettings = {
   emailListSubject: 700, // Bold by default for unread emails
 };
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const settings = useSettings();
 
   const fontWeight = DEFAULT_FONT_WEIGHTS;
   const fontSize = FONT_SIZES[settings.density];
 
-  // Update localStorage when dark mode changes
-  useEffect(() => {
-    document.documentElement.style.setProperty('--email-list-container-bg', settings.darkMode ? '#121212' : '#f5f5f5');
-    document.documentElement.style.setProperty('--email-header-bg', settings.darkMode ? '#1e1e1e' : '#ffffff');
-    document.documentElement.style.setProperty('--border-color', settings.darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
-    document.documentElement.style.setProperty('--email-list-container-a', settings.darkMode ? '#afafff' : null);
-  }, [settings.darkMode]);
+  // keep for reference of how to set css variables globally if ever needed
+  // useEffect(() => {
+  //   document.documentElement.style.setProperty('--email-list-container-bg', settings.darkMode ? '#121212' : '#f5f5f5');
+  // }, [settings.darkMode]);
 
 
   // Create theme based on current mode and density

@@ -1,46 +1,56 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { SettingsProvider } from './ctxSettings';
-import { ThemeProvider } from './ctxTheme';
-import { ApiDataCacheProvider } from './ctxApiDataCache';
-import AppLayout from './AppLayout';
 import EmailDetail from './EmailDetail';
-import { ToastContainer, Bounce } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
+import { Box, Toolbar } from '@mui/material';
+import Header from './Header';
+import LabelsSidebar from './LabelsSidebar';
+import { AuthFailed } from './AuthFailed';
+import EmailList from './EmailList';
 
 const App: React.FC = () => {
 
   return (
-    <SettingsProvider>
-      <ThemeProvider>
-        <ApiDataCacheProvider>
-          <Router>
-            <ToastContainer
-              style={{ width: "unset" }}
-              toastStyle={{ width: "unset" }}
-              position="top-center"
-              autoClose={3000}
-              hideProgressBar={false}
-              newestOnTop={true}
-              closeOnClick={true}
-              pauseOnFocusLoss={true}
-              draggable={true}
-              pauseOnHover={true}
-              theme="colored"
-              transition={Bounce}
-            />
+    <div style={{
+      height: "100vh",
+      minHeight: 0,
+      display: "flex", flexDirection: "column",
+      overflow: 'hidden',
+    }}>
 
+      <Toolbar 
+        disableGutters // removes the default left/right inset
+        sx={{ px: 1.5 }} >
+        <Header />
+      </Toolbar>
+
+      <Box sx={{
+        flex: 1, minHeight: 0,
+        overflow: 'hidden',
+        display: 'flex'
+      }}>
+
+        <LabelsSidebar />
+
+        <Box sx={{
+          flex: 1, minWidth: 0, minHeight: 0,
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column'
+        }}>
+          <AuthFailed />
+
+          <Router>
             <Routes>
-              <Route path="/" element={<AppLayout />} />
+              <Route path="/" element={<EmailList />} />
               <Route path="/email/:emailId" element={<EmailDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-
           </Router>
-        </ApiDataCacheProvider>
-      </ThemeProvider>
-    </SettingsProvider>
+
+        </Box>
+
+      </Box>
+    </div>
   );
 };
 

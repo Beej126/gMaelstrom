@@ -1,0 +1,63 @@
+// to pass debug info to Cypress tests
+// declare global {
+//   interface Window {
+//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+//     [index: string]: any;
+//   }
+// }
+
+// Cypress cy.task logging for debug output in tests
+// const cypressLog = (msg: string) => {
+//   if (window.Cypress && window.cy && window.cy.task) {
+//     window.cy.task('log', msg);
+//   }
+// };
+
+// Diagnostic: Log DataGrid DOM element heights to Cypress
+// useEffect(() => {
+//   if (
+//     typeof window !== 'undefined' &&
+//     window.Cypress &&
+//     gridContainerRef.current &&
+//     typeof containerHeight === 'number'
+//   ) {
+//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+//     const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
+//     const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
+//     const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
+//     cypressLog('[DIAG] containerHeight: ' + containerHeight);
+//     if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
+//     if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
+//     if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
+//     if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
+//   }
+// }, [containerHeight]);
+
+
+// Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
+// useEffect(() => {
+//   if (
+//     typeof window !== 'undefined' &&
+//     window.Cypress &&
+//     gridContainerRef.current &&
+//     typeof containerHeight === 'number'
+//   ) {
+//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
+//     if (gridRoot) {
+//       const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
+//       const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
+//       const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
+//       const body = gridRoot.querySelector('.MuiDataGrid-main');
+//       window.__EMAILGRID_DEBUG__ = {
+//         containerHeight,
+//         gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
+//         virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
+//         footerHeight: footer ? footer.clientHeight : undefined,
+//         headerHeight: header ? header.clientHeight : undefined,
+//         bodyHeight: body ? body.clientHeight : undefined,
+//       };
+//       cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
+//     }
+//   }
+// }, [containerHeight]);
+

@@ -5,7 +5,7 @@ interface gMaelstromLogoSvgProps extends SvgIconProps {
   fontSize?: 'inherit' | 'small' | 'medium' | 'large';
 }
 
-const GMaelstromLogoSvg: React.FC<gMaelstromLogoSvgProps> = (props) => {
+const GMaelstromLogoSvg: React.FC<gMaelstromLogoSvgProps> = props => {
   return (
     <SvgIcon {...props} viewBox="0 0 24 24">
       {/* Base Email Envelope Icon */}

@@ -1,0 +1,12 @@
+$data-grid-header-height: 30px;
+
+// set the height of the column headers to be tighter than the default
+.MuiDataGrid-row--borderBottom {
+  height: $data-grid-header-height !important;
+}
+
+//even though we're doing everything to have grid size dynamically with browser window,
+// it still draws an uncessary scrollbar upon resize
+.MuiDataGrid-scrollbar {
+  display: none !important;
+}

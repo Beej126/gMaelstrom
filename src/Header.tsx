@@ -4,15 +4,16 @@ import {
   IconButton,
   Box,
   Tooltip,
+  Button,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CreateIcon from '@mui/icons-material/Create';
 import GMaelstromIcon from './gMaelstromLogoSvg';
 import { toast } from 'react-toastify';
 import MenuProfile from './MenuProfile';
 import MenuSettings from './MenuSettings';
-
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -54,13 +55,21 @@ const Header: React.FC = () => {
     toast.info("TBD =)");
   };
 
+  const onComposeClick = () => {
+    toast.info("TBD =)");
+  };
   return <>
 
     <Tooltip title="gMaelstrom">
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <GMaelstromIcon sx={{ mr: 1, color: 'rgb(33, 150, 243)' }} />
-      </Box>
+      <GMaelstromIcon sx={{ color: 'rgb(33, 150, 243)', fontSize: 30 }} />
     </Tooltip>
+
+    <Button sx={{ ml: 1 }}
+      variant="contained"
+      color="primary"
+      startIcon={<CreateIcon />}
+      onClick={onComposeClick}
+    >Compose</Button>
 
     <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
       <Search>

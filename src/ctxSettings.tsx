@@ -30,7 +30,7 @@ export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE'
 export type SettingNameType = EnumValue<typeof SettingName>;
 
 
-export const SettingsProvider: React.FC<{ children: React.ReactNode }> = props => {
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
   const [darkMode, setDarkMode] = useLocalStorageState<boolean, SettingNameType>(SettingName.DARK_MODE, prefersDarkMode);
@@ -50,7 +50,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = props =
       combineThreads,
       setCombineThreads,
   }}>
-      {props.children}
+      {children}
     </SettingsContext.Provider>
   );
 

@@ -1,20 +1,11 @@
-@import './MUI.DataGrid.scss';
-
-
-// :root {
-//   --toastify-text-color-warning: black;
-//   // --toastify-container-width: unset;
-//   // --toastify-toast-width: unset;
-// }
-
-
+@import './styling/MUI.DataGrid.scss';
 
 // Any customization to ::-webkit-scrollbar triggers the custom rendering path.
 // Browsers like Chrome and Edge switch from the native OS scrollbar to a custom-drawn one.
 // This disables the default platform appearance and features,
 // so you lose the native look and get a simplified, stylable scrollbar instead.
 ::-webkit-scrollbar {
-    width: 16px;
+    width: 12px;
 
     &-thumb {
         background: #555;

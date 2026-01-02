@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Box, Checkbox, IconButton, Tooltip, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
@@ -9,6 +9,7 @@ import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import useMuiGridHelpers from './helpers/useMuiGridHelpers';
 
 const emailRowHeight = 26;
 
@@ -16,7 +17,7 @@ const EmailList: React.FC = _ => {
 
   const cache = useApiDataCache();
   const navigate = useNavigate();
-  const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
+  const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
 
   const [checkedEmailIds, setCheckedEmailIds] = useState<Record<string, boolean>>({});
   const anyChecked = Object.values(checkedEmailIds).some(Boolean);
@@ -24,7 +25,7 @@ const EmailList: React.FC = _ => {
   const allChecked = allEmailIds.length > 0 && allEmailIds.every(id => checkedEmailIds[id]);
   const someChecked = allEmailIds.some(id => checkedEmailIds[id]) && !allChecked;
 
-  const { selectedLabelId: selectedCategory } = useApiDataCache();
+  const { selectedLabelId } = useApiDataCache();
   const [refreshing, setRefreshing] = useState(false);
 
   const onMarkAsUnread = async () => {
@@ -37,13 +38,11 @@ const EmailList: React.FC = _ => {
     setCheckedEmailIds({}); // Clear selection
   };
 
-
   const onRefreshEmails = async () => {
     setRefreshing(true);
     await cache.fetchEmails(0, cache.pageSize);
     setRefreshing(false);
   };
-
 
   const onRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
     navigate(`/email/${params.row.id}`);
@@ -55,42 +54,6 @@ const EmailList: React.FC = _ => {
     setCheckedEmailIds(newChecked);
   }, [allEmailIds]);
 
-  useEffect(() => {
-
-    // Use ResizeObserver on .email-list-container for robust sizing
-    const updatePageSizeAndHeight = () => {
-
-      // Find the main content container
-      const mainContent = document.querySelector('.MuiDataGrid-mainContent');
-      if (!mainContent) return;
-
-      // Get the immediate child (header_row_client)
-      const headerRowClient = mainContent.firstElementChild as HTMLElement | null;
-      if (!headerRowClient) return;
-
-      // Get the top container (header)
-      const topContainer = mainContent.querySelector('.MuiDataGrid-topContainer') as HTMLElement | null;
-      if (!topContainer) return;
-
-      // Calculate available height for rows
-      const available = headerRowClient.clientHeight - topContainer.clientHeight;
-
-      // Calculate max whole rows that fit
-      const rows = Math.max(10, Math.floor(available / emailRowHeight));
-      cache.setPageSize(rows);
-      setContainerHeight(headerRowClient.clientHeight);
-    };
-
-    updatePageSizeAndHeight();
-
-    const gridParent = document.querySelector('.email-list-container');
-    const observer = new ResizeObserver(updatePageSizeAndHeight);
-    observer.observe(gridParent as HTMLElement);
-
-    return () => observer.unobserve(gridParent as HTMLElement);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const columns = useMemo<GridColDef[]>(() => [
     {
@@ -131,7 +94,8 @@ const EmailList: React.FC = _ => {
     {
       field: 'subject',
       headerName: 'Subject',
-      width: 320,
+      flex: 1,
+      minWidth: 320,
       valueGetter: (_unused: never, row: GridRowModel) => getSubject(row),
       resizable: true
     },
@@ -175,7 +139,8 @@ const EmailList: React.FC = _ => {
     {
       field: 'labels',
       headerName: 'Labels',
-      width: 120,
+      // flex: 1,
+      minWidth: 120,
       renderCell: (params: GridRenderCellParams) => {
 
         return (
@@ -212,7 +177,7 @@ const EmailList: React.FC = _ => {
 
       <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', }}>
         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-          {selectedCategory}
+          {cache.labels?.[selectedLabelId]?.displayName}
         </Typography>
 
         <Box
@@ -239,115 +204,54 @@ const EmailList: React.FC = _ => {
 
         </Box>
       </Box>
-      
+
     </Box>
 
-    <Box className='email-list-container' sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <DataGrid
-          disableColumnFilter={true}
-          sortingOrder={[]}
-          rows={gridRows}
-          columns={columns}
-          paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}
-          onPaginationModelChange={({ page, pageSize }) => {
-            cache.setPageSize(pageSize);
-            if (page !== cache.currentPage) cache.setCurrentPage(page);
-          }}
-          pageSizeOptions={[cache.pageSize]}
-          rowCount={cache.totalEmails}
-          paginationMode="server"
-          autoHeight={false}
-          onRowClick={onRowClick}
-          loading={cache.loading}
-          disableRowSelectionOnClick
-          checkboxSelection={false}
-          getRowClassName={(params: GridRowClassNameParams<gapi.client.gmail.Message>) => {
-            if (!params.row) return '';
-            if (params.row.id === cache.selectedEmail?.id) return 'Mui-selected';
-            return isRead(params.row) ? 'email-read' : 'email-unread';
-          }}
-          rowHeight={emailRowHeight}
-          sx={{
-            border: 0,
-            height: containerHeight ? `${containerHeight}px` : '100%',
-            minHeight: 300,
-            background: 'var(--email-list-container-bg)',
-            '.MuiDataGrid-footerContainer': {
-              background: 'var(--email-header-bg)',
-              borderTop: '1px solid var(--border-color)',
-            },
-            '.MuiDataGrid-columnHeaders': {
-              background: 'var(--email-header-bg)',
-              borderBottom: '1px solid var(--border-color)',
-            },
-          }}
-        />
+    {/* In 2026, the "two-Box" pattern is the standard fix for a fundamental conflict between how Flexbox calculates sizes and how the MUI DataGrid measures its available space.
+The two containers serve distinct roles:
+
+1. The Outer Box: Defining the Layout
+The outer Box defines the available area.
+It uses display: flex and height: 400 (or 100%) to stake out a claim in the UI.
+Without this, the DataGrid has no reference point and may collapse to 0px or expand infinitely. 
+
+2. The Inner Box: The "Sizing Sandbox"
+The inner Box is the actual "fix." It acts as a buffer to solve two specific issues:
+The Flex-Shrink Bug: By default, flex items have min-height: auto, which prevents them from shrinking smaller than their content. If the DataGrid has 50 rows, it will try to be 2000px tall. The inner Box with min-height: 0 breaks this, forcing the DataGrid to acknowledge the 400px limit and show its own scrollbars.
+Resize Awareness: The DataGrid uses a ResizeObserver to detect its parent's size. If you place the DataGrid directly in a flex container, it sometimes fails to "shrink" because the flex parent is waiting for the child to define its size—a circular dependency. The inner Box provides a stable, non-flex container for the grid to measure.      */}
+
+    <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }} ref={refGrid}>
+      <DataGrid
+        autoHeight={false}
+
+        loading={cache.loading}
+        rows={gridRows}
+        rowHeight={emailRowHeight}
+        rowCount={cache.totalEmails}
+        onRowClick={onRowClick}
+        getRowClassName={(params: GridRowClassNameParams<gapi.client.gmail.Message>) => {
+          if (!params.row) return '';
+          if (params.row.id === cache.selectedEmail?.id) return 'Mui-selected';
+          return isRead(params.row) ? 'email-read' : 'email-unread';
+        }}
+
+        columns={columns}
+
+        checkboxSelection={true}
+
+        disableColumnFilter={true}
+        sortingOrder={[]}
+
+        paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}
+        onPaginationModelChange={({ page, pageSize }) => {
+          cache.setPageSize(pageSize);
+          if (page !== cache.currentPage) cache.setCurrentPage(page);
+        }}
+        pageSizeOptions={[cache.pageSize]}
+
+      />
     </Box>
   </>;
 };
 
 export default EmailList;
-
-// to pass debug info to Cypress tests
-// declare global {
-//   interface Window {
-//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//     [index: string]: any;
-//   }
-// }
-
-// Cypress cy.task logging for debug output in tests
-// const cypressLog = (msg: string) => {
-//   if (window.Cypress && window.cy && window.cy.task) {
-//     window.cy.task('log', msg);
-//   }
-// };
-
-// Diagnostic: Log DataGrid DOM element heights to Cypress
-// useEffect(() => {
-//   if (
-//     typeof window !== 'undefined' &&
-//     window.Cypress &&
-//     gridContainerRef.current &&
-//     typeof containerHeight === 'number'
-//   ) {
-//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-//     const virtualScroller = gridContainerRef.current.querySelector('.MuiDataGrid-virtualScroller');
-//     const footer = gridContainerRef.current.querySelector('.MuiDataGrid-footerContainer');
-//     const header = gridContainerRef.current.querySelector('.MuiDataGrid-columnHeaders');
-//     cypressLog('[DIAG] containerHeight: ' + containerHeight);
-//     if (gridRoot) cypressLog('[DIAG] .MuiDataGrid-root height: ' + gridRoot.clientHeight);
-//     if (virtualScroller) cypressLog('[DIAG] .MuiDataGrid-virtualScroller height: ' + virtualScroller.clientHeight);
-//     if (footer) cypressLog('[DIAG] .MuiDataGrid-footerContainer height: ' + footer.clientHeight);
-//     if (header) cypressLog('[DIAG] .MuiDataGrid-columnHeaders height: ' + header.clientHeight);
-//   }
-// }, [containerHeight]);
-
-
-// Diagnostic: Log DataGrid DOM element heights to Cypress for overflow debugging
-// useEffect(() => {
-//   if (
-//     typeof window !== 'undefined' &&
-//     window.Cypress &&
-//     gridContainerRef.current &&
-//     typeof containerHeight === 'number'
-//   ) {
-//     const gridRoot = gridContainerRef.current.querySelector('.MuiDataGrid-root');
-//     if (gridRoot) {
-//       const virtualScroller = gridRoot.querySelector('.MuiDataGrid-virtualScroller');
-//       const footer = gridRoot.querySelector('.MuiDataGrid-footerContainer');
-//       const header = gridRoot.querySelector('.MuiDataGrid-columnHeaders');
-//       const body = gridRoot.querySelector('.MuiDataGrid-main');
-//       window.__EMAILGRID_DEBUG__ = {
-//         containerHeight,
-//         gridRootHeight: gridRoot ? gridRoot.clientHeight : undefined,
-//         virtualScrollerHeight: virtualScroller ? virtualScroller.clientHeight : undefined,
-//         footerHeight: footer ? footer.clientHeight : undefined,
-//         headerHeight: header ? header.clientHeight : undefined,
-//         bodyHeight: body ? body.clientHeight : undefined,
-//       };
-//       cypressLog(`DOM_DIAG: ${JSON.stringify(window.__EMAILGRID_DEBUG__)}`);
-//     }
-//   }
-// }, [containerHeight]);
-

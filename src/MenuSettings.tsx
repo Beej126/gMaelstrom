@@ -22,6 +22,7 @@ import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import LabelSettingsDialog from './LabelSettingsDialog';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useSettings } from './ctxSettings';
+import { toast } from 'react-toastify';
 
 
 const SettingsMenu: React.FC = _ => {
@@ -172,6 +173,8 @@ const SettingsMenu: React.FC = _ => {
         </ListItemIcon>
         <ListItemText>Un-Ignore All Warnings</ListItemText>
       </MenuItem> */}
+
+      <MenuItem onClick={()=>toast.info("fresh toast!")}>Toast Test</MenuItem>
 
     </Menu>
   </>;

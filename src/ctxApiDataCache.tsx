@@ -8,11 +8,12 @@ import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReportIcon from '@mui/icons-material/Report';
 import DescriptionIcon from '@mui/icons-material/Description';
+import { SvgIcon } from '@mui/material';
 
 export type ExtendedLabel = gmail_Label & {
   displayName: string;
   visible: boolean;
-  icon?: React.ReactNode;
+  icon?: React.ReactElement<typeof SvgIcon>;
 };
 
 const genLabelDisplayName = (labelRawName: string): string => {
@@ -21,12 +22,12 @@ const genLabelDisplayName = (labelRawName: string): string => {
   return displayName;
 };
 
-const mainLabelIcons: Record<string, React.ReactNode> = { 
-  'INBOX': <InboxIcon/> ,
-  'SENT': <SendIcon/>,
-  'DRAFT': <DescriptionIcon/>,
-  'SPAM': <ReportIcon/>,
-  'TRASH': <DeleteIcon/>
+const mainLabelIcons: Record<string, React.ReactElement<typeof SvgIcon>> = { 
+  'INBOX': <InboxIcon sx={{ fontSize: 18 }} /> ,
+  'SENT': <SendIcon sx={{ fontSize: 18 }} />,
+  'DRAFT': <DescriptionIcon sx={{ fontSize: 18 }} />,
+  'SPAM': <ReportIcon sx={{ fontSize: 18 }} />,
+  'TRASH': <DeleteIcon sx={{ fontSize: 18 }} />
 };
 
 const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, boolean>) =>
@@ -34,7 +35,7 @@ const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, bool
     ...l,
     displayName: genLabelDisplayName(l.name),
     visible: labelVis[l.id] !== false,
-    icon: mainLabelIcons[l.id] 
+    icon: mainLabelIcons[l.id]
   })), 'id');
 
 const ApiDataCacheContext = createContext<{
@@ -70,21 +71,14 @@ const ApiDataCacheContext = createContext<{
 
 export const useApiDataCache = () => {
   const context = useContext(ApiDataCacheContext);
-  if (context === undefined) {
-    throw new Error('useApiDataCache must be used within an ApiDataCacheProvider');
-  }
+  if (context === undefined) throw new Error('useApiDataCache must be used within an ApiDataCacheProvider');
   return context;
 };
 
-interface ApiDataCacheProviderProps {
-  children: ReactNode;
-}
 
+export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
-export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ children }) => {
-
-  // Category state must be declared before useEffect that uses it
-  const [selectedLabelId, setSelectedLabelId] = useState<string>('Inbox');
+  const [selectedLabelId, setSelectedLabelId] = useState<string>(Object.entries(mainLabelIcons)[0][0]);
 
   // Flat cache for all emails (by absolute index)
   const [emailCache, setEmailCache] = useState<Array<gapi.client.gmail.Message | undefined>>([]);
@@ -191,8 +185,6 @@ export const ApiDataCacheProvider: React.FC<ApiDataCacheProviderProps> = ({ chil
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLabelId, pageTokens]);
 
-
-  // const lastFetchRef = useRef<{ page: number; pageSize: number; selectedCategory: string }>({ page: -1, pageSize: -1, selectedCategory: '' });
 
   useEffect(() => { fetchEmails(currentPage, pageSize); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
