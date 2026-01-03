@@ -1,14 +1,11 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Box, Checkbox, IconButton, Tooltip, Typography } from '@mui/material';
+import React, { useMemo, useCallback } from 'react';
+import { Box, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useApiDataCache } from './ctxApiDataCache';
-import { markEmailsAsRead } from './gMailApi';
 import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
 
 const emailRowHeight = 26;
@@ -19,71 +16,10 @@ const EmailList: React.FC = _ => {
   const navigate = useNavigate();
   const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
 
-  const [checkedEmailIds, setCheckedEmailIds] = useState<Record<string, boolean>>({});
-  const anyChecked = Object.values(checkedEmailIds).some(Boolean);
-  const allEmailIds = Object.keys(checkedEmailIds);
-  const allChecked = allEmailIds.length > 0 && allEmailIds.every(id => checkedEmailIds[id]);
-  const someChecked = allEmailIds.some(id => checkedEmailIds[id]) && !allChecked;
 
-  const { selectedLabelId } = useApiDataCache();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onMarkAsUnread = async () => {
-    const selectedIds = Object.entries(checkedEmailIds)
-      .filter(([_, checked]) => checked)
-      .map(([id]) => id);
-    if (!selectedIds.length) return;
-
-    await markEmailsAsRead(selectedIds, false);
-    setCheckedEmailIds({}); // Clear selection
-  };
-
-  const onRefreshEmails = async () => {
-    setRefreshing(true);
-    await cache.fetchEmails(0, cache.pageSize);
-    setRefreshing(false);
-  };
-
-  const onRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
-    navigate(`/email/${params.row.id}`);
-  }, [navigate]);
-
-  const onCheckAll = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const newChecked: Record<string, boolean> = {};
-    for (const id of allEmailIds) newChecked[id] = event.target.checked;
-    setCheckedEmailIds(newChecked);
-  }, [allEmailIds]);
-
+  type GridRowModel = Required<Pick<gapi.client.gmail.Message, "id">> & gapi.client.gmail.Message & { threadCount?: number };
 
   const columns = useMemo<GridColDef[]>(() => [
-    {
-      field: 'checkbox',
-      headerName: '',
-      renderHeader: () => <Checkbox
-        size="small"
-        checked={allChecked}
-        indeterminate={someChecked}
-        onChange={onCheckAll}
-        inputProps={{ 'aria-label': 'Select all emails' }}
-        sx={{ p: 0, mr: 1 }}
-      />,
-      width: 40,
-      sortable: false,
-      filterable: false,
-      disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams) => (
-        <Box onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={!!checkedEmailIds[params.row.id]}
-            onChange={e => setCheckedEmailIds(prev => ({ ...prev, [params.row.id]: e.target.checked }))}
-            style={{ cursor: 'pointer' }}
-            aria-label="Select email"
-          />
-        </Box>
-      ),
-      resizable: false
-    },
     {
       field: 'from',
       headerName: 'From',
@@ -96,8 +32,20 @@ const EmailList: React.FC = _ => {
       headerName: 'Subject',
       flex: 1,
       minWidth: 320,
-      valueGetter: (_unused: never, row: GridRowModel) => getSubject(row),
-      resizable: true
+      resizable: true,
+      renderCell: (params: GridRenderCellParams<GridRowModel>) => (
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: isRead(params.row) ? 300 : 700,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {getSubject(params.row)}
+        </Typography>
+      )
     },
     {
       field: 'attachment',
@@ -109,7 +57,8 @@ const EmailList: React.FC = _ => {
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<gapi.client.gmail.Message>) => (
         params.row?.payload?.parts?.some(part => part.filename && part.filename.length > 0) ? (
-          <span title="Has attachment">📎</span>
+          <AttachFileIcon fontSize="small" titleAccess="Attachment" />
+          // <span title="Has attachment">📎</span>
         ) : null
       ),
       resizable: false
@@ -151,81 +100,36 @@ const EmailList: React.FC = _ => {
       },
       resizable: true
     }
-  ], [allChecked, cache.labels, checkedEmailIds, onCheckAll, someChecked]);
+  ], [cache]); //move dependencies into separate memos per event handler
 
 
-  interface GridRowModel extends gapi.client.gmail.Message { threadCount?: number };
+  const onRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
+    navigate(`/email/${params.row.id}`);
+  }, [navigate]);
 
-  const gridRows = useMemo(() => {
-    const pageEmails = cache.getPageEmails(cache.currentPage, cache.pageSize);
-    return pageEmails.map((email: gapi.client.gmail.Message): GridRowModel => ({
-      ...email,
-      threadCount: pageEmails.filter((e: gapi.client.gmail.Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cache.getPageEmails, cache.currentPage, cache.pageSize]);
 
 
   return <>
-    <Box sx={{ display: 'flex', my: "2px" }}>
-
-      <Tooltip title="Refresh emails">
-        <IconButton sx={{ mx: '0 3em 0 0' }} size="large" onClick={onRefreshEmails} aria-label="Refresh emails" disabled={refreshing || cache.loading}>
-          <RefreshIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-
-      <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', }}>
-        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-          {cache.labels?.[selectedLabelId]?.displayName}
-        </Typography>
-
-        <Box
-          sx={{
-            ml: '1em', px: 1, borderRadius: 2,
-            border: theme => `2px solid ${theme.palette.divider}`,
-            bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
-          }}
-        >
-          <Tooltip title="Mark as Unread" disableInteractive>
-            <span>
-              <IconButton
-                aria-label="Mark as Unread"
-                size="small"
-                onClick={onMarkAsUnread}
-                disabled={!anyChecked}
-              >
-                <MarkEmailUnreadIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-
-          {/* Add more icon buttons here in the future */}
-
-        </Box>
-      </Box>
-
-    </Box>
-
     {/* In 2026, the "two-Box" pattern is the standard fix for a fundamental conflict between how Flexbox calculates sizes and how the MUI DataGrid measures its available space.
-The two containers serve distinct roles:
+      The two containers serve distinct roles:
 
-1. The Outer Box: Defining the Layout
-The outer Box defines the available area.
-It uses display: flex and height: 400 (or 100%) to stake out a claim in the UI.
-Without this, the DataGrid has no reference point and may collapse to 0px or expand infinitely. 
+      1. The Outer Box: Defining the Layout
+      The outer Box defines the available area.
+      It uses display: flex and height: 400 (or 100%) to stake out a claim in the UI.
+      Without this, the DataGrid has no reference point and may collapse to 0px or expand infinitely. 
 
-2. The Inner Box: The "Sizing Sandbox"
-The inner Box is the actual "fix." It acts as a buffer to solve two specific issues:
-The Flex-Shrink Bug: By default, flex items have min-height: auto, which prevents them from shrinking smaller than their content. If the DataGrid has 50 rows, it will try to be 2000px tall. The inner Box with min-height: 0 breaks this, forcing the DataGrid to acknowledge the 400px limit and show its own scrollbars.
-Resize Awareness: The DataGrid uses a ResizeObserver to detect its parent's size. If you place the DataGrid directly in a flex container, it sometimes fails to "shrink" because the flex parent is waiting for the child to define its size—a circular dependency. The inner Box provides a stable, non-flex container for the grid to measure.      */}
+      2. The Inner Box: The "Sizing Sandbox"
+      The inner Box is the actual "fix." It acts as a buffer to solve two specific issues:
+      The Flex-Shrink Bug: By default, flex items have min-height: auto, which prevents them from shrinking smaller than their content. If the DataGrid has 50 rows, it will try to be 2000px tall. The inner Box with min-height: 0 breaks this, forcing the DataGrid to acknowledge the 400px limit and show its own scrollbars.
+      Resize Awareness: The DataGrid uses a ResizeObserver to detect its parent's size. If you place the DataGrid directly in a flex container, it sometimes fails to "shrink" because the flex parent is waiting for the child to define its size—a circular dependency. The inner Box provides a stable, non-flex container for the grid to measure.
+    */}
 
     <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }} ref={refGrid}>
       <DataGrid
         autoHeight={false}
 
         loading={cache.loading}
-        rows={gridRows}
+        rows={cache.currentPageEmails}
         rowHeight={emailRowHeight}
         rowCount={cache.totalEmails}
         onRowClick={onRowClick}
@@ -238,16 +142,33 @@ Resize Awareness: The DataGrid uses a ResizeObserver to detect its parent's size
         columns={columns}
 
         checkboxSelection={true}
+        //mui datagrid uses the .id property on the objects passed to rows as the unique row identifier
+        //so it's convenient gmail messages already have an id property
+        rowSelectionModel={cache.checkedEmailIds}
+        onRowSelectionModelChange={cache.setCheckedEmailIds}
 
         disableColumnFilter={true}
         sortingOrder={[]}
 
+        paginationMode='server' //important for rowcount to work
+        // it seemed most sense to ask google server for each page and cache, versus requesting all emails and paginating client side
+        // in tandem with deliberate search retrievals being the way to dig through large folders (like trash, etc)
         paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}
         onPaginationModelChange={({ page, pageSize }) => {
           cache.setPageSize(pageSize);
           if (page !== cache.currentPage) cache.setCurrentPage(page);
         }}
         pageSizeOptions={[cache.pageSize]}
+
+        sx={{
+          '& .MuiDataGrid-columnHeaderTitle, & .MuiDataGrid-cell': { fontWeight: 300 },
+          '& .MuiDataGrid-row.email-read': {
+            backgroundColor: theme => theme.palette.background.default,
+          },
+          '& .MuiDataGrid-row.email-read.Mui-selected': {
+            backgroundColor: theme => theme.palette.action.selected,
+          }
+        }}
 
       />
     </Box>

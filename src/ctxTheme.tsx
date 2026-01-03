@@ -134,9 +134,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ),
     },
     //roboto is the default for MUI, keeping in case ever want to change
-    // typography: {
-    //   fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    // },
+    typography: {
+      fontFamily: '"Google Sans", "Roboto", "Helvetica Neue", Arial, sans-serif',
+    },
     components: {
       MuiButtonBase: {
         styleOverrides: {

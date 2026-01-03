@@ -1,3 +1,5 @@
+// @internal - Only import via gMailApi.ts
+
 // Batch fetch Gmail message metadata for a list of message IDs
 // Returns an array of message objects (with the same fields as before)
 import { getAuthedUser } from './gAuthApi';

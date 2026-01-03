@@ -5,6 +5,7 @@ import {
   Box,
   Tooltip,
   Button,
+  Typography,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
@@ -14,6 +15,9 @@ import GMaelstromIcon from './gMaelstromLogoSvg';
 import { toast } from 'react-toastify';
 import MenuProfile from './MenuProfile';
 import MenuSettings from './MenuSettings';
+import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { useApiDataCache } from './ctxApiDataCache';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -44,7 +48,16 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
 }));
 
 const Header: React.FC = () => {
+  const cache = useApiDataCache();
   const [searchQuery, setSearchQuery] = useState('');
+  const { selectedLabelId } = useApiDataCache();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefreshEmails = async () => {
+    setRefreshing(true);
+    await cache.fetchEmails(0, cache.pageSize);
+    setRefreshing(false);
+  };
 
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -70,6 +83,42 @@ const Header: React.FC = () => {
       startIcon={<CreateIcon />}
       onClick={onComposeClick}
     >Compose</Button>
+
+    <Tooltip title="Refresh emails">
+      <IconButton sx={{ mx: '0 3em 0 0' }} size="large" onClick={onRefreshEmails} aria-label="Refresh emails" disabled={refreshing || cache.loading}>
+        <RefreshIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+
+    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', }}>
+      <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+        {cache.labels?.[selectedLabelId]?.displayName}
+      </Typography>
+
+      <Box
+        sx={{
+          ml: '1em', px: 1, borderRadius: 2,
+          border: theme => `2px solid ${theme.palette.divider}`,
+          bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
+        }}
+      >
+        <Tooltip title="Mark as Read" disableInteractive>
+          <span>
+            <IconButton
+              aria-label="Mark as Read"
+              size="small"
+              onClick={() => cache.markCheckedEmailIdsAsRead(true)}
+              disabled={!cache.checkedEmailIds.ids.size}
+            >
+              <MarkEmailUnreadIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        {/* Add more icon buttons here in the future */}
+
+      </Box>
+    </Box>
 
     <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
       <Search>

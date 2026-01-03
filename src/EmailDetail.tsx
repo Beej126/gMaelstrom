@@ -24,8 +24,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
 import { useApiDataCache } from './ctxApiDataCache';
-import { getEmailById, getEmailThread, getAttachmentData, markEmailsAsRead } from './gMailApi';
-// import { Email } from '../types/email';
+import { getEmailDetailsById, getEmailThread, getAttachmentData, markEmailIdsAsRead } from './gMailApi';
 import {
   extractHtmlContent,
   extractInlineAttachments,
@@ -170,7 +169,7 @@ const EmailDetail: React.FC = () => {
       // setSelectedEmail(updated); // REMOVE THIS LINE
       updateEmailInContext(updated);
       setIsReadLocal(true);
-      if (selectedEmail.id) markEmailsAsRead([selectedEmail.id], true);
+      if (selectedEmail.id) markEmailIdsAsRead([selectedEmail.id], true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail?.id]);
@@ -205,9 +204,9 @@ const EmailDetail: React.FC = () => {
         setLoading(true);
         try {
           // Use cache if available
-          let email = getCachedEmail(emailId);
+          let email = getCachedEmail(emailId)!;
           if (!email) {
-            email = await getEmailById(emailId);
+            email = await getEmailDetailsById(emailId);
             setCachedEmail(email);
           }
           setSelectedEmail(email);
@@ -241,7 +240,7 @@ const EmailDetail: React.FC = () => {
       };
       setIsReadLocal(true);
       updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id], true);
+      if (selectedEmail.id) await markEmailIdsAsRead([selectedEmail.id], true);
     } else {
       // Mark as unread
       updated = {
@@ -251,7 +250,7 @@ const EmailDetail: React.FC = () => {
       };
       setIsReadLocal(false);
       updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailsAsRead([selectedEmail.id], false);
+      if (selectedEmail.id) await markEmailIdsAsRead([selectedEmail.id], false);
     }
     // Do NOT call setSelectedEmail(updated) here
   };
