@@ -4,7 +4,7 @@ import App from './App';
 import { ToastContainer, Bounce } from 'react-toastify';
 import { ThemeProvider } from './ctxTheme';
 import { SettingsProvider } from './ctxSettings';
-import { ApiDataCacheProvider } from './ctxApiDataCache';
+import { ApiDataCacheProviderComponent } from './ctxApiDataCache';
 import 'react-toastify/dist/ReactToastify.css';
 
 const rootEl = document.getElementById('root');
@@ -28,9 +28,9 @@ if (rootEl) ReactDOM.createRoot(rootEl).render(
 
     <SettingsProvider>
       <ThemeProvider>
-        <ApiDataCacheProvider>
+        <ApiDataCacheProviderComponent>
           <App />
-        </ApiDataCacheProvider>
+        </ApiDataCacheProviderComponent>
       </ThemeProvider>
     </SettingsProvider>
 

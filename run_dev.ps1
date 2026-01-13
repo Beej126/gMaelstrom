@@ -18,7 +18,7 @@ function Test-SemVer {
 
 function checkInstall(
     [string[]] $checkNames,
-    [string] $reason,
+    [string] $purpose,
     [ScriptBlock] $installCommand,
     [string] $versionMin,
     [ScriptBlock] $upgradeCommand, # provide empty scriptblock to use the $installCommand for upgrade
@@ -28,14 +28,18 @@ function checkInstall(
     
     if (!($checkNames | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue })) {
         $Host.UI.RawUI.FlushInputBuffer()
-        Write-Host "`n'$checkNames' is not in path. purpose: $purpose. Attempt install? (y/n)" -NoNewline
+        Write-Host "`n'$($checkNames -join " or ")' is not in path. purpose: $purpose. Attempt install? (y/n)" -NoNewline
         if ($Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character -ne "y") { echo "  aborting."; exit }
+        Write-Host ""
 
         & $installCommand
 
         # relaunch script after install to pick up new PATH and continue on
-        if ($restart) { 
-            Start-Process -FilePath "pwsh" -ArgumentList "-File", "$PSCommandPath"
+        if ($restart) {
+            Write-Host "`nRestarting script to pick up new env vars..."
+            Write-Host "unfortunately there's no straightforward way to re-launch new terminals inside vscode without being tied to vscode."
+            Write-Host "once this script finally completes, close and re-run inside vscode terminal if that is preferred."
+            Start-Process -FilePath "pwsh" -WorkingDirectory $PWD.Path -ArgumentList "-File", "$PSCommandPath"
             exit
         }
     }
@@ -52,6 +56,7 @@ function checkInstall(
             if ($upgradeCommand) {
                 Write-Host "` Attempt upgrade? (y/n)" -NoNewline
                 if ($Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character -ne "y") { echo "  aborting."; exit }
+                Write-Host ""
 
                 # if $upgradeCommand is empty, use $installCommand
                 & ($upgradeCommand.ToString().Trim() -eq '' ? $installCommand : $upgradeCommand)
@@ -69,18 +74,40 @@ function checkInstall(
     }
 }
 
+function gitHubDlAndInstall(
+    [string] $latestUrl,
+    [string] $msiRegex
+) {
+    $msiUrl = ((iwr $latestUrl | ConvertFrom-Json).assets | Where-Object name -match $msiRegex).browser_download_url
+    iwr -Uri $msiUrl -OutFile "$env:TEMP\volta.msi"
+    Start-Process "$env:temp\volta.msi" -Wait
+    # remove-item "$env:TEMP\volta.msi"
+}
 
 
-checkInstall "nvm" "preferred Node.js install manager" `
-    { winget install -e --id CoreyButler.NVMforWindows --accept-source-agreements --accept-package-agreements } `
-    -restart $true
 
-checkInstall "node" "everybody loves raymond =)" `
-    { nvm install latest; nvm use latest } `
-    -versionMin "25" { }
+# volta is considered the latest/greatest node version manager circa Q1 2026 (i.e. instead of NVM, etc)
+#   and it also manages pnpm installation and versions
+#   pnpm can do some node version management but not project folder specific versions like volta does (pnpm still installs node versions only globally)
+# but voltas MSI installer seems to be broken on some key initial pathing...
+#   it installs initial shims to c:\program files\volta
+#   so that DOES needs to be in path and apparently it adds this to the SYSTEM path
+#   but additional package installs go to the USER path at %LOCALAPPDATA%\volta\bin
+#   and the installer adds this to the USER path so it resolves BEHIND the c:\program files\volta path!!!
+#   so with a clean install volta gives warnings about c:\program files\volta overshadowing %LOCALAPPDATA%\volta\bin arrrg!
+#   the best thing to do right now seems to be removing pnpm.* from c:\program files\volta...
+# winget has a volta package but it is often out of date, so we download the latest from github releases directly
+# dir "$env:ProgramFiles\Volta" | % { if ($_.Name -notlike "volta*" -and $_.Name -notlike "node*") { mv $_ "$env:ProgramFiles\Volta\hide\" } } `
+checkInstall "volta" "volta is latest/greatest node & pnpm manager" `
+  { gitHubDlAndInstall "https://api.github.com/repos/volta-cli/volta/releases/latest" "windows-x86_64\.msi"; `
+    mkdir "$env:ProgramFiles\Volta\hide" -ErrorAction SilentlyContinue; `
+    mv "$env:ProgramFiles\Volta\pnpm.*" "$env:ProgramFiles\Volta\hide\"; `
+  } `
+  -restart $true
 
-checkInstall "pnpm" "much improved package manager. e.g. finally jsonc comments in package.json, yay!! =)" `
-    { npm install -g pnpm }
+# checkInstall "node" "might be needed for components but not directly yet" { volta install node@lts; volta pin node@lts }
+checkInstall "pnpm" "required package manager for this project" { volta install pnpm }
+
 
 checkInstall "openssl" "for local https dev server cert gen" `
     { winget install -e --id Git.Git --interactive --accept-source-agreements --accept-package-agreements } `
@@ -103,6 +130,16 @@ if (!(Get-ChildItem -Path Cert:\LocalMachine\Root | Where-Object { $_.Thumbprint
         -restart $true
 
     gsudo Import-Certificate -FilePath .\localhost-cert.pem -CertStoreLocation Cert:\LocalMachine\Root
+}
+
+if (
+    !(Test-Path "node_modules") -or
+    !(Test-Path "pnpm-lock.yaml") -or
+    ([Math]::Abs(((Get-Item "package.json").LastWriteTime - (Get-Item "pnpm-lock.yaml").LastWriteTime).TotalSeconds) -gt 1)
+) {
+    Write-Host "Running pnpm install to ensure dependencies are up to date..."
+    pnpm install
+    touch pnpm-lock.yaml package.json
 }
 
 Write-Host "Environment check complete. Starting dev runtime..."

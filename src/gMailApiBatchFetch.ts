@@ -3,6 +3,7 @@
 // Batch fetch Gmail message metadata for a list of message IDs
 // Returns an array of message objects (with the same fields as before)
 import { getAuthedUser } from './gAuthApi';
+import { GMessage } from './gMailApi';
 
 
 // Helper to sleep for ms milliseconds
@@ -11,12 +12,12 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 export const gmailApiBatchFetch = async (
   messageIds: string[],
   fields: string = 'id,threadId,snippet,labelIds,payload(headers,parts)'
-): Promise<gapi.client.gmail.Message[]> => {
+): Promise<GMessage[]> => {
   const token = (await getAuthedUser())?.accessToken;
   const url = 'https://gmail.googleapis.com/batch';
   const BATCH_SIZE = 10;
   const DELAY_MS = 300;
-  const allResults: gapi.client.gmail.Message[] = [];
+  const allResults: GMessage[] = [];
   for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
     const chunk = messageIds.slice(i, i + BATCH_SIZE);
     const boundary = 'batch_boundary_' + Math.random().toString(36).slice(2);

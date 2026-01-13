@@ -55,7 +55,7 @@ const Header: React.FC = () => {
 
   const onRefreshEmails = async () => {
     setRefreshing(true);
-    await cache.fetchEmails(0, cache.pageSize);
+    await cache.fetchMessages(0, cache.pageSize);
     setRefreshing(false);
   };
 
@@ -77,48 +77,47 @@ const Header: React.FC = () => {
       <GMaelstromIcon sx={{ color: 'rgb(33, 150, 243)', fontSize: 30 }} />
     </Tooltip>
 
-    <Button sx={{ ml: 1 }}
+    <Typography variant="h6" component="div" sx={{ fontWeight: 600, ml: 1 }}>
+      {cache.labels?.[selectedLabelId]?.displayName}
+    </Typography>
+
+    <Tooltip title="Refresh email list">
+      <IconButton sx={{ left: -5, width: 35 }} size="large" onClick={onRefreshEmails} aria-label="Refresh email list" disabled={refreshing || cache.loading}>
+        <RefreshIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+
+    <Box
+      sx={{
+        mr: 1.5,
+        px: 1, borderRadius: 2,
+        border: theme => `2px solid ${theme.palette.divider}`,
+        bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
+      }}
+    >
+      <Tooltip title="Mark as Read" disableInteractive>
+        <span>
+          <IconButton
+            aria-label="Mark as Read"
+            size="small"
+            onClick={() => cache.markCheckedMessageIdsAsRead(true)}
+            disabled={!cache.checkedMessageIds.ids.size}
+          >
+            <MarkEmailUnreadIcon />
+          </IconButton>
+        </span>
+      </Tooltip>
+
+      {/* Add more icon buttons here in the future */}
+
+    </Box>
+
+    <Button
       variant="contained"
       color="primary"
       startIcon={<CreateIcon />}
       onClick={onComposeClick}
     >Compose</Button>
-
-    <Tooltip title="Refresh emails">
-      <IconButton sx={{ mx: '0 3em 0 0' }} size="large" onClick={onRefreshEmails} aria-label="Refresh emails" disabled={refreshing || cache.loading}>
-        <RefreshIcon fontSize="small" />
-      </IconButton>
-    </Tooltip>
-
-    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', }}>
-      <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-        {cache.labels?.[selectedLabelId]?.displayName}
-      </Typography>
-
-      <Box
-        sx={{
-          ml: '1em', px: 1, borderRadius: 2,
-          border: theme => `2px solid ${theme.palette.divider}`,
-          bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
-        }}
-      >
-        <Tooltip title="Mark as Read" disableInteractive>
-          <span>
-            <IconButton
-              aria-label="Mark as Read"
-              size="small"
-              onClick={() => cache.markCheckedEmailIdsAsRead(true)}
-              disabled={!cache.checkedEmailIds.ids.size}
-            >
-              <MarkEmailUnreadIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
-
-        {/* Add more icon buttons here in the future */}
-
-      </Box>
-    </Box>
 
     <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
       <Search>
@@ -126,7 +125,7 @@ const Header: React.FC = () => {
           <SearchIcon />
         </SearchIconWrapper>
         <SearchInput
-          placeholder="Search mail…"
+          placeholder="Search for emails…"
           inputProps={{ 'aria-label': 'search' }}
           value={searchQuery}
           onChange={onSearchChange}

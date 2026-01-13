@@ -1,12 +1,13 @@
 import React, { useMemo, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams, GridRowClassNameParams, GridRowParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useApiDataCache } from './ctxApiDataCache';
 import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
+import { GMessage } from './gMailApi';
 
 const emailRowHeight = 26;
 
@@ -17,7 +18,7 @@ const EmailList: React.FC = _ => {
   const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
 
 
-  type GridRowModel = Required<Pick<gapi.client.gmail.Message, "id">> & gapi.client.gmail.Message & { threadCount?: number };
+  type GridRowModel = Required<Pick<GMessage, "id">> & GMessage & { threadCount?: number };
 
   const columns = useMemo<GridColDef[]>(() => [
     {
@@ -55,7 +56,7 @@ const EmailList: React.FC = _ => {
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<gapi.client.gmail.Message>) => (
+      renderCell: (params: GridRenderCellParams<GMessage>) => (
         params.row?.payload?.parts?.some(part => part.filename && part.filename.length > 0) ? (
           <AttachFileIcon fontSize="small" titleAccess="Attachment" />
           // <span title="Has attachment">📎</span>
@@ -129,23 +130,19 @@ const EmailList: React.FC = _ => {
         autoHeight={false}
 
         loading={cache.loading}
-        rows={cache.currentPageEmails}
+        rows={cache.currentPageMessages}
         rowHeight={emailRowHeight}
-        rowCount={cache.totalEmails}
+        rowCount={cache.totalMessages}
         onRowClick={onRowClick}
-        getRowClassName={(params: GridRowClassNameParams<gapi.client.gmail.Message>) => {
-          if (!params.row) return '';
-          if (params.row.id === cache.selectedEmail?.id) return 'Mui-selected';
-          return isRead(params.row) ? 'email-read' : 'email-unread';
-        }}
+        getRowClassName={params => isRead(params.row) ? 'email-read' : 'email-unread'}
 
         columns={columns}
 
         checkboxSelection={true}
         //mui datagrid uses the .id property on the objects passed to rows as the unique row identifier
         //so it's convenient gmail messages already have an id property
-        rowSelectionModel={cache.checkedEmailIds}
-        onRowSelectionModelChange={cache.setCheckedEmailIds}
+        rowSelectionModel={cache.checkedMessageIds}
+        onRowSelectionModelChange={cache.setCheckedMessageIds}
 
         disableColumnFilter={true}
         sortingOrder={[]}

@@ -24,7 +24,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
 import { useApiDataCache } from './ctxApiDataCache';
-import { getEmailDetailsById, getEmailThread, getAttachmentData, markEmailIdsAsRead } from './gMailApi';
+// import { getEmailDetailsById, getApiThreadMessages as getEmailThread, getAttachmentData, markEmailIdsAsRead, GMessage } from './gMailApi';
 import {
   extractHtmlContent,
   extractInlineAttachments,
@@ -43,10 +43,11 @@ import {
 } from './helpers/emailParser';
 import AttachmentList from './AttachmentList';
 import styles from './EmailDetail.module.scss';
+import { getApiAttachmentData, getApiThreadMessages, GMessage, markApiMessageIdsAsRead } from './gMailApi';
 
 // Separate component for email content
 interface EmailContentProps {
-  email: gapi.client.gmail.Message;
+  email: GMessage;
   inlineAttachments: Map<string, Record<string, InlineAttachment>>;
   isDarkMode: boolean;
 }
@@ -78,7 +79,7 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
             inlineAttachments.get(email.id) || {},
             async (messageId, attachmentId) => {
               try {
-                return await getAttachmentData(messageId, attachmentId);
+                return await getApiAttachmentData(messageId, attachmentId);
               } catch (error) {
                 console.error(`Error fetching attachment ${attachmentId}:`, error);
                 return '';
@@ -140,10 +141,10 @@ const getInitials = (name: string) => {
 
 const EmailDetail: React.FC = () => {
   const { emailId } = useParams<{ emailId: string }>();
-  const { selectedEmail, setSelectedEmail, updatePageEmail: updateEmailInContext, getCachedEmail, setCachedEmail } = useApiDataCache();
+  const { selectedEmail, setSelectedEmail, updatePageMessage, getCachedMessageDetails } = useApiDataCache();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [emailThread, setEmailThread] = useState<gapi.client.gmail.Message[]>([]);
+  const [emailThread, setEmailThread] = useState<GMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [emailAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
@@ -167,19 +168,19 @@ const EmailDetail: React.FC = () => {
         isRead: true
       };
       // setSelectedEmail(updated); // REMOVE THIS LINE
-      updateEmailInContext(updated);
+      updatePageMessage(updated);
       setIsReadLocal(true);
-      if (selectedEmail.id) markEmailIdsAsRead([selectedEmail.id], true);
+      if (selectedEmail.id) markApiMessageIdsAsRead([selectedEmail.id], true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail?.id]);
 
   // Extract attachments from emails and update state
-  const processEmailAttachments = (emails: gapi.client.gmail.Message[]) => {
+  const processEmailAttachments = (emails: GMessage[]) => {
     const attachmentsMap = new Map<string, Attachment[]>();
     const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
 
-    emails.forEach((email: gapi.client.gmail.Message) => {
+    emails.forEach((email: GMessage) => {
       if (hasAttachments(email) && email.payload && email.id) {
         const attachments = extractAttachments(email.payload);
         if (attachments.length > 0) {
@@ -204,15 +205,12 @@ const EmailDetail: React.FC = () => {
         setLoading(true);
         try {
           // Use cache if available
-          let email = getCachedEmail(emailId)!;
-          if (!email) {
-            email = await getEmailDetailsById(emailId);
-            setCachedEmail(email);
-          }
+          const email = await getCachedMessageDetails(emailId)!;
           setSelectedEmail(email);
+
           // Optionally, fetch the thread for context/attachments
           if (email.threadId) {
-            const thread = await getEmailThread(email.threadId);
+            const thread = await getApiThreadMessages(email.threadId);
             setEmailThread(thread);
             processEmailAttachments(thread);
           }
@@ -239,8 +237,8 @@ const EmailDetail: React.FC = () => {
         // isRead: true // No longer assign non-existent property
       };
       setIsReadLocal(true);
-      updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailIdsAsRead([selectedEmail.id], true);
+      updatePageMessage(updated);
+      if (selectedEmail.id) await markApiMessageIdsAsRead([selectedEmail.id], true);
     } else {
       // Mark as unread
       updated = {
@@ -249,8 +247,8 @@ const EmailDetail: React.FC = () => {
         // isRead: false // No longer assign non-existent property
       };
       setIsReadLocal(false);
-      updateEmailInContext(updated);
-      if (selectedEmail.id) await markEmailIdsAsRead([selectedEmail.id], false);
+      updatePageMessage(updated);
+      if (selectedEmail.id) await markApiMessageIdsAsRead([selectedEmail.id], false);
     }
     // Do NOT call setSelectedEmail(updated) here
   };
@@ -414,7 +412,7 @@ const EmailDetail: React.FC = () => {
                 {emailThread.length - 1} earlier message{emailThread.length > 2 ? 's' : ''}
               </Typography>
 
-              {emailThread.filter((email: gapi.client.gmail.Message) => email.id !== selectedEmail.id).map((email: gapi.client.gmail.Message) => (
+              {emailThread.filter(email => email.id !== selectedEmail.id).map(email => (
                 <Paper
                   key={email.id}
                   elevation={0}

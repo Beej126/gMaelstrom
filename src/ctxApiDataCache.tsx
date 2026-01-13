@@ -1,5 +1,5 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import gMailApi, { gmail_Label } from './gMailApi';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import gMailApi, { GLabel, GMessage } from './gMailApi';
 import { SettingName } from './ctxSettings';
 import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
 import { arrayToRecord } from './helpers/typeHelpers';
@@ -11,111 +11,77 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import StarOutlineIcon from '@mui/icons-material/StarOutline';
 import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
+import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from './helpers/emailParser';
+import { createContextBundle } from "./helpers/contextFactory";
 
-export type ExtendedLabel = gmail_Label & {
-  displayName: string;
-  visible: boolean;
-  icon?: React.ReactElement<typeof SvgIcon>;
-};
 
-const genLabelDisplayName = (labelRawName: string): string => {
-  let displayName = labelRawName.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-  displayName = displayName.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-  return displayName;
-};
-
-const mainLabelIcons: Record<string, React.ReactElement<typeof SvgIcon>> = {
-  'INBOX': <InboxIcon sx={{ fontSize: 18 }} />,
-  'SENT': <SendIcon sx={{ fontSize: 18 }} />,
-  'DRAFT': <DescriptionIcon sx={{ fontSize: 18 }} />,
-  'SPAM': <ReportIcon sx={{ fontSize: 18 }} />,
-  'TRASH': <DeleteIcon sx={{ fontSize: 18 }} />,
-  'IMPORTANT': <StarOutlineIcon sx={{ fontSize: 18 }} />,
-};
-
-const buildLabelRecords = (gLabels: gmail_Label[], labelVis: Record<string, boolean>) =>
-  arrayToRecord(gLabels.map(l => ({
-    ...l,
-    displayName: genLabelDisplayName(l.name),
-    visible: labelVis[l.id] !== false,
-    icon: mainLabelIcons[l.id]
-  })), 'id');
-
-const ApiDataCacheContext = createContext<{
+export type ApiDataCacheType = {
   loading: boolean;
+  fetchMessages: (page: number, pageSize: number) => Promise<void>;
+  messageHeadersCache: GMessage[];
+  getCachedMessageDetails: (emailId: string) => Promise<GMessage>;
+  messageAttachments: Map<string, Attachment[]>;
+  inlineAttachments: Map<string, Record<string, InlineAttachment>>;
+  threadMessages: GMessage[];
 
-  fetchEmails: (page: number, pageSize: number) => Promise<void>;
-  emailCache: gapi.client.gmail.Message[];
-  updatePageEmail: (email: gapi.client.gmail.Message) => void;
+  setCachedEmail: (email: GMessage) => void;
 
-  getCachedEmail: (id: string) => gapi.client.gmail.Message | null;
-  setCachedEmail: (email: gapi.client.gmail.Message) => void;
+  selectedEmail: GMessage | null;
+  setSelectedEmail: (email: GMessage | null) => void;
 
-  selectedEmail: gapi.client.gmail.Message | null;
-  setSelectedEmail: (email: gapi.client.gmail.Message | null) => void;
-
-  checkedEmailIds: GridRowSelectionModel;
-  setCheckedEmailIds: (selection: GridRowSelectionModel) => void;
-
-  markCheckedEmailIdsAsRead: (asRead: boolean) => void;
-
+  checkedMessageIds: GridRowSelectionModel;
+  setCheckedMessageIds: (selection: GridRowSelectionModel) => void;
+  markCheckedMessageIdsAsRead: (asRead: boolean) => void;
   labels?: Record<string, ExtendedLabel>;
   setLabels: (labels: Record<string, ExtendedLabel>) => void;
-
   selectedLabelId: string;
   setSelectedLabelId: (labelId: string) => void;
-
-  totalEmails: number;
-
+  totalMessages: number;
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
-  currentPageEmails: gapi.client.gmail.Message[];
-
   pageSize: number;
   setPageSize: React.Dispatch<React.SetStateAction<number>>;
-
-} | undefined>(undefined);
-
-
-export const useApiDataCache = () => {
-  const context = useContext(ApiDataCacheContext);
-  if (context === undefined) throw new Error('useApiDataCache must be used within an ApiDataCacheProvider');
-  return context;
+  currentPageMessages: GMessage[];
+  updatePageMessage: (email: GMessage) => void;
 };
 
+const { Provider: ApiDataCacheProvider, useCtx: useApiDataCache } = createContextBundle<ApiDataCacheType>();
 
-export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export { useApiDataCache };
+
+export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const [loading, setLoading] = useState<boolean>(false);
 
-  const [emailCache, setEmailCache] = useState<Array<gapi.client.gmail.Message>>([]);
-  const [selectedEmail, setSelectedEmail] = useState<gapi.client.gmail.Message | null>(null);
-  const emailDetailsCache = useRef<Record<string, gapi.client.gmail.Message>>({});
-  const getCachedEmail = (id: string) => emailDetailsCache.current[id] || null;
-  const setCachedEmail = (email: gapi.client.gmail.Message) => emailDetailsCache.current[email.id!] = email;
+  const [messageHeadersCache, setMessageHeadersCache] = useState<Array<GMessage>>([]);
+  const messageDetailsCache = useRef<Record<string, GMessage>>({});
+
+  const setCachedEmail = (email: GMessage) => messageDetailsCache.current[email.id!] = email;
+
+  const [selectedEmail, setSelectedEmail] = useState<GMessage | null>(null);
 
   // Gmail API uses pageToken, so we track tokens for each page
   const [pageTokens, setPageTokens] = useState<Array<string | null>>([null]);
-  const [totalEmails, setTotalEmails] = useState<number>(0);
+  const [totalMessages, setTotalMessages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(-1);
 
   // kindof a stretch to bring MUI type in here
-  const [checkedEmailIds, setCheckedEmailIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
-
-  const currentPageEmails = useMemo(() => {
-    const start = currentPage * pageSize;
-    return emailCache.slice(start, start + pageSize);
-  }, [currentPage, emailCache, pageSize]);
-
+  const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
   const [labels, setLabels] = useState<Record<string, ExtendedLabel>>();
   const [selectedLabelId, setSelectedLabelId] = useState<string>(Object.entries(mainLabelIcons)[0][0]);
 
+
+  const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
+  const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
+  
+  const [threadMessages, _setThreadMessages] = useState<GMessage[]>([]);
+
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
-    gMailApi.getLabels().then(gmailLabels => {
-      setLabels(buildLabelRecords(
+    gMailApi.getApiLabels().then(gmailLabels => {
+      setLabels(buildExtendedLabels(
         gmailLabels,
         getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
       ));
@@ -131,29 +97,35 @@ export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [labels]);
 
   useEffect(() => {
-    setEmailCache([]);
+    setMessageHeadersCache([]);
     setPageTokens([null]);
-    setTotalEmails(0);
+    setTotalMessages(0);
     setCurrentPage(0);
   }, [selectedLabelId]);
 
 
-  const markCheckedEmailIdsAsRead = (asRead: boolean) => {
-    gMailApi.markEmailIdsAsRead(Array.from(checkedEmailIds.ids) as string[], asRead).then(() => setCheckedEmailIds({ type: 'include', ids: new Set() }));
-  }
+  const markCheckedMessageIdsAsRead = (/*asRead: boolean*/) => {
+    //   gMailApi.markMessageIdsAsRead(Array.from(checkedMessageIds.ids) as string[], asRead).then(() => {
+    //     updatePageMessage({
+    //       ...selectedEmail,
+    //       labelIds: selectedEmail?.labelIds?.filter(l => l !== 'UNREAD') ?? [],
 
-  //TODO: incorporate groupin emails into threads and giving a threadcount on those 
-  //       threadCount: pageEmails.filter((e: gapi.client.gmail.Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
+    //       setCheckedMessageIds({ type: 'include', ids: new Set() });
+    // });
+  };
 
-  const fetchEmails = useCallback(async (page: number, pageSize: number): Promise<void> => {
+  //TODO: incorporate grouping messages into threads and giving a threadcount on those in the message list
+  //       threadCount: pageEmails.filter((e: gmail_Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
+
+  const fetchMessages = useCallback(async (page: number, pageSize: number): Promise<void> => {
 
     if (pageSize === -1) { return; }
 
     // Check cache: only skip fetch if all emails for this page are present AND the page is within totalEmails
     const start = page * pageSize;
     const end = start + pageSize;
-    const cacheSlice = emailCache.slice(start, end);
-    const cacheHit = cacheSlice.length === pageSize && cacheSlice.every(e => !!e) && end <= totalEmails;
+    const cacheSlice = messageHeadersCache.slice(start, end);
+    const cacheHit = cacheSlice.length === pageSize && cacheSlice.every(e => !!e) && end <= totalMessages;
 
     if (cacheHit) {
       setLoading(false);
@@ -164,22 +136,22 @@ export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     try {
       // Use pageTokens to get the correct pageToken for this page
-      const token = pageTokens[page] || null;
+      const token = pageTokens[page];
 
       // If we don't have a token for this page, fetch previous pages to get it
       while (pageTokens.length <= page) {
         // Fetch previous page to get nextPageToken
         const prevToken = pageTokens[pageTokens.length - 1];
-        const prevResult = await gMailApi.getEmails(prevToken || undefined, selectedLabelId, { maxResults: pageSize });
+        const prevResult = await gMailApi.getApiMessages(selectedLabelId, pageSize, prevToken);
         setPageTokens(tokens => [...tokens, prevResult.nextPageToken || null]);
       }
 
       // Now fetch the actual page
-      const result = await gMailApi.getEmails(token || undefined, selectedLabelId, { maxResults: pageSize });
-      setTotalEmails(result.total);
+      const result = await gMailApi.getApiMessages(selectedLabelId, pageSize, token);
+      setTotalMessages(result.total);
 
       // Fill the cache at the correct indices
-      setEmailCache(prev => {
+      setMessageHeadersCache(prev => {
         const newCache = [...prev];
         const start = page * pageSize;
         for (let i = 0; i < result.emails.length; ++i) {
@@ -190,8 +162,8 @@ export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     } catch {
 
-      setEmailCache([]);
-      setTotalEmails(0);
+      setMessageHeadersCache([]);
+      setTotalMessages(0);
 
     } finally {
       setLoading(false);
@@ -201,46 +173,128 @@ export const ApiDataCacheProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [selectedLabelId, pageTokens]);
 
 
-  useEffect(() => { fetchEmails(currentPage, pageSize); },
+  const currentPageMessages = useMemo(() => {
+    if (!messageHeadersCache || pageSize === -1) return [];
+
+    const start = currentPage * pageSize;
+    return messageHeadersCache.slice(start, start + pageSize);
+  }, [currentPage, messageHeadersCache, pageSize]);
+
+
+
+  useEffect(() => { fetchMessages(currentPage, pageSize); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [currentPage, pageSize, selectedLabelId]
   );
 
-  const updatePageEmail = (updatedEmail: gapi.client.gmail.Message) => {
-    setEmailCache(prev => prev.map((email) =>
+  const updatePageMessage = (updatedEmail: GMessage) => {
+    setMessageHeadersCache(prev => prev.map((email) =>
       email && email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
     ));
   };
 
-  return <ApiDataCacheContext.Provider value={({
+
+  const getCachedMessageDetails = async (messageId: string) => {
+    let message = messageDetailsCache.current[messageId];
+    if (!message) {
+      message = await gMailApi.getApiMessageDetailsById(messageId);
+      messageDetailsCache.current[message.id!] = message;
+      const thread = await gMailApi.getApiThreadMessages(message.threadId);
+      //TODO:setEmailThread(thread);
+      processEmailAttachments(thread);
+
+    }
+    return message;
+  }
+
+
+
+  // Extract attachments from emails and update state
+  const processEmailAttachments = (emails: GMessage[]) => {
+    const attachmentsMap = new Map<string, Attachment[]>();
+    const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
+
+    emails.forEach((email: GMessage) => {
+      if (hasAttachments(email) && email.payload && email.id) {
+        const attachments = extractAttachments(email.payload);
+        if (attachments.length > 0) {
+          attachmentsMap.set(email.id, attachments);
+        }
+      }
+      if (email.payload && email.id) {
+        const inline = extractInlineAttachments(email.id, email.payload);
+        if (Object.keys(inline).length > 0) {
+          inlineAttachmentsMap.set(email.id, inline);
+        }
+      }
+    });
+
+    setEmailAttachments(attachmentsMap);
+    setInlineAttachments(inlineAttachmentsMap);
+  };
+
+  const value: ApiDataCacheType = {
     loading,
-
-    fetchEmails,
-    emailCache,
-    updatePageEmail,
-
-    selectedEmail,
-    setSelectedEmail,
-
-    checkedEmailIds,
-    setCheckedEmailIds,
-    markCheckedEmailIdsAsRead,
-
-    getCachedEmail,
-    setCachedEmail,
-
+    fetchMessages,
+    messageHeadersCache,
+    getCachedMessageDetails,
+    messageAttachments,
+    inlineAttachments,
+    threadMessages,
+    checkedMessageIds,
+    setCheckedMessageIds,
+    markCheckedMessageIdsAsRead,
     labels,
     setLabels,
-
     selectedLabelId,
     setSelectedLabelId,
-
-    totalEmails,
+    totalMessages,
     currentPage,
     setCurrentPage,
-    currentPageEmails,
     pageSize,
-    setPageSize
-  })}
-  >{children}</ApiDataCacheContext.Provider>;
+    setPageSize,
+    currentPageMessages,
+    updatePageMessage,
+
+    setCachedEmail,
+    selectedEmail,
+    setSelectedEmail
+  };
+
+  return <ApiDataCacheProvider value={value}>{children}</ApiDataCacheProvider>;
+
 };
+
+
+export type ExtendedLabel = GLabel & {
+  displayName: string;
+  visible: boolean;
+  icon?: React.ReactElement<typeof SvgIcon>;
+};
+
+
+
+
+
+const mainLabelIcons: Record<string, React.ReactElement<typeof SvgIcon>> = {
+  'INBOX': <InboxIcon sx={{ fontSize: 18 }} />,
+  'SENT': <SendIcon sx={{ fontSize: 18 }} />,
+  'DRAFT': <DescriptionIcon sx={{ fontSize: 18 }} />,
+  'SPAM': <ReportIcon sx={{ fontSize: 18 }} />,
+  'TRASH': <DeleteIcon sx={{ fontSize: 18 }} />,
+  'IMPORTANT': <StarOutlineIcon sx={{ fontSize: 18 }} />,
+};
+
+const buildLabelDisplayName = (labelRawName: string): string => {
+  let displayName = labelRawName.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
+  displayName = displayName.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+  return displayName;
+};
+
+const buildExtendedLabels = (gLabels: GLabel[], labelVis: Record<string, boolean>) =>
+  arrayToRecord(gLabels.map(l => ({
+    ...l,
+    displayName: buildLabelDisplayName(l.name),
+    visible: labelVis[l.id] !== false,
+    icon: mainLabelIcons[l.id]
+  })), 'id');

@@ -3,8 +3,13 @@
 // copy-readme.js
 // Cross-platform script to copy readme_google_auth.md from root to public/
 
-const fs = require('fs');
-const path = require('path');
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const src = path.join(__dirname, '../readme_google_auth.md');
 const destDir = path.join(__dirname, '../public');

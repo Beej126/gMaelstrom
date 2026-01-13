@@ -23,7 +23,7 @@ import {
   Visibility as ViewIcon
 } from '@mui/icons-material';
 import { Attachment, formatFileSize } from './helpers/emailParser';
-import { getAttachmentData } from './gMailApi';
+import { getApiAttachmentData } from './gMailApi';
 import PdfViewer from './PdfViewer';
 
 interface AttachmentListProps {
@@ -110,7 +110,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
 
     try {
       // Fetch attachment data
-      const data = await getAttachmentData(messageId, attachment.attachmentId);
+      const data = await getApiAttachmentData(messageId, attachment.attachmentId);
       
       // Store the data and update state
       setAttachmentState(prev => ({

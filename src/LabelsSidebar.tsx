@@ -15,7 +15,7 @@ const Sidebar: React.FC = () => {
   const cache = useApiDataCache();
 
   const getUnreadCount = (labelId: string) =>
-    cache.emailCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
+    cache.messageHeadersCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
 
   const onLabelClick = (labelId: string) => {
     cache.setSelectedLabelId(labelId);
@@ -32,7 +32,7 @@ const Sidebar: React.FC = () => {
           selected={cache.selectedLabelId === label.id}
           onClick={() => onLabelClick(label.id)}
         >
-          <ListItemIcon sx={{ minWidth: 0.13, mr: 1 }}>
+          <ListItemIcon sx={{ minWidth: 0.13, mr: 1.3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {label.icon}
             </Box>

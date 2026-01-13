@@ -1,5 +1,7 @@
+import { GMessage } from "../gMailApi";
+
 // Extract the 'From' field from a Gmail message
-export const getFrom = (message?: gapi.client.gmail.Message | null): string => {
+export const getFrom = (message?: GMessage | null): string => {
   if (!message) return '';
   const headers = message.payload?.headers || [];
   const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
@@ -14,7 +16,7 @@ export const getFrom = (message?: gapi.client.gmail.Message | null): string => {
 };
 
 // Extract the 'To' field from a Gmail message
-export const getTo = (message: gapi.client.gmail.Message): string[] => {
+export const getTo = (message: GMessage): string[] => {
   const headers = message.payload?.headers || [];
   const toHeader = headers.find(h => h.name?.toLowerCase() === 'to');
   if (!toHeader?.value) return [];
@@ -23,7 +25,7 @@ export const getTo = (message: gapi.client.gmail.Message): string[] => {
 };
 
 // Extract the 'Subject' field from a Gmail message
-export const getSubject = (message?: gapi.client.gmail.Message | null): string => {
+export const getSubject = (message?: GMessage | null): string => {
   if (!message) return '';
   const headers = message.payload?.headers || [];
   const subjectHeader = headers.find(h => h.name?.toLowerCase() === 'subject');
@@ -31,7 +33,7 @@ export const getSubject = (message?: gapi.client.gmail.Message | null): string =
 };
 
 // Extract the date from a Gmail message (as ISO string)
-export const getDate = (message?: gapi.client.gmail.Message | null): string => {
+export const getDate = (message?: GMessage | null): string => {
   if (!message) return '';
   const headers = message.payload?.headers || [];
   const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date');
@@ -42,13 +44,13 @@ export const getDate = (message?: gapi.client.gmail.Message | null): string => {
 };
 
 // Check if a Gmail message is read
-export const isRead = (message?: gapi.client.gmail.Message | null): boolean => {
+export const isRead = (message?: GMessage | null): boolean => {
   if (!message) return true;
   return !(message.labelIds || []).includes('UNREAD');
 };
 
 // Check if a Gmail message is starred
-export const isStarred = (message: gapi.client.gmail.Message): boolean => {
+export const isStarred = (message: GMessage): boolean => {
   return (message.labelIds || []).includes('STARRED');
 };
 
@@ -197,8 +199,8 @@ export const processEmailContentForDarkMode = (htmlContent: string, isDarkMode: 
 }
 
 // Helper function to extract HTML content from a Gmail message or message part
-export const extractHtmlContent = (item: gapi.client.gmail.Message | gapi.client.gmail.MessagePart): string => {
-  const payload = (item as gapi.client.gmail.Message).payload ? (item as gapi.client.gmail.Message).payload : (item as gapi.client.gmail.MessagePart);
+export const extractHtmlContent = (item: GMessage | gapi.client.gmail.MessagePart): string => {
+  const payload = (item as GMessage).payload ? (item as GMessage).payload : (item as gapi.client.gmail.MessagePart);
   // Check if the payload has a simple body
   if (payload && payload.body && payload.body.data) {
     return sanitizeHtmlContent(decodeBase64(payload.body.data));
@@ -387,7 +389,7 @@ const guessMimeType = (base64Data: string): string => {
 // (getHeader removed: unused)
 
 // Helper to check if an email has attachments
-export const hasAttachments = (message: gapi.client.gmail.Message): boolean => {
+export const hasAttachments = (message: GMessage): boolean => {
   // Check if there's a label that indicates attachments
   if ((message.labelIds || []).includes('HAS_ATTACHMENT')) {
     return true;
@@ -495,4 +497,4 @@ export const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// No longer needed: parseEmailData. Use gapi.client.gmail.Message directly throughout the app.
+// No longer needed: parseEmailData. Use gmail_Message directly throughout the app.
