@@ -1,12 +1,29 @@
 import { getFromSessionStorage, saveToSessionStorage } from "./helpers/browserStorage";
 import { useEffect, useState } from "react";
 import { TokenPayload } from 'google-auth-library';
-import { STORAGE_KEY_PREFIX } from "./ctxSettings";
 import { loadScript } from "./helpers/loadScript";
-import { fetchAuthedJson } from "./helpers/getJson";
-// import { toast } from "react-toastify";
+import { gApiFetchJson } from "./gMailApi";
 
-const GOOGLE_CLIENT_ID = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
+// overview of Google Auth flow implemented here:
+// 
+// it may seem a little naive to be reinventing the wheel by implementing OAuth orchestration via the bare metal script google provides
+//   when there's probably really good libraries like https://github.com/MomenSherif/react-oauth
+
+//   part of this project for me was the opportunity to experience what the google auth flow really requires to pull off
+//     it was cool to discover it's not really that bad - basically just load the script and fire a token request =) see "DoAuth()"
+//     so it's nice not to be wondering whether i'm properly aligned with another library and
+//     provide my preferred auth function signature to the rest of the app
+//
+// FYI Google's minimalist "One Tap" auth flow is not used at all here...
+//   GMail API calls require a full OAuth access token that carries the authorized permissions of the gmail APIs we want to call.
+//     These permissions are requested via the "scopes" provided below in getToken().
+//   One Tap only provides an ID token, not enough to make Gmail API calls.
+//   The full access token is only provided by the full user consent popup flow,
+//      which displays as result of calling requestAccessToken() below.
+//
+//   fyi, the "One Tap" popup flow happens by calling: window.google.accounts.id.prompt(...)
+//     if interested, see old code in $/keep_scraps/gAuthApi-before_removing_one_tap.ts
+
 
 export function useUser() {
     const [user, setUser] = useState<AuthedUser>();
@@ -16,42 +33,42 @@ export function useUser() {
 
 export type AuthedUser = Required<Pick<TokenPayload, "name" | "given_name" | "family_name" | "email" | "picture">> & {
     authFailed: boolean; // Indicates login attempt failed
-    accessToken: string; //used for all api calls bearer token
-    initials: string; //derived from given_name + family_name
+    accessToken: string; //used for all api calls' bearer token
+    initials: string; //populated for UI convenience
 };
 
 let authedUser: AuthedUser | null = null;
-const AUTHED_USER_STORAGE_KEY = STORAGE_KEY_PREFIX + 'authedUser';
+const AUTHED_USER_STORAGE_KEY = "authedUser";
 /**
- * sets global getAuthedUser() regardless of success/fail
- * returns .authedFailed = true if sign-in fails/cancelled to provide specifically timed indicator (via useUser hook) for UI to display failure
- * Returns the current authed user when succeeds
- * throws exception on error so the calling stack immediately dies, code callers based on success, no "if failed" checks
- * pass refreshToken=true to force a token refresh
- * attempts sign-in flow if necessary to re-authenticate
- */
-export const getAuthedUser = async (refreshToken: boolean = false): Promise<AuthedUser> => {
+ * sets global, cached authedUser variable regardless of success/fail
+ * .authedFailed = true when sign-in fails/cancelled as key property to bind UI (via useUser hook)
 
-    if (refreshToken) setAuthedUser({ authFailed: false, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
+ * throws exception on error so the calling stack immediately dies
+ *   facilitating callers to be cleanly based on assuming success, no "if failed" checks
+ 
+ * gMailApi passes refreshToken=true to force a single token refresh attempt upon 401 Unauthorized error
+*/
+export const getAuthedUser = async (forceTokenRefresh: boolean = false): Promise<AuthedUser> => {
+
+    if (forceTokenRefresh) {
+        saveToSessionStorage(AUTHED_USER_STORAGE_KEY, null);
+        authedUser = null;
+    }
 
     if (authedUser?.accessToken) return authedUser;
 
+    // just caching in session storage to survive full page refresh while token is still valid
     authedUser = getFromSessionStorage<AuthedUser>(AUTHED_USER_STORAGE_KEY);
     if (authedUser?.accessToken) return authedUser;
 
     // Try to sign in
-    await DoOAuth(); //calls setAuthedUser internally, so after await, authedUser will be populated for sure
-    return authedUser!;
+    return doOAuth();
 };
 
-const setAuthedUser = (authed: AuthedUser | null) => {
-    if (authed) authed.initials = (authed.given_name.charAt(0) + authed.family_name.charAt(0)).toUpperCase();
-    authedUser = authed;
-    saveToSessionStorage(AUTHED_USER_STORAGE_KEY, { ...authed, authFailed: false }); //never save failed to storage so page refresh always retries =)
-};
 
-// --- GIS Initialization and Sign-In ---
-
+// see commments below around loadScript() in tandem with these global Window declarations
+// our gsiApi declaration merely overrides some OVERLY OPTIONAL properties the official google type definitions...
+//   so calling code doesn't need to be littered with unecessary undefined checks.
 declare global {
     interface Window {
         //sucks we can't really declare .google as optional because typescript **merges** the NON OPTIONAL global @types/google.accounts declaration with it, erasing the optionality arrg!!
@@ -63,51 +80,70 @@ declare global {
     }
 }
 
-// We do NOT use Google One Tap here because this app always needs Gmail API access, which requires a full OAuth access token and user consent for Gmail scopes.
-// One Tap only provides an ID token and cannot grant Gmail API access without the popup.
-let signInPromise: Promise<void> | null = null;
 
-const DoOAuth = async (): Promise<void> => {
+// signInPromise acts as a mutex to facilitate multiple APIs calls that could fire during initial sign-in...
+//   they will all await the same promise if one is already in progress
+let signInPromise: Promise<AuthedUser> | null = null;
+
+const doOAuth = async (): Promise<AuthedUser> => {
 
     if (signInPromise) return signInPromise;
 
     signInPromise = (async () => {
 
-        if (!GOOGLE_CLIENT_ID) {
+        authedUser = null; //clear any prior user state
+
+        if (!import.meta.env.PUBLIC_GOOGLE_CLIENT_ID) {
             throw new Error("Google Client ID is not populated in .env file. see setup instructions (readme_google_auth.md)");
         }
 
-        // Load GIS script
+        // Load the official GSI client script for logging in
+        //   (GSI = Google Identity Services - i guess GIS was already taken =)
+
+        // see Window.google declaration above in tandem with these few lines below...
+        //   this is the only spot we want to access the GSI Window.google object directly,
+        //   so we need to cast into that being otherwise hidden via global window.google type def above.
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const goog = () => window.google as unknown as any; // see Window.google declaration above for why
-        await loadScript(() => goog(), 'https://accounts.google.com/gsi/client');
+        const goog = () => window.google as unknown as any; // implemented as function so we can get fresh value after loadScript completes
+        await loadScript(() => !!goog(), 'https://accounts.google.com/gsi/client');
         window.gsiApi = { oauth2: goog().accounts.oauth2, id: goog().accounts.id };
 
-        // popup Google "choose account" OAuth flow to get Gmail access token and user profile
+        // this getToken call is what actually pops up the Google "choose account" OAuth dialog and returns with a Gmail access TOKEN
         const token = await getToken();
 
-        setAuthedUser({ authFailed: false, accessToken: token, ...await fetchAuthedJson('https://openidconnect.googleapis.com/v1/userinfo', token) });
+        // then we fetch the user profile info (i.e. display name, avatar picture, etc)
+        const profile = await gApiFetchJson('https://openidconnect.googleapis.com/v1/userinfo', "GET", undefined, token);
+        // create an initials property for convenience
+        profile.initials = (profile.given_name.charAt(0) + profile.family_name.charAt(0)).toUpperCase();
+
+        authedUser = {
+            authFailed: false,
+            accessToken: token,
+            ...profile
+        };
+        saveToSessionStorage(AUTHED_USER_STORAGE_KEY, authedUser);
+
+        return authedUser!;
     })();
 
     try {
-        await signInPromise;
+        return signInPromise;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     catch (ex: any) {
-        setAuthedUser({ authFailed: true, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' });
+        //set the failed flag
+        authedUser = { authFailed: true, accessToken: '', name: '', given_name: '', family_name: '', initials: '', email: '', picture: '' };
+        saveToSessionStorage(AUTHED_USER_STORAGE_KEY, authedUser);
         throw ex;
-    } finally {
-        signInPromise = null;
-    }
+    } 
 };
 
 
-/**
- * Requests a Gmail OAuth2 access token using GIS. Returns the token string.
- */
+// Requests a Gmail OAuth2 access token using GSI api. Returns the token string.
 const getToken = () => new Promise<string>((resolve, reject) => {
     window.gsiApi?.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: import.meta.env.PUBLIC_GOOGLE_CLIENT_ID,
         scope: [
             'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.modify',
@@ -126,6 +162,6 @@ const getToken = () => new Promise<string>((resolve, reject) => {
  */
 export const signOut = () => {
     window.gsiApi?.id.disableAutoSelect();
-    setAuthedUser(null);
+    authedUser = null;
     window.location.reload();
 };

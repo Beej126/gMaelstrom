@@ -29,11 +29,11 @@ export const getApiThreadsByLabelId = (
   labelId: string,
   pageSize: number,
   pageToken: string | null
-): Promise<GListThreadsResponse> => gmailApiFetch("threads", "GET", {
-    maxResults: pageSize.toString(),
-    labelIds: labelId, // Note: The API allows multiple labels via CSV if that's ever handy
-    pageToken: pageToken,
-  });
+): Promise<GListThreadsResponse> => gApiFetchJson("threads", "GET", {
+  maxResults: pageSize.toString(),
+  labelIds: labelId, // Note: The API allows multiple labels via CSV if that's ever handy
+  pageToken: pageToken,
+});
 
 
 export const getApiMessages = async (
@@ -47,7 +47,7 @@ export const getApiMessages = async (
     ...(pageToken ? { pageToken } : {}),
     ...(labelId ? { labelIds: labelId } : {}),
   });
-  const data = await gmailApiFetch(`messages?${params.toString()}`);
+  const data = await gApiFetchJson(`messages?${params.toString()}`);
   const messages = data.messages || [];
   const nextPageToken = data.nextPageToken || null;
   const total = typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0;
@@ -85,50 +85,55 @@ export const getApiMessages = async (
 
 // Fetch full message details only when needed (e.g., when user opens an email)
 export const getApiMessageDetailsById = async (id: string): Promise<GMessage> =>
-  gmailApiFetch(`messages/${id}?format=full`);
+  gApiFetchJson(`messages/${id}?format=full`);
 
 export const getApiThreadMessages = async (threadId: string): Promise<GMessage[]> =>
-  (await gmailApiFetch(`threads/${threadId}`)).messages ?? [];
+  (await gApiFetchJson(`threads/${threadId}`)).messages ?? [];
 
 
 export const getApiAttachmentData = async (messageId: string, attachmentId: string): Promise<string> => {
-  const response = await gmailApiFetch(`messages/${messageId}/attachments/${attachmentId}`);
+  const response = await gApiFetchJson(`messages/${messageId}/attachments/${attachmentId}`);
   const urlSafeBase64 = response.data ?? '';
   const standardBase64 = urlSafeBase64.replace(/-/g, '+').replace(/_/g, '/');
   return standardBase64;
 };
 
 
-const getApiLabels = async (): Promise<GLabel[]> => (await gmailApiFetch('labels')).labels ?? [];
+const getApiLabels = async (): Promise<GLabel[]> => (await gApiFetchJson('labels')).labels ?? [];
 
 
 export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean): Promise<void> => {
   if (!emailIds.length || !emailIds.filter(Boolean)) return;
 
-  return gmailApiFetch('messages/batchModify', "POST", {
+  return gApiFetchJson('messages/batchModify', "POST", {
     ids: emailIds,
     ...(asRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] })
   });
 };
 
+const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
 
-const toastAndThrow = (error: unknown, endpoint: string, extra?: string) => {
-  toast.error(`Error fetching GMail API '${endpoint}'${extra ? extra + '\n' : ''}${error instanceof Error ? "\n" + error.message : ""}`);
-  throw error;
-}
+export const gApiFetchJson = async (
+  endpoint: string, 
+  method: "GET" | "POST" = "GET",
+  /** converted to URLSearchParams for GET requests */
+  parms?: object,
+  /** passed in when called from gAuthApi */
+  token?: string
+) => {
 
-const gmailApiFetch = async (endpoint: string, method: "GET" | "POST" = "GET", parms?: object) => {
-
-  const url = "https://gmail.googleapis.com/gmail/v1/users/me/" + endpoint
+  // allow full url passed from gAuthApi, otherwise assume just a tail end gmail api endpoint passed in needs to be prefixed with the base url (e.g. "messages")
+  const url = (endpoint.toLowerCase().startsWith('http') ? '' : GMAIL_API_BASE_URL) + endpoint
     + (parms && method === "GET" ? "?" + new URLSearchParams(parms as Record<string, string>).toString() : "");
 
   const body = parms && method === "POST" ? JSON.stringify(parms) : undefined;
 
   let attempt = 0;
-  while(++attempt) {
+  while (++attempt) {
 
     const headers = {
-      Authorization: `Bearer ${(await getAuthedUser())?.accessToken}`,
+      // try getting a fresh token on 2nd attempt
+      Authorization: `Bearer ${token ?? (await getAuthedUser(attempt === 2))?.accessToken}`,
       "Content-Type": "application/json",
       "Accept": "application/json",
     };
@@ -137,19 +142,18 @@ const gmailApiFetch = async (endpoint: string, method: "GET" | "POST" = "GET", p
       const response = await fetch(url, { headers, method, body });
 
       // if unauthorized, attempt *once* to get a fresh token and retry
-      if (response.status === 401 && attempt === 1) continue;
+      if (response.status === 401 && !token) { if (attempt === 1) continue; else throw new Error("Auth failed"); }
 
-      if (!response.ok) {
-        toastAndThrow(undefined, endpoint, response.statusText);
-      }
+      if (!response.ok) throw new Error(response.statusText);
 
-      // Gmail batchModify and some endpoints return 204 No Content or empty body
+      // Gmail batchModify returns 204 No Content which is ok
       if (response.status === 204) return null;
 
       return response.json();
 
     } catch (ex) {
-      toastAndThrow(ex, endpoint);
+      toast.error(`Error fetching GMail API '${endpoint}'${ex instanceof Error ? "\n" + ex.message : ""}`);
+      throw ex;
     }
   };
 

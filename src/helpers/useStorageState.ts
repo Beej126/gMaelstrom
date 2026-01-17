@@ -1,21 +1,13 @@
 import { useState } from "react";
+import { getFromLocalStorage, saveToLocalStorage } from "./browserStorage";
 
-export function useLocalStorageState<TVal, TKey extends string = string>(key: TKey, initial: TVal) {
+export function useLocalStorageState<TVal extends boolean | string | object | null, TKey extends string = string>(key: TKey, initial: TVal) {
 
-  const [state, setState] = useState<TVal>(() => {
-    const raw = localStorage.getItem(key);
-    const stored = raw ? JSON.parse(raw) as TVal : null;
-    return stored !== null ? stored : initial;
-  });
+  const [state, setState] = useState<TVal>(getFromLocalStorage(key) ?? initial);
 
   const setPersistentState = (value: TVal) => {
     setState(value);
-
-    if (value) {
-      localStorage.setItem(key, JSON.stringify(value));
-    } else {
-      localStorage.removeItem(key);
-    }
+    saveToLocalStorage(key, value);
   };
 
   return [state, setPersistentState] as const;

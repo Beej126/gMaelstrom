@@ -47,7 +47,7 @@ Your personal Google Authentication requires one time setup:
    1. and add the main gmail address you wish to login under to "Test users" at the bottom
 
 ---
-### realized API Key is not needed for gmail api calls
+### An "API Key" is NOT needed for gmail api calls (only a "Client ID")
 
 The API key is typically required for Google services that use public, unauthenticated access (like Maps, some public APIs, or client-side JavaScript libraries). For Gmail and most Google Identity flows in a secure web app, only the OAuth Client ID is actually used for authentication and authorization.
 

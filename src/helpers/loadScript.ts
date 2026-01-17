@@ -1,5 +1,5 @@
 export const loadScript = async (
-  isLoaded: () => unknown,
+  isLoaded: () => boolean,
   src: string
 ) => {
   if (isLoaded()) return;

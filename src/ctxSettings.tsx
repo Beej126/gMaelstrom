@@ -25,7 +25,6 @@ export const useSettings = () => {
   return context;
 };
 
-export const STORAGE_KEY_PREFIX = "gMaelstrom_";
 export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'LABEL_VISIBILITY'] as const]);
 export type SettingNameType = EnumValue<typeof SettingName>;
 

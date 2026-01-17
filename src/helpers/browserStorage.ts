@@ -1,20 +1,20 @@
-import { STORAGE_KEY_PREFIX } from "../ctxSettings";
+const APP_STORAGE_KEY_PREFIX = "gMaelstrom_" as const; //just to make them stand out in browser storage UIs versus any other keys created by other dependencies (auth, etc)
 
-export const getFromStorage = <T>(key: string, storage: Storage): T | null => {
-    const raw = storage.getItem(STORAGE_KEY_PREFIX + key);
+const getFromStorage = <T>(key: string, storage: Storage): T | null => {
+    const raw = storage.getItem(APP_STORAGE_KEY_PREFIX + key);
     return raw ? JSON.parse(raw) as T : null;
 };
 
-export const saveToStorage = (key: string, value: object | string | null, storage: Storage) => {
+const saveToStorage = (key: string, value: boolean | string | object | null, storage: Storage) => {
     if (value) {
-        storage.setItem(STORAGE_KEY_PREFIX + key, JSON.stringify(value));
+        storage.setItem(APP_STORAGE_KEY_PREFIX + key, JSON.stringify(value));
     } else {
-        storage.removeItem(STORAGE_KEY_PREFIX + key);
+        storage.removeItem(APP_STORAGE_KEY_PREFIX + key);
     }
 };
 
 export const getFromSessionStorage = <T>(key: string): T | null => getFromStorage<T>(key, sessionStorage);
-export const saveToSessionStorage = (key: string, value: object | string | null) => saveToStorage(key, value, sessionStorage);
+export const saveToSessionStorage = <T extends boolean | string | object | null>(key: string, value: T) => saveToStorage(key, value, sessionStorage);
 
 export const getFromLocalStorage = <T>(key: string): T | null => getFromStorage<T>(key, localStorage);
-export const saveToLocalStorage = (key: string, value: object | string | null) => saveToStorage(key, value, localStorage);
+export const saveToLocalStorage = <T extends boolean | string | object | null>(key: string, value: T) => saveToStorage(key, value, localStorage);

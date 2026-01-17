@@ -65,18 +65,6 @@ const EmailList: React.FC = _ => {
       resizable: false
     },
     {
-      field: 'thread',
-      headerName: 'Thread',
-      width: 32,
-      sortable: false,
-      filterable: false,
-      disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<GridRowModel>) => (
-        params.row && params.row.threadCount && params.row.threadCount > 1 ? <span title="Threaded">→</span> : null
-      ),
-      resizable: false
-    },
-    {
       field: 'date',
       headerName: 'Date',
       width: 110,
@@ -89,15 +77,9 @@ const EmailList: React.FC = _ => {
     {
       field: 'labels',
       headerName: 'Labels',
-      // flex: 1,
       minWidth: 120,
-      renderCell: (params: GridRenderCellParams) => {
-
-        return (
-          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5, overflow: 'hidden' }}>
-            {params.row.labelIds?.map((labelId: string) => cache.labels?.[labelId]?.displayName).sort().join(', ')}
-          </Box>
-        );
+      valueGetter: (_unused: never, row: GridRowModel) => {
+        return row.labelIds?.map((labelId: string) => cache.labels?.[labelId]?.displayName).sort().join(', ');
       },
       resizable: true
     }
