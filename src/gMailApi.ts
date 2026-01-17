@@ -113,14 +113,30 @@ export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolea
 
 const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
 
+// React 18+ "strict mode" causes useEffect to double invoke in dev mode which drives double fetches
+//   use a simple fetch promise map based on GET url to dedupe inflight fetches
+const inflightFetches = new Map<string, Promise<Response>>();
+
+
+/**
+ * Perform an authenticated Gmail API fetch and return parsed JSON.
+ * @param endpoint API endpoint tail (e.g. `messages`) or full URL
+ * @param method HTTP method, defaults to `GET`
+ * @param parms converted to `URLSearchParams` for GET requests or request body for POST
+ * @param token optional bearer token to use instead of the default authed user
+ */
 export const gApiFetchJson = async (
-  endpoint: string, 
+  endpoint: string,
   method: "GET" | "POST" = "GET",
-  /** converted to URLSearchParams for GET requests */
   parms?: object,
-  /** passed in when called from gAuthApi */
   token?: string
 ) => {
+
+  // avoid duplicate fetches (e.g. react fires effects twice in dev builds under strict mode)
+  //   assuming we're only avoiding **GETs*** that tend to fire during initial mounts, 
+  //   so using endpoint is good enough vs worrying about keying on unique parms
+  const existingFetch = inflightFetches.get(endpoint);
+  if (existingFetch) return existingFetch;
 
   // allow full url passed from gAuthApi, otherwise assume just a tail end gmail api endpoint passed in needs to be prefixed with the base url (e.g. "messages")
   const url = (endpoint.toLowerCase().startsWith('http') ? '' : GMAIL_API_BASE_URL) + endpoint
@@ -128,36 +144,40 @@ export const gApiFetchJson = async (
 
   const body = parms && method === "POST" ? JSON.stringify(parms) : undefined;
 
-  let attempt = 0;
-  while (++attempt) {
+  const aborter = new AbortController();
+  const fetchPromise = (async () => {
+    let attempt = 0;
+    while (++attempt) {
 
-    const headers = {
-      // try getting a fresh token on 2nd attempt
-      Authorization: `Bearer ${token ?? (await getAuthedUser(attempt === 2))?.accessToken}`,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
+      const headers = {
+        // try getting a fresh token on 2nd attempt
+        Authorization: `Bearer ${token ?? (await getAuthedUser(attempt === 2))?.accessToken}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      };
+
+      try {
+        const response = await fetch(url, { headers, method, body, signal: aborter.signal });
+
+        // if unauthorized, attempt *once* to get a fresh token and retry
+        if (response.status === 401 && !token) { if (attempt === 1) continue; else throw new Error("Auth failed"); }
+
+        if (!response.ok) throw new Error(response.statusText);
+
+        // Gmail batchModify returns 204 No Content which is ok
+        if (response.status === 204) return null;
+
+        return response.json();
+
+      } catch (ex) {
+        toast.error(`Error fetching GMail API '${endpoint}'${ex instanceof Error ? "\n" + ex.message : ""}`);
+        throw ex;
+      }
     };
+  })();
 
-    try {
-      const response = await fetch(url, { headers, method, body });
-
-      // if unauthorized, attempt *once* to get a fresh token and retry
-      if (response.status === 401 && !token) { if (attempt === 1) continue; else throw new Error("Auth failed"); }
-
-      if (!response.ok) throw new Error(response.statusText);
-
-      // Gmail batchModify returns 204 No Content which is ok
-      if (response.status === 204) return null;
-
-      return response.json();
-
-    } catch (ex) {
-      toast.error(`Error fetching GMail API '${endpoint}'${ex instanceof Error ? "\n" + ex.message : ""}`);
-      throw ex;
-    }
-  };
-
-
+  inflightFetches.set(endpoint, fetchPromise);
+  return fetchPromise;
 };
 
 export default {
