@@ -4,7 +4,7 @@ import EmailDetail from './EmailDetail';
 import './App.scss';
 import { Box, Toolbar } from '@mui/material';
 import Header from './Header';
-import LabelsSidebar from './LabelsSidebar';
+import LabelsSidePanel from './LabelsSidePanel';
 import { AuthFailed } from './AuthFailed';
 import EmailList from './EmailList';
 
@@ -30,7 +30,7 @@ const App: React.FC = () => {
         display: 'flex'
       }}>
 
-        <LabelsSidebar />
+        <LabelsSidePanel />
 
         <Box sx={{
           flex: 1, minWidth: 0, minHeight: 0,

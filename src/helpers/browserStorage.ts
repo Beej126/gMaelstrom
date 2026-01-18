@@ -5,7 +5,7 @@ const getFromStorage = <T>(key: string, storage: Storage): T | null => {
     return raw ? JSON.parse(raw) as T : null;
 };
 
-const saveToStorage = (key: string, value: boolean | string | object | null, storage: Storage) => {
+const saveToStorage = (key: string, value: boolean | string | number | object | null, storage: Storage) => {
     if (value) {
         storage.setItem(APP_STORAGE_KEY_PREFIX + key, JSON.stringify(value));
     } else {
@@ -14,7 +14,7 @@ const saveToStorage = (key: string, value: boolean | string | object | null, sto
 };
 
 export const getFromSessionStorage = <T>(key: string): T | null => getFromStorage<T>(key, sessionStorage);
-export const saveToSessionStorage = <T extends boolean | string | object | null>(key: string, value: T) => saveToStorage(key, value, sessionStorage);
+export const saveToSessionStorage = <T extends boolean | string | number | object | null>(key: string, value: T) => saveToStorage(key, value, sessionStorage);
 
 export const getFromLocalStorage = <T>(key: string): T | null => getFromStorage<T>(key, localStorage);
-export const saveToLocalStorage = <T extends boolean | string | object | null>(key: string, value: T) => saveToStorage(key, value, localStorage);
+export const saveToLocalStorage = <T extends boolean | string | number | object | null>(key: string, value: T) => saveToStorage(key, value, localStorage);

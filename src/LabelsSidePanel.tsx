@@ -11,12 +11,14 @@ import IconButton from '@mui/material/IconButton';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useApiDataCache } from './ctxApiDataCache';
 import { isRead } from './helpers/emailParser';
+import { useResizableWidth } from './helpers/useResizableWidth';
 
-const Sidebar: React.FC = () => {
+const LabelsSidePanel: React.FC = () => {
 
   const cache = useApiDataCache();
   const [editMode, setEditMode] = useState(false);
-  // sidebar UI state
+
+  const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
   const getUnreadCount = (labelId: string) =>
     cache.messageHeadersCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
@@ -28,12 +30,9 @@ const Sidebar: React.FC = () => {
     }
   }, [cache.selectedLabelId, cache.labels, cache]);
 
-  // hover on the sidebar will control gear opacity via CSS
-
-  
 
   return (
-    <Box sx={{ position: 'relative' }}>
+    <Box ref={containerRef} sx={{ position: 'relative', width: width, minWidth: width, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ position: 'absolute', top: -10, left: 6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
         <IconButton
           className="gearBtn"
@@ -52,9 +51,15 @@ const Sidebar: React.FC = () => {
         </IconButton>
       </Box>
 
-      {/** Resizing is handled by parent `Split` in App.tsx; local handle removed. */}
+      {/* Right-edge drag handle: pointer events based. */}
+      <Box
+        onPointerDown={handleProps.onPointerDown}
+        sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}
+      >
+        <Box sx={{ width: 2, height: 28, borderRadius: 1, bgcolor: 'text.secondary', opacity: 0.28 }} />
+      </Box>
 
-      <List component="nav" dense aria-label="mail categories" sx={{ py: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <List component="nav" dense aria-label="mail categories" sx={{ py: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, WebkitOverflowScrolling: 'touch' }}>
 
       {cache.labels?.sortedValues.map(label =>
 
@@ -63,15 +68,19 @@ const Sidebar: React.FC = () => {
           key={label.id}
           selected={cache.selectedLabelId === label.id}
           onClick={() => cache.setSelectedLabelId(label.id)}
+          sx={{ pr: 0 }}
         >
-          <ListItemIcon sx={{ minWidth: 0.13, mr: 1.3 }}>
+          <ListItemIcon sx={{ minWidth: 24, mr: 1.25, display: 'flex', justifyContent: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {label.icon}
             </Box>
           </ListItemIcon>
 
           <ListItemText primary={label.displayName} sx={{ ml: -1, mr: 0 }}
-          slotProps={{ primary: { fontWeight: 300, fontSize: "13px", lineHeight: 1.3 } }}
+          slotProps={{ primary: { fontWeight: 300, fontSize: "13.7px",
+            my: -0.4, // 'my' sets the vertical gap between labels
+            lineHeight: 1.1 
+          } }}
           />
 
           {getUnreadCount(label.id) > 0 && (
@@ -90,4 +99,4 @@ const Sidebar: React.FC = () => {
   );
 };
 
-export default Sidebar;
+export default LabelsSidePanel;
