@@ -31,7 +31,8 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.5.2",
     "react-toastify": "^11.0.5",
-    "rehype-raw": "^7.0.0"
+    "rehype-raw": "^7.0.0",
+    "sorted-btree": "^2.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

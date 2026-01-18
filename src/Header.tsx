@@ -50,7 +50,6 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
 const Header: React.FC = () => {
   const cache = useApiDataCache();
   const [searchQuery, setSearchQuery] = useState('');
-  const { selectedLabelId } = useApiDataCache();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefreshEmails = async () => {
@@ -78,7 +77,7 @@ const Header: React.FC = () => {
     </Tooltip>
 
     <Typography variant="h6" component="div" sx={{ fontWeight: 600, ml: 1 }}>
-      {cache.labels?.[selectedLabelId]?.displayName}
+      {cache.labels?.get(cache.selectedLabelId)?.displayName}
     </Typography>
 
     <Tooltip title="Refresh email list">

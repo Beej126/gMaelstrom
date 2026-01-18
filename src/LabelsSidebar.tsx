@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   List,
   ListItemButton,
@@ -17,20 +17,23 @@ const Sidebar: React.FC = () => {
   const getUnreadCount = (labelId: string) =>
     cache.messageHeadersCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
 
-  const onLabelClick = (labelId: string) => {
-    cache.setSelectedLabelId(labelId);
-  };
+  //select the first label if none already selected
+  useEffect(() => {
+    if (!cache.selectedLabelId && cache.labels) {
+      cache.setSelectedLabelId(cache.labels.sortedValues[0].id);
+    }
+  }, [cache.selectedLabelId, cache.labels, cache]);
 
   return (
     <List component="nav" dense aria-label="mail categories" sx={{ py: 0, overflowY: 'auto', overflowX: 'hidden' }}>
 
-      {Object.values(cache.labels || {}).map(label =>
+      {cache.labels?.sortedValues.map(label =>
 
         <ListItemButton
           dense
           key={label.id}
           selected={cache.selectedLabelId === label.id}
-          onClick={() => onLabelClick(label.id)}
+          onClick={() => cache.setSelectedLabelId(label.id)}
         >
           <ListItemIcon sx={{ minWidth: 0.13, mr: 1.3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>

@@ -17,19 +17,7 @@ const LabelSettingsDialog: React.FC<{
 }> = props => {
     const cache = useApiDataCache();
 
-    // Get all labels as array, sorted alphabetically by name
-    const sortedLabels = Object.values(cache.labels ?? {}).sort((a, b) => a.name.localeCompare(b.name));
-
-    // Toggle label visibility by updating the ExtendedLabel.visible property
-    const handleToggle = (labelId: string) => {
-        const updated = { ...cache.labels };
-        for (const key in updated) {
-            if (updated[key].id === labelId) {
-                updated[key] = { ...updated[key], visible: !updated[key].visible };
-            }
-        }
-        cache.setLabels(updated);
-    };
+    const onToggleVisible = (labelId: string, visible: boolean) => cache.patchLabelItem(labelId, { visible });
 
     return (
         <Dialog open={props.open} onClose={props.onClose} maxWidth={false}
@@ -57,22 +45,21 @@ const LabelSettingsDialog: React.FC<{
                     alignItems: 'center',
                     rowGap: 0,
                 }}>
-                    {sortedLabels.length === 0 && (
+                    {!!cache.labels?.count && (
                         <Box sx={{ gridColumn: '1 / -1', py: 1 }}>
                             No labels found.
                         </Box>
                     )}
-                    {sortedLabels.map(label => (
+                    {cache.labels?.sortedValues.map(label => (
                         <React.Fragment key={label.id}>
                             <Box>
-                                {label.name}
-                                {/* You can now access label.type, label.color, etc. here */}
+                                {label.displayName}
                             </Box>
                             <Box>
                                 <Switch
                                     edge="end"
                                     checked={!!label.visible}
-                                    onChange={() => handleToggle(label.id)}
+                                    onChange={(_, checked) => onToggleVisible(label.id, checked)}
                                     inputProps={{ 'aria-label': `Show label ${label.name}` }}
                                 />
                             </Box>

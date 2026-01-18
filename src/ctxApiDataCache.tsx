@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import gMailApi, { GLabel, GMessage } from './gMailApi';
 import { SettingName } from './ctxSettings';
-import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
-import { arrayToRecord } from './helpers/typeHelpers';
+import { getFromLocalStorage } from './helpers/browserStorage';
 import InboxIcon from '@mui/icons-material/Inbox';
 import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -13,6 +12,7 @@ import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from './helpers/emailParser';
 import { createContextBundle } from "./helpers/contextFactory";
+import { MultiIndex, useMultiIndexState } from './helpers/multiIndex';
 
 
 export type ApiDataCacheType = {
@@ -32,10 +32,13 @@ export type ApiDataCacheType = {
   checkedMessageIds: GridRowSelectionModel;
   setCheckedMessageIds: (selection: GridRowSelectionModel) => void;
   markCheckedMessageIdsAsRead: (asRead: boolean) => void;
-  labels?: Record<string, ExtendedLabel>;
-  setLabels: (labels: Record<string, ExtendedLabel>) => void;
-  selectedLabelId: string;
+
+  labels: MultiIndex<string, ExtendedLabel, string> | undefined;
+  patchLabelItem: (id: string, value: Partial<ExtendedLabel>) => void
+
+  selectedLabelId: string | undefined;
   setSelectedLabelId: (labelId: string) => void;
+
   totalMessages: number;
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
@@ -69,32 +72,23 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   // kindof a stretch to bring MUI type in here
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
-  const [labels, setLabels] = useState<Record<string, ExtendedLabel>>();
-  const [selectedLabelId, setSelectedLabelId] = useState<string>(Object.entries(mainLabelIcons)[0][0]);
-
+  const [labels, initiLabels,, patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName");
+  const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
   const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
-  
+
   const [threadMessages, _setThreadMessages] = useState<GMessage[]>([]);
 
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
-    gMailApi.getApiLabels().then(gmailLabels => {
-      setLabels(buildExtendedLabels(
-        gmailLabels,
-        getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
-      ));
-    });
+    gMailApi.getApiLabels().then(gmailLabels => initiLabels(buildExtendedLabels(
+      gmailLabels,
+      getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
+    )));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist only {id: visible} to localStorage when labels change
-  useEffect(() => {
-    const vis: Record<string, boolean> = {};
-    arrayToRecord(Object.values(labels || {}), 'id');
-    for (const l of Object.values(labels ?? {})) vis[l.id] = !!l.visible;
-    saveToLocalStorage(SettingName.LABEL_VISIBILITY, vis);
-  }, [labels]);
 
   useEffect(() => {
     setMessageHeadersCache([]);
@@ -119,7 +113,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
   const fetchMessages = useCallback(async (page: number, pageSize: number): Promise<void> => {
 
-    if (pageSize === -1) { return; }
+    if (pageSize === -1 || !selectedLabelId) { return; }
 
     // Check cache: only skip fetch if all emails for this page are present AND the page is within totalEmails
     const start = page * pageSize;
@@ -244,10 +238,13 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     checkedMessageIds,
     setCheckedMessageIds,
     markCheckedMessageIdsAsRead,
+
     labels,
-    setLabels,
+    patchLabelItem,
+    
     selectedLabelId,
     setSelectedLabelId,
+
     totalMessages,
     currentPage,
     setCurrentPage,
@@ -292,9 +289,10 @@ const buildLabelDisplayName = (labelRawName: string): string => {
 };
 
 const buildExtendedLabels = (gLabels: GLabel[], labelVis: Record<string, boolean>) =>
-  arrayToRecord(gLabels.map(l => ({
+  // build array of [key, value] entries for BTree constructor
+  gLabels.map(l => [l.id, {
     ...l,
     displayName: buildLabelDisplayName(l.name),
     visible: labelVis[l.id] !== false,
     icon: mainLabelIcons[l.id]
-  })), 'id');
+  }] as [string, ExtendedLabel]);

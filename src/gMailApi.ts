@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 
 
 // extend some base gmail API types to make some fields required that we always expect to be present so callers don't need to be littered with unecessary undefined checks to avoid lint errors
-export type GLabel = Required<Pick<gapi.client.gmail.Label, 'id' | 'name' | 'type'>> & gapi.client.gmail.Label;
+export type GLabel = Required<Pick<gapi.client.gmail.Label, 'id' | 'name' | 'type' | 'labelListVisibility'>>;// & gapi.client.gmail.Label;
 export type GMessage = Required<Pick<gapi.client.gmail.Message, 'id' | 'threadId' | 'snippet' | 'labelIds'>> & gapi.client.gmail.Message;
 export type GThread = Required<Pick<gapi.client.gmail.Thread, 'id' | 'snippet'>>;
 export type GListThreadsResponse = Required<Pick<gapi.client.gmail.ListThreadsResponse, 'nextPageToken' | 'resultSizeEstimate'>> & { threads: GThread[] };
@@ -101,6 +101,10 @@ export const getApiAttachmentData = async (messageId: string, attachmentId: stri
 
 const getApiLabels = async (): Promise<GLabel[]> => (await gApiFetchJson('labels')).labels ?? [];
 
+// docs: https://developers.google.com/gmail/api/reference/rest/v1/users.labels/patch
+export const setApiLabelVisibility = async (labelId: string, visible: boolean): Promise<GLabel> =>
+  gApiFetchJson(`labels/${labelId}`, 'PATCH', { labelListVisibility: visible ? 'labelShow' : 'labelHide' });
+
 
 export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean): Promise<void> => {
   if (!emailIds.length || !emailIds.filter(Boolean)) return;
@@ -127,7 +131,7 @@ const inflightFetches = new Map<string, Promise<Response>>();
  */
 export const gApiFetchJson = async (
   endpoint: string,
-  method: "GET" | "POST" = "GET",
+  method: "GET" | "POST" | "PATCH" = "GET",
   parms?: object,
   token?: string
 ) => {
@@ -142,7 +146,7 @@ export const gApiFetchJson = async (
   const url = (endpoint.toLowerCase().startsWith('http') ? '' : GMAIL_API_BASE_URL) + endpoint
     + (parms && method === "GET" ? "?" + new URLSearchParams(parms as Record<string, string>).toString() : "");
 
-  const body = parms && method === "POST" ? JSON.stringify(parms) : undefined;
+  const body = parms && (["POST", "PATCH"].includes(method)) ? JSON.stringify(parms) : undefined;
 
   const aborter = new AbortController();
   const fetchPromise = (async () => {
@@ -183,8 +187,13 @@ export const gApiFetchJson = async (
 export default {
   getApiMessages,
   getApiMessageDetailsById,
+
   getApiThreadMessages,
+  
   getApiAttachmentData,
+
   getApiLabels,
-  markMessageIdsAsRead: markApiMessageIdsAsRead,
+  setApiLabelVisibility,
+
+  markMessageIdsAsRead: markApiMessageIdsAsRead
 };
