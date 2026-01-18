@@ -143,4 +143,4 @@ if (
 }
 
 Write-Host "Environment check complete. Starting dev runtime..."
-pnpm run dev
+volta run pnpm -- run dev
