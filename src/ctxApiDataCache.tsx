@@ -84,7 +84,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   useEffect(() => {
     gMailApi.getApiLabels().then(gmailLabels => initiLabels(buildExtendedLabels(
       gmailLabels,
-      getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
+      getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
     )));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -265,7 +265,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
 export type ExtendedLabel = GLabel & {
   displayName: string;
-  visible: boolean;
+  sortNum: number;
   icon?: React.ReactElement<typeof SvgIcon>;
 };
 
@@ -288,11 +288,11 @@ const buildLabelDisplayName = (labelRawName: string): string => {
   return displayName;
 };
 
-const buildExtendedLabels = (gLabels: GLabel[], labelVis: Record<string, boolean>) =>
+const buildExtendedLabels = (gLabels: GLabel[], labelOrder: Record<string, number>) =>
   // build array of [key, value] entries for BTree constructor
   gLabels.map(l => [l.id, {
     ...l,
     displayName: buildLabelDisplayName(l.name),
-    visible: labelVis[l.id] !== false,
+    sortNum: labelOrder[l.id],
     icon: mainLabelIcons[l.id]
   }] as [string, ExtendedLabel]);

@@ -18,8 +18,6 @@ import ViewComfyIcon from '@mui/icons-material/ViewComfy';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import ForumIcon from '@mui/icons-material/Forum';
-import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import LabelSettingsDialog from './LabelSettingsDialog';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useSettings } from './ctxSettings';
 import { toast } from 'react-toastify';
@@ -28,7 +26,6 @@ import { toast } from 'react-toastify';
 const SettingsMenu: React.FC = _ => {
 
   const settings = useSettings();
-  const [labelSettingsOpen, setLabelSettingsOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const onOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -89,8 +86,6 @@ const SettingsMenu: React.FC = _ => {
         <SettingsIcon />
       </IconButton>
     </Tooltip>
-
-    <LabelSettingsDialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} />
 
     <Menu
       id="settings-menu"
@@ -153,17 +148,6 @@ const SettingsMenu: React.FC = _ => {
         </Box>
         <Switch checked={settings.combineThreads} onChange={onCombineThreadsChange} onClick={e => e.stopPropagation()} />
       </MenuItem>
-
-      <Divider sx={{ my: 0, minHeight: 0 }} />
-
-      <MenuItem onClick={() => { setLabelSettingsOpen(true); onClose(); }}>
-        <ListItemIcon>
-          <LabelOutlinedIcon color="primary" />
-        </ListItemIcon>
-        <ListItemText>Label Settings</ListItemText>
-      </MenuItem>
-
-      <LabelSettingsDialog open={labelSettingsOpen} onClose={() => setLabelSettingsOpen(false)} />
 
       <Divider sx={{ my: 0, minHeight: 0 }} />
 
