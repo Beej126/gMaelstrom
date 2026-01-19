@@ -1,3 +1,7 @@
+export type NonNullableProps<T> = { [K in keyof T]: NonNullable<T[K]>; };
+export type StrictRequired<T> = { [K in keyof T]-?: NonNullable<T[K]>; };
+
+
 export function makeStringEnum<T extends string>(keys: T[]): { [K in T]: K } {
   return keys.reduce((res, key) => {
     res[key] = key;

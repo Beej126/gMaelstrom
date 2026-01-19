@@ -72,7 +72,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   // kindof a stretch to bring MUI type in here
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
-  const [labels, initiLabels,, patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName");
+  const [labels, initiLabels, , patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible);
   const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
   const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
@@ -86,7 +86,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
       gmailLabels,
       getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
     )));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -241,7 +241,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
     labels,
     patchLabelItem,
-    
+
     selectedLabelId,
     setSelectedLabelId,
 
@@ -265,8 +265,9 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
 export type ExtendedLabel = GLabel & {
   displayName: string;
-  sortNum: number;
   icon?: React.ReactElement<typeof SvgIcon>;
+  sortNum: number;
+  isVisible: boolean;
 };
 
 
@@ -293,6 +294,7 @@ const buildExtendedLabels = (gLabels: GLabel[], labelOrder: Record<string, numbe
   gLabels.map(l => [l.id, {
     ...l,
     displayName: buildLabelDisplayName(l.name),
+    icon: mainLabelIcons[l.id],
     sortNum: labelOrder[l.id],
-    icon: mainLabelIcons[l.id]
+    isVisible: l.labelListVisibility === undefined || !(l.labelListVisibility !== "labelShow"),
   }] as [string, ExtendedLabel]);

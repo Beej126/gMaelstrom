@@ -3,7 +3,8 @@ import BTree from "sorted-btree";
 
 
 export function useMultiIndexState<ID, V, SortKey>(
-  sortKeyOrFn: keyof V | ((v: V) => SortKey)
+  sortKeyOrFn: keyof V | ((v: V) => SortKey),
+  initialFilter?: (v: V) => boolean
 ): [
   MultiIndex<ID, V, SortKey> | undefined,
   (entries: Array<[ID, V]>) => void,
@@ -14,9 +15,9 @@ export function useMultiIndexState<ID, V, SortKey>(
 
   const initialize = useCallback(
     (entries: Array<[ID, V]>) => {
-      setIndex(new MultiIndex(sortKeyOrFn, entries));
+      setIndex(new MultiIndex(sortKeyOrFn, entries, initialFilter));
     },
-    [sortKeyOrFn]
+    [sortKeyOrFn, initialFilter]
   );
 
   const setItem = useCallback(
@@ -56,12 +57,16 @@ export class MultiIndex<ID, V, SortKey> {
   private readonly bySort: BTree<SortKey, V>;
   private readonly sortKey: (value: V) => SortKey;
 
-  /** Always-up-to-date sorted array of values */
+  /** Always-up-to-date sorted array of values. When a filter is set, this
+   * contains the filtered snapshot; otherwise it contains the full sorted list.
+   */
   readonly sortedValues: V[];
+  private filterFn?: (v: V) => boolean;
 
   constructor(
     sortKeyOrFn: KeyOf<V> | ((value: V) => SortKey),
-    entries: Array<[ID, V]> = []
+    entries: Array<[ID, V]> = [],
+    initialFilter?: (v: V) => boolean
   ) {
     this.byId = new Map(entries);
 
@@ -74,17 +79,27 @@ export class MultiIndex<ID, V, SortKey> {
       entries.map(([_id, value]) => [this.sortKey(value), value])
     );
 
-    // materialize sorted array once
+    // materialize sorted array once (no filter initially)
     this.sortedValues = [];
     for (const [, value] of this.bySort.entries()) {
       this.sortedValues.push(value);
+    }
+    this.filterFn = initialFilter;
+    // apply initial filter if present
+    this.sortedValues = [];
+    for (const [, value] of this.bySort.entries()) {
+      if (!this.filterFn || this.filterFn(value)) {
+        this.sortedValues.push(value);
+      }
     }
   }
 
   private rebuildSortedArray() {
     this.sortedValues.length = 0;
     for (const [, value] of this.bySort.entries()) {
-      this.sortedValues.push(value);
+      if (!this.filterFn || this.filterFn(value)) {
+        this.sortedValues.push(value);
+      }
     }
   }
 
@@ -109,6 +124,17 @@ export class MultiIndex<ID, V, SortKey> {
 
     this.byId.delete(id);
     this.bySort.delete(this.sortKey(value));
+    this.rebuildSortedArray();
+  }
+
+  /**
+   * Set an optional filter. When `filter` is `undefined`, `sortedValues` will
+   * contain the full sorted list. When provided, `sortedValues` will be
+   * replaced with a filtered snapshot. The computation runs once when the
+   * filter is set and again whenever data changes (insert/delete).
+   */
+  setFilter(filter?: (v: V) => boolean) {
+    this.filterFn = filter;
     this.rebuildSortedArray();
   }
 

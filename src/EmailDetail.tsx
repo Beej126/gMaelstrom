@@ -77,14 +77,7 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
           htmlContent = await replaceInlineAttachments(
             htmlContent,
             inlineAttachments.get(email.id) || {},
-            async (messageId, attachmentId) => {
-              try {
-                return await getApiAttachmentData(messageId, attachmentId);
-              } catch (error) {
-                console.error(`Error fetching attachment ${attachmentId}:`, error);
-                return '';
-              }
-            }
+            getApiAttachmentData
           );
         }
 

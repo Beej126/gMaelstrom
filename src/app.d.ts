@@ -1,10 +1,6 @@
 
-// --- RSBuild environment variable types ---
+// provides "import.meta.env." prefix to reference .env-file based variables (e.g. PUBLIC_GOOGLE_CLIENT_ID)
 /// <reference types="@rsbuild/core/types" />
-
-// --- Google API TypeScript type definitions ---
-// These provide type safety for gapi, gapi.client, and Gmail API objects used in the app
-/// <reference types="gapi.client.gmail-v1" />
 
 
 // --- SVG module declaration for React ---
@@ -25,6 +21,7 @@ declare module '*.svg' {
   // export default src;
 }
 
+// basically a stand in for "any" that avoid the implicit any compiler warning
 interface Expando {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;

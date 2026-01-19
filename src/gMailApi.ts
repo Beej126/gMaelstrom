@@ -3,14 +3,17 @@
 import { getAuthedUser } from './gAuthApi';
 import { gmailApiBatchFetch } from './gMailApiBatchFetch';
 import { toast } from 'react-toastify';
-
+import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
+import { StrictRequired } from './helpers/typeHelpers';
 
 // extend some base gmail API types to make some fields required that we always expect to be present so callers don't need to be littered with unecessary undefined checks to avoid lint errors
-export type GLabel = Required<Pick<gapi.client.gmail.Label, 'id' | 'name' | 'type' | 'labelListVisibility'>>;// & gapi.client.gmail.Label;
-export type GMessage = Required<Pick<gapi.client.gmail.Message, 'id' | 'threadId' | 'snippet' | 'labelIds'>> & gapi.client.gmail.Message;
-export type GThread = Required<Pick<gapi.client.gmail.Thread, 'id' | 'snippet'>>;
-export type GListThreadsResponse = Required<Pick<gapi.client.gmail.ListThreadsResponse, 'nextPageToken' | 'resultSizeEstimate'>> & { threads: GThread[] };
+type GLabelVisibility = 'labelShow' | 'labelShowIfUnread' | 'labelHide';
+type GLabelType = "system" | "user";
+export type GLabel = StrictRequired<Pick<gmail_v1.Schema$Label, 'id' | 'name'>> & { type: GLabelType; labelListVisibility: GLabelVisibility };// & gapi.client.gmail.Label;
 
+export type GMessage = StrictRequired<Pick<gmail_v1.Schema$Message, 'id' | 'threadId' | 'snippet' | 'labelIds'>> & gmail_v1.Schema$Message;
+export type GThread = StrictRequired<Pick<gmail_v1.Schema$Thread, 'id' | 'snippet'>>;
+export type GListThreadsResponse = StrictRequired<Pick<gmail_v1.Schema$ListThreadsResponse, 'nextPageToken' | 'resultSizeEstimate'>> & { threads: GThread[] };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // general error handling convention for all google API calls:
@@ -25,11 +28,12 @@ export type GListThreadsResponse = Required<Pick<gapi.client.gmail.ListThreadsRe
 //   put all further bundling logic in the data cache layer APIs
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/list
 export const getApiThreadsByLabelId = (
   labelId: string,
   pageSize: number,
   pageToken: string | null
-): Promise<GListThreadsResponse> => gApiFetchJson("threads", "GET", {
+) => gApiFetchJson<GListThreadsResponse>("threads", "GET", {
   maxResults: pageSize.toString(),
   labelIds: labelId, // Note: The API allows multiple labels via CSV if that's ever handy
   pageToken: pageToken,
@@ -47,7 +51,7 @@ export const getApiMessages = async (
     ...(pageToken ? { pageToken } : {}),
     ...(labelId ? { labelIds: labelId } : {}),
   });
-  const data = await gApiFetchJson(`messages?${params.toString()}`);
+  const data = await gApiFetchJson<{ messages?: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken?: string; resultSizeEstimate?: number }>(`messages?${params.toString()}`);
   const messages = data.messages || [];
   const nextPageToken = data.nextPageToken || null;
   const total = typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0;
@@ -65,7 +69,7 @@ export const getApiMessages = async (
         threadId: string;
         snippet: string;
         labelIds: string[];
-        payload?: gapi.client.gmail.MessagePart;
+        payload?: gmail_v1.Schema$MessagePart;
       } =>
         !!meta &&
         typeof meta.id === 'string' &&
@@ -87,29 +91,25 @@ export const getApiMessages = async (
 export const getApiMessageDetailsById = async (id: string): Promise<GMessage> =>
   gApiFetchJson(`messages/${id}?format=full`);
 
-export const getApiThreadMessages = async (threadId: string): Promise<GMessage[]> =>
-  (await gApiFetchJson(`threads/${threadId}`)).messages ?? [];
+export const getApiThreadMessages = async (threadId: string) =>
+  (await gApiFetchJson<{ messages: GMessage[] }>(`threads/${threadId}`)).messages ?? [];
 
 
-export const getApiAttachmentData = async (messageId: string, attachmentId: string): Promise<string> => {
-  const response = await gApiFetchJson(`messages/${messageId}/attachments/${attachmentId}`);
-  const urlSafeBase64 = response.data ?? '';
-  const standardBase64 = urlSafeBase64.replace(/-/g, '+').replace(/_/g, '/');
-  return standardBase64;
-};
+export const getApiAttachmentData = (messageId: string, attachmentId: string) =>
+  gApiFetchJson<{ data?: string }>(`messages/${messageId}/attachments/${attachmentId}`).then(resp =>
+    resp.data?.replace(/-/g, '+').replace(/_/g, '/'));
 
-
-const getApiLabels = async (): Promise<GLabel[]> => (await gApiFetchJson('labels')).labels ?? [];
+const getApiLabels = () => gApiFetchJson<{ labels: GLabel[] }>('labels').then(resp => resp.labels);
 
 // docs: https://developers.google.com/gmail/api/reference/rest/v1/users.labels/patch
-export const setApiLabelVisibility = async (labelId: string, visible: boolean): Promise<GLabel> =>
-  gApiFetchJson(`labels/${labelId}`, 'PATCH', { labelListVisibility: visible ? 'labelShow' : 'labelHide' });
+export const setApiLabelVisibility = async (labelId: string, visible: boolean) =>
+  gApiFetchJson<GLabel>(`labels/${labelId}`, 'PATCH', { labelListVisibility: visible ? 'labelShow' : 'labelHide' });
 
 
-export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean): Promise<void> => {
+export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean) => {
   if (!emailIds.length || !emailIds.filter(Boolean)) return;
 
-  return gApiFetchJson('messages/batchModify', "POST", {
+  return gApiFetchJson<void>('messages/batchModify', "POST", {
     ids: emailIds,
     ...(asRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] })
   });
@@ -119,7 +119,8 @@ const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
 
 // React 18+ "strict mode" causes useEffect to double invoke in dev mode which drives double fetches
 //   use a simple fetch promise map based on GET url to dedupe inflight fetches
-const inflightFetches = new Map<string, Promise<Response>>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const inflightFetches = new Map<string, Promise<any>>();
 
 
 /**
@@ -129,12 +130,12 @@ const inflightFetches = new Map<string, Promise<Response>>();
  * @param parms converted to `URLSearchParams` for GET requests or request body for POST
  * @param token optional bearer token to use instead of the default authed user
  */
-export const gApiFetchJson = async (
+export const gApiFetchJson = async <T>(
   endpoint: string,
   method: "GET" | "POST" | "PATCH" = "GET",
   parms?: object,
   token?: string
-) => {
+): Promise<T> => {
 
   // avoid duplicate fetches (e.g. react fires effects twice in dev builds under strict mode)
   //   assuming we're only avoiding **GETs*** that tend to fire during initial mounts, 
@@ -189,7 +190,7 @@ export default {
   getApiMessageDetailsById,
 
   getApiThreadMessages,
-  
+
   getApiAttachmentData,
 
   getApiLabels,
