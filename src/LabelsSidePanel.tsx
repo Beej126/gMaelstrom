@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   List,
   ListItemButton,
@@ -16,7 +16,6 @@ import { useResizableWidth } from './helpers/useResizableWidth';
 const LabelsSidePanel: React.FC = () => {
 
   const cache = useApiDataCache();
-  const [editMode, setEditMode] = useState(false);
 
   const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
@@ -37,16 +36,16 @@ const LabelsSidePanel: React.FC = () => {
         <IconButton
           aria-label="label settings"
           size="small"
-          onClick={() => setEditMode(e => !e)}
+          onClick={() => cache.setLabelSettingsEditMode(prev => !prev)}
           sx={{
-            opacity: 0.25,
+            opacity: cache.labelSettingsEditMode ? 1 : 0.35,
             transition: 'opacity 200ms ease',
-            bgcolor: editMode ? 'action.selected' : 'transparent',
+            bgcolor: cache.labelSettingsEditMode ? 'action.selected' : 'transparent',
             pointerEvents: 'auto',
             '&:hover': { bgcolor: 'action.hover', opacity: 1 }
           }}
         >
-          <SettingsIcon fontSize="small" color={editMode ? 'primary' : 'inherit'} />
+          <SettingsIcon fontSize={cache.labelSettingsEditMode ? "large" : "small"} color={cache.labelSettingsEditMode ? 'primary' : 'inherit'} />
         </IconButton>
       </Box>
 

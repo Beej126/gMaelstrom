@@ -34,7 +34,9 @@ export type ApiDataCacheType = {
   markCheckedMessageIdsAsRead: (asRead: boolean) => void;
 
   labels: MultiIndex<string, ExtendedLabel, string> | undefined;
-  patchLabelItem: (id: string, value: Partial<ExtendedLabel>) => void
+  patchLabelItem: (id: string, value: Partial<ExtendedLabel>) => void;
+  labelSettingsEditMode: boolean;
+  setLabelSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
 
   selectedLabelId: string | undefined;
   setSelectedLabelId: (labelId: string) => void;
@@ -72,7 +74,9 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   // kindof a stretch to bring MUI type in here
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
-  const [labels, initiLabels, , patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible);
+  const [labelSettingsEditMode, setLabelSettingsEditMode] = useState(false);
+  const [labels, initiLabels, , patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible, !labelSettingsEditMode);
+
   const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
   const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
@@ -241,6 +245,8 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
     labels,
     patchLabelItem,
+    labelSettingsEditMode,
+    setLabelSettingsEditMode,
 
     selectedLabelId,
     setSelectedLabelId,

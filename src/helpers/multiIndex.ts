@@ -1,23 +1,23 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import BTree from "sorted-btree";
 
 
 export function useMultiIndexState<ID, V, SortKey>(
   sortKeyOrFn: keyof V | ((v: V) => SortKey),
-  initialFilter?: (v: V) => boolean
+  filter?: (v: V) => boolean,
+  filterEnabled: boolean = true
 ): [
-  MultiIndex<ID, V, SortKey> | undefined,
-  (entries: Array<[ID, V]>) => void,
-  (id: ID, value: V) => void,
-  (id: ID, patch: Partial<V>) => void
-] {
+    MultiIndex<ID, V, SortKey> | undefined,
+    (entries: Array<[ID, V]>) => void,
+    (id: ID, value: V) => void,
+    (id: ID, patch: Partial<V>) => void
+  ] {
   const [index, setIndex] = useState<MultiIndex<ID, V, SortKey> | undefined>(undefined);
 
-  const initialize = useCallback(
-    (entries: Array<[ID, V]>) => {
-      setIndex(new MultiIndex(sortKeyOrFn, entries, initialFilter));
-    },
-    [sortKeyOrFn, initialFilter]
+  const initEntries = useCallback(
+    (entries: Array<[ID, V]>) => setIndex(new MultiIndex(sortKeyOrFn, entries, filter, filterEnabled)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   const setItem = useCallback(
@@ -46,7 +46,13 @@ export function useMultiIndexState<ID, V, SortKey>(
     [index, setItem]
   );
 
-  return [index, initialize, setItem, patchItem];
+  // When the external boolean changes, toggle the initial filter on the
+  // MultiIndex instance (if present) and rebuild the snapshot.
+  useEffect(() => {
+    if (index?.setFilterEnabled(filterEnabled)) setIndex(index.bumpIdentity());
+  }, [index, filterEnabled]);
+  
+  return [index, initEntries, setItem, patchItem];
 };
 
 
@@ -61,12 +67,17 @@ export class MultiIndex<ID, V, SortKey> {
    * contains the filtered snapshot; otherwise it contains the full sorted list.
    */
   readonly sortedValues: V[];
-  private filterFn?: (v: V) => boolean;
+  // The originally-provided filter and a boolean that controls whether it is
+  // currently applied. The active filter is computed from these two values
+  // when rebuilding the snapshot.
+  private filter?: (v: V) => boolean;
+  private filterEnabled: boolean = false;
 
   constructor(
     sortKeyOrFn: KeyOf<V> | ((value: V) => SortKey),
     entries: Array<[ID, V]> = [],
-    initialFilter?: (v: V) => boolean
+    filter?: (v: V) => boolean,
+    filterEnabled: boolean = !!filter
   ) {
     this.byId = new Map(entries);
 
@@ -79,16 +90,13 @@ export class MultiIndex<ID, V, SortKey> {
       entries.map(([_id, value]) => [this.sortKey(value), value])
     );
 
-    // materialize sorted array once (no filter initially)
+    // store the initial filter and whether it's enabled
+    this.filter = filter;
+    this.filterEnabled = filterEnabled;
     this.sortedValues = [];
+    const active = this.filterEnabled ? this.filter : undefined;
     for (const [, value] of this.bySort.entries()) {
-      this.sortedValues.push(value);
-    }
-    this.filterFn = initialFilter;
-    // apply initial filter if present
-    this.sortedValues = [];
-    for (const [, value] of this.bySort.entries()) {
-      if (!this.filterFn || this.filterFn(value)) {
+      if (!active || active(value)) {
         this.sortedValues.push(value);
       }
     }
@@ -96,8 +104,9 @@ export class MultiIndex<ID, V, SortKey> {
 
   private rebuildSortedArray() {
     this.sortedValues.length = 0;
+    const active = this.filterEnabled ? this.filter : undefined;
     for (const [, value] of this.bySort.entries()) {
-      if (!this.filterFn || this.filterFn(value)) {
+      if (!active || active(value)) {
         this.sortedValues.push(value);
       }
     }
@@ -127,15 +136,15 @@ export class MultiIndex<ID, V, SortKey> {
     this.rebuildSortedArray();
   }
 
-  /**
-   * Set an optional filter. When `filter` is `undefined`, `sortedValues` will
-   * contain the full sorted list. When provided, `sortedValues` will be
-   * replaced with a filtered snapshot. The computation runs once when the
-   * filter is set and again whenever data changes (insert/delete).
-   */
-  setFilter(filter?: (v: V) => boolean) {
-    this.filterFn = filter;
+  /** 
+   * Enable or disable the initially-provided filter and rebuild the snapshot. 
+   * returns true if the filter state was changed, false otherwise.
+  */
+  setFilterEnabled(enabled: boolean) {
+    if (!this.filter || this.filterEnabled === enabled) return false;
+    this.filterEnabled = enabled;
     this.rebuildSortedArray();
+    return true;
   }
 
   /** Identity bump for React */
