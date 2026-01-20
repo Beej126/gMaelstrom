@@ -71,13 +71,17 @@ const LabelsSidePanel: React.FC = () => {
             onClick={() => cache.setSelectedLabelId(label.id)}
             sx={{ pr: 0 }}
           >
-            <ListItemIcon sx={{ mt: "-3px", minWidth: 24, mr: 1.25, display: 'flex', justifyContent: 'center' }}>
+            <ListItemIcon sx={{ mt: "-3px", minWidth: 24, display: 'flex', justifyContent: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 {label.icon}
               </Box>
             </ListItemIcon>
 
-            <ListItemText primary={label.displayName} sx={{ ml: -1, mr: 0 }}
+            {cache.labelSettingsEditMode && label.type === 'system' && (
+              <Box sx={{ borderRadius: '50%', mt: "-3px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
+            )}
+
+            <ListItemText primary={label.displayName}
               slotProps={{
                 primary: {
                   noWrap: true,
