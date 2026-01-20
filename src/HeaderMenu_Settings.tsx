@@ -82,9 +82,11 @@ const SettingsMenu: React.FC = _ => {
 
     <Tooltip title="Settings">
       <IconButton
-        sx={{ 
-          mx: -0.75, 
-          zIndex: (theme) => theme.zIndex.modal + 1 }} // allows the button to be clickable even when the menu is open
+        sx={{
+          mx: -0.75,
+          // zIndex allows the button to be clickable even when the menu is open
+          zIndex: (theme) => theme.zIndex.modal + 1 
+        }} 
         size="large"
         onClick={onToggleOpen}
       >
@@ -93,6 +95,8 @@ const SettingsMenu: React.FC = _ => {
     </Tooltip>
 
     <Menu
+      // lowering the zIndex down to 1 (theme default 1300) allows the label panel settings to be clickable while the menu is open
+      sx={{ zIndex: 1 }}
       disablePortal={true}
       anchorEl={anchorEl}
       open={Boolean(anchorEl)}

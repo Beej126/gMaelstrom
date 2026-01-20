@@ -80,7 +80,12 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   // kindof a stretch to bring MUI type in here
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
-  const labelCollection = useXCollectionState<string, ExtendedLabel, string>("id", "displayName", label => label.isVisible, !settingsEditMode);
+  const labelCollection = useXCollectionState<string, ExtendedLabel, string>(
+    "id", 
+    "displayName", 
+    label => label.isVisible, 
+    !settingsEditMode
+);
 
   const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
     labelCollection.patchItem(existing, patch);
@@ -94,7 +99,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
       if (!existing.isSystem) gMailApi.setApiLabelVisibility(existing.id, patch.isVisible ? 'labelShow' : 'labelHide');
 
       // save hidden system labels to local storage since those can't be saved to google backend
-      else saveToLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY,
+      else saveToLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY,
         arrayToRecord(labelCollection.sortedFiltered.filter(l => l.isSystem && !l.isVisible), "id", "isVisible")!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,7 +117,8 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     gMailApi.getApiLabels().then(gmailLabels => {
       labelCollection.setEntries(buildExtendedLabels(
         gmailLabels,
-        getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
+        getFromLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY) ?? {},
+        getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
       ));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,7 +323,7 @@ const buildLabelDisplayName = (labelRawName: string): string => {
   return displayName;
 };
 
-const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolean>) =>
+const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolean>, storedOrder: Record<string, number>) =>
   // build array of [key, value] entries for BTree constructor
   gLabels.map(l => {
     const isSystem = l.type === "system";;
@@ -331,7 +337,7 @@ const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolea
       displayName: buildLabelDisplayName(l.name),
       icon: mainLabelIcons[l.id],
 
-      // sortNum: storedVis[l.id]?.sortNum,
+      sortNum: storedOrder[l.id],
       isVisible: isSystem ? (stored ?? backend) : (backend ?? stored), //system labels don't update to googles backend so take anything from local storage first and vice versa
       isSystem
 
