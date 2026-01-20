@@ -102,8 +102,9 @@ export const getApiAttachmentData = (messageId: string, attachmentId: string) =>
 const getApiLabels = () => gApiFetchJson<{ labels: GLabel[] }>('labels').then(resp => resp.labels);
 
 // docs: https://developers.google.com/gmail/api/reference/rest/v1/users.labels/patch
-export const setApiLabelVisibility = async (labelId: string, visible: boolean) =>
-  gApiFetchJson<GLabel>(`labels/${labelId}`, 'PATCH', { labelListVisibility: visible ? 'labelShow' : 'labelHide' });
+export const setApiLabelVisibility = async (labelId: string, visible: boolean) => {
+  return gApiFetchJson<void>(`labels/${labelId}`, "PATCH", { labelListVisibility: visible ? 'labelShow' : 'labelHide' } satisfies Partial<GLabel>);
+};
 
 
 export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean) => {

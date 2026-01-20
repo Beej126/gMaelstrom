@@ -75,7 +75,11 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
   const [labelSettingsEditMode, setLabelSettingsEditMode] = useState(false);
-  const [labels, initiLabels, , patchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible, !labelSettingsEditMode);
+  const [labels, initLabels, _setLabelItem, privatePatchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible, !labelSettingsEditMode);
+  const patchLabelItem = useCallback((id: string, patch: Partial<ExtendedLabel>) => {
+    privatePatchLabelItem(id, patch);
+    if (patch.isVisible !== undefined) gMailApi.setApiLabelVisibility(id, patch.isVisible);
+  }, [privatePatchLabelItem]);
 
   const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
@@ -86,7 +90,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
-    gMailApi.getApiLabels().then(gmailLabels => initiLabels(buildExtendedLabels(
+    gMailApi.getApiLabels().then(gmailLabels => initLabels(buildExtendedLabels(
       gmailLabels,
       getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
     )));
