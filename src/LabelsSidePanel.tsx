@@ -6,6 +6,7 @@ import {
   ListItemText,
   Box,
   Badge,
+  Checkbox,
 } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -70,7 +71,7 @@ const LabelsSidePanel: React.FC = () => {
             onClick={() => cache.setSelectedLabelId(label.id)}
             sx={{ pr: 0 }}
           >
-            <ListItemIcon sx={{ minWidth: 24, mr: 1.25, display: 'flex', justifyContent: 'center' }}>
+            <ListItemIcon sx={{ mt: "-3px", minWidth: 24, mr: 1.25, display: 'flex', justifyContent: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 {label.icon}
               </Box>
@@ -80,9 +81,10 @@ const LabelsSidePanel: React.FC = () => {
               slotProps={{
                 primary: {
                   noWrap: true,
-                  fontWeight: 300, fontSize: "13.7px",
-                  my: -0.4, // 'my' sets the vertical gap between labels
+                  fontWeight: 300,
+                  fontSize: "13.7px",
                   lineHeight: 1.1,
+                  my: -0.4 // 'my' sets the vertical gap between labels
                 }
               }}
             />
@@ -92,6 +94,24 @@ const LabelsSidePanel: React.FC = () => {
                 badgeContent={getUnreadCount(label.id)}
                 color="primary"
                 sx={{ ml: 0.5 }}
+              />
+            )}
+
+            {cache.labelSettingsEditMode && (
+              <Checkbox
+                sx={{
+                  // alignSelf: 'center',
+                  p: 0, // remove Checkbox padding
+                  mr: 0.5,
+                  '& .MuiSvgIcon-root': {
+                    height: '15px', // 15px is approximately equal to label font size 13.7px + lineHeight 1.1 set above
+                    // transform: 'scale(1.2)', // use >1 to enlarge the glyph inside the svg if it has internal whitespace
+                  }
+                }}
+                size="small"
+                checked={label.isVisible}
+                onChange={(e) => cache.patchLabelItem(label.id, { isVisible: e.target.checked })}
+                inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
               />
             )}
 
