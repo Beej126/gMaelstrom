@@ -8,9 +8,7 @@ import {
   Badge,
   Checkbox,
 } from '@mui/material';
-import IconButton from '@mui/material/IconButton';
-import SettingsIcon from '@mui/icons-material/Settings';
-import { useApiDataCache } from './ctxApiDataCache';
+import { useApiDataCache } from './services/ctxApiDataCache';
 import { isRead } from './helpers/emailParser';
 import { useResizableWidth } from './helpers/useResizableWidth';
 
@@ -28,28 +26,34 @@ const LabelsSidePanel: React.FC = () => {
     if (!cache.selectedLabelId && !!cache.labels.sortedFiltered.length) {
       cache.setSelectedLabelId(cache.labels.sortedFiltered[0].id);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache.selectedLabelId, cache.labels.sortedFiltered]);
 
 
   return (
-    <Box ref={containerRef} sx={{ position: 'relative', width: width, minWidth: width, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ position: 'absolute', top: -8, left: -6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+    <Box ref={containerRef}
+      sx={{
+        position: 'relative',
+        display: 'flex', flexDirection: 'column',
+        height: '100%', minHeight: 0,
+        width: width, minWidth: width
+      }}>
+      {/* <Box sx={{ position: 'absolute', top: -8, left: -6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
         <IconButton
           aria-label="label settings"
           size="small"
-          onClick={() => cache.setLabelSettingsEditMode(prev => !prev)}
+          onClick={() => cache.setSettingsEditMode(prev => !prev)}
           sx={{
-            opacity: cache.labelSettingsEditMode ? 1 : 0.35,
+            opacity: cache.settingsEditMode ? 1 : 0.35,
             transition: 'opacity 200ms ease',
-            bgcolor: cache.labelSettingsEditMode ? 'action.selected' : 'transparent',
+            bgcolor: cache.settingsEditMode ? 'action.selected' : 'transparent',
             pointerEvents: 'auto',
             '&:hover': { bgcolor: 'action.hover', opacity: 1 }
           }}
         >
-          <SettingsIcon fontSize={cache.labelSettingsEditMode ? "large" : "small"} color={cache.labelSettingsEditMode ? 'primary' : 'inherit'} />
+          <SettingsIcon fontSize={cache.settingsEditMode ? "large" : "small"} color={cache.settingsEditMode ? 'primary' : 'inherit'} />
         </IconButton>
-      </Box>
+      </Box> */}
 
       <Box
         onPointerDown={handleProps.onPointerDown}
@@ -61,7 +65,14 @@ const LabelsSidePanel: React.FC = () => {
         <Box sx={{ width: 2, height: 28, borderRadius: 1, bgcolor: 'text.secondary', opacity: 0.28 }} />
       </Box>
 
-      <List component="nav" dense aria-label="mail categories" sx={{ py: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+      <List component="nav" dense aria-label="mail categories" 
+        sx={{ 
+          WebkitOverflowScrolling: 'touch',
+          flex: 1,
+          py: 0, 
+          overflowY: 'auto', 
+          overflowX: 'hidden'
+        }}>
 
         {cache.labels?.sortedFiltered.map(label =>
 
@@ -70,7 +81,7 @@ const LabelsSidePanel: React.FC = () => {
             key={label.id}
             selected={cache.selectedLabelId === label.id}
             onClick={() => cache.setSelectedLabelId(label.id)}
-            sx={{ pr: 0 }}
+            sx={{ px: 0 }}
           >
             <ListItemIcon sx={{ mt: "-3px", minWidth: 24, display: 'flex', justifyContent: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -78,7 +89,7 @@ const LabelsSidePanel: React.FC = () => {
               </Box>
             </ListItemIcon>
 
-            {cache.labelSettingsEditMode && label.isSystem && (
+            {cache.settingsEditMode && label.isSystem && (
               <Box sx={{ borderRadius: '50%', mt: "-3px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
             )}
 
@@ -102,7 +113,7 @@ const LabelsSidePanel: React.FC = () => {
               />
             )}
 
-            {cache.labelSettingsEditMode && (
+            {cache.settingsEditMode && (
               <Checkbox
                 sx={{
                   // alignSelf: 'center',

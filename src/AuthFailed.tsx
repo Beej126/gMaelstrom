@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { useUser } from './gAuthApi';
+import { useUser } from './services/gAuthApi';
 import { Alert, Box } from '@mui/material';
 
 export const AuthFailed: React.FC = () => {

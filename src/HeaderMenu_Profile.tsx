@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { useUser, signOut } from './gAuthApi';
+import { useUser, signOut } from './services/gAuthApi';
 
 const ProfileMenu: React.FC = _ => {
 

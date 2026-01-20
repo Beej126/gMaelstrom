@@ -1,4 +1,4 @@
-import { GMessage } from "../gMailApi";
+import { GMessage } from "../services/gMailApi";
 import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
 
 // Extract the 'From' field from a Gmail message

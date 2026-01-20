@@ -11,13 +11,13 @@ import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CreateIcon from '@mui/icons-material/Create';
-import GMaelstromIcon from './gMaelstromLogoSvg';
+import GMaelstromIcon from './AppLogoSvg';
 import { toast } from 'react-toastify';
-import MenuProfile from './MenuProfile';
-import MenuSettings from './MenuSettings';
+import MenuProfile from './HeaderMenu_Profile';
+import MenuSettings from './HeaderMenu_Settings';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useApiDataCache } from './ctxApiDataCache';
+import { useApiDataCache } from './services/ctxApiDataCache';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -73,7 +73,7 @@ const Header: React.FC = () => {
   return <>
 
     <Tooltip title="gMaelstrom">
-      <GMaelstromIcon sx={{ color: 'rgb(33, 150, 243)', fontSize: 30 }} />
+      <GMaelstromIcon sx={{ color: 'rgb(33, 150, 243)', fontSize: 30, cursor: 'pointer' }} onClick={() => window.location.reload()} />
     </Tooltip>
 
     <Typography variant="h6" component="div" sx={{ fontWeight: 600, ml: 1 }}>
@@ -94,10 +94,10 @@ const Header: React.FC = () => {
         bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
       }}
     >
-      <Tooltip title="Mark as Read" disableInteractive>
+      <Tooltip title="Mark Selected Emails as Read" disableInteractive>
         <span>
           <IconButton
-            aria-label="Mark as Read"
+            aria-label="Mark Selected Emails as Read"
             size="small"
             onClick={() => cache.markCheckedMessageIdsAsRead(true)}
             disabled={!cache.checkedMessageIds.ids.size}
@@ -106,8 +106,6 @@ const Header: React.FC = () => {
           </IconButton>
         </span>
       </Tooltip>
-
-      {/* Add more icon buttons here in the future */}
 
     </Box>
 

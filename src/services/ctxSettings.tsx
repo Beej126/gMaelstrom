@@ -1,8 +1,8 @@
 
 import { useMediaQuery } from '@mui/material';
 import React, { createContext, useContext } from 'react';
-import { EnumValue, makeStringEnum } from './helpers/typeHelpers';
-import { useLocalStorageState } from './helpers/useStorageState';
+import { EnumValue, makeStringEnum } from '../helpers/typeHelpers';
+import { useLocalStorageState } from '../helpers/useStorageState';
 
 type DensityMode = 'sparse' | 'condensed';
 

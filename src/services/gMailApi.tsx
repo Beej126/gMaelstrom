@@ -4,7 +4,7 @@ import { getAuthedUser } from './gAuthApi';
 import { gmailApiBatchFetch } from './gMailApiBatchFetch';
 import { toast } from 'react-toastify';
 import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
-import { StrictRequired } from './helpers/typeHelpers';
+import { StrictRequired } from '../helpers/typeHelpers';
 
 // extend some base gmail API types to make some fields required that we always expect to be present so callers don't need to be littered with unecessary undefined checks to avoid lint errors
 type GLabelVisibility = 'labelShow' | 'labelShowIfUnread' | 'labelHide' | undefined;

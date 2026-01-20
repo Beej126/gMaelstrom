@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import EmailDetail from './EmailDetail';
-import './App.scss';
+import './AppGlobal.scss';
 import { Box, Toolbar } from '@mui/material';
 import Header from './Header';
 import LabelsSidePanel from './LabelsSidePanel';

@@ -23,7 +23,7 @@ import {
   Visibility as ViewIcon
 } from '@mui/icons-material';
 import { Attachment, formatFileSize } from './helpers/emailParser';
-import { getApiAttachmentData } from './gMailApi';
+import { getApiAttachmentData } from './services/gMailApi';
 import PdfViewer from './PdfViewer';
 
 interface AttachmentListProps {

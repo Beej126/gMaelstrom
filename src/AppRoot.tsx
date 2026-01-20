@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ToastContainer, Bounce } from 'react-toastify';
-import { ThemeProvider } from './ctxTheme';
-import { SettingsProvider } from './ctxSettings';
-import { ApiDataCacheProviderComponent } from './ctxApiDataCache';
+import { ThemeProvider } from './services/ctxTheme';
+import { SettingsProvider } from './services/ctxSettings';
+import { ApiDataCacheProviderComponent } from './services/ctxApiDataCache';
 import 'react-toastify/dist/ReactToastify.css';
 
 const rootEl = document.getElementById('root');

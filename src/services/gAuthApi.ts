@@ -1,9 +1,9 @@
-import { getFromSessionStorage, saveToSessionStorage } from "./helpers/browserStorage";
+import { getFromSessionStorage, saveToSessionStorage } from "../helpers/browserStorage";
 import { useEffect, useState } from "react";
-import { loadScript } from "./helpers/loadScript";
+import { loadScript } from "../helpers/loadScript";
 import { gApiFetchJson } from "./gMailApi";
 import type { oauth2_v2 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
-import { StrictRequired } from "./helpers/typeHelpers";
+import { StrictRequired } from "../helpers/typeHelpers";
 
 // overview of Google Auth flow implemented here:
 // 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import gMailApi, { GLabel, GMessage } from './gMailApi';
 import { SettingName } from './ctxSettings';
-import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
+import { getFromLocalStorage, saveToLocalStorage } from '../helpers/browserStorage';
 import InboxIcon from '@mui/icons-material/Inbox';
 import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -10,10 +10,10 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import StarOutlineIcon from '@mui/icons-material/StarOutline';
 import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
-import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from './helpers/emailParser';
-import { createContextBundle } from "./helpers/contextFactory";
-import { useXCollectionState } from './helpers/multiIndex';
-import { arrayToRecord } from './helpers/typeHelpers';
+import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from '../helpers/emailParser';
+import { createContextBundle } from "../helpers/contextFactory";
+import { useXCollectionState } from '../helpers/XCollection';
+import { arrayToRecord } from '../helpers/typeHelpers';
 
 
 export type ApiDataCacheType = {
@@ -40,8 +40,8 @@ export type ApiDataCacheType = {
     patchLabelItem: (label: ExtendedLabel, value: Partial<ExtendedLabel>) => void
   };
 
-  labelSettingsEditMode: boolean;
-  setLabelSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
+  settingsEditMode: boolean;
+  setSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
 
   selectedLabelId: string | undefined;
   setSelectedLabelId: (labelId: string) => void;
@@ -62,6 +62,7 @@ export { useApiDataCache };
 export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const [loading, setLoading] = useState<boolean>(false);
+  const [settingsEditMode, setSettingsEditMode] = useState(false);
 
   const [messageHeadersCache, setMessageHeadersCache] = useState<Array<GMessage>>([]);
   const messageDetailsCache = useRef<Record<string, GMessage>>({});
@@ -79,14 +80,14 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   // kindof a stretch to bring MUI type in here
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
-  const [labelSettingsEditMode, setLabelSettingsEditMode] = useState(false);
-  const labelCollection = useXCollectionState<string, ExtendedLabel, string>("id", "displayName", label => label.isVisible, !labelSettingsEditMode);
+  const labelCollection = useXCollectionState<string, ExtendedLabel, string>("id", "displayName", label => label.isVisible, !settingsEditMode);
 
   const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
     labelCollection.patchItem(existing, patch);
 
     // save user label visibility settings to google backend so official gMail UI reflects changes as well
-    //   unfortunately google doesn't provide a public API to change visibility of system labels
+    //   unfortunately google doesn't provide a public API to change visibility of *system* labels
+    //   nugget: actually there are *some* system labels that do survive the set visibility API call (e.g. Forums i think) but i just chose to consistently avoid them all
     if (patch.isVisible !== undefined) {
 
       // save user level visibility changes to google backend
@@ -269,8 +270,8 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
     labels: { sortedFiltered: labelCollection.sortedFiltered, byId: labelCollection.byId, patchLabelItem },
 
-    labelSettingsEditMode,
-    setLabelSettingsEditMode,
+    settingsEditMode,
+    setSettingsEditMode,
 
     selectedLabelId,
     setSelectedLabelId,

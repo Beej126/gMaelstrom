@@ -19,37 +19,42 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import ForumIcon from '@mui/icons-material/Forum';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { useSettings } from './ctxSettings';
+import { useSettings } from './services/ctxSettings';
 import { toast } from 'react-toastify';
+import { useApiDataCache } from './services/ctxApiDataCache';
 
 
 const SettingsMenu: React.FC = _ => {
 
+  const cache = useApiDataCache();
   const settings = useSettings();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const onOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
+  const onToggleOpen = (event: React.MouseEvent<HTMLElement>) => {
+    const enabled = anchorEl ? null : event.currentTarget;
+    setAnchorEl(enabled);
+    cache.setSettingsEditMode(!!enabled);
   };
 
   const onClose = () => {
     setAnchorEl(null);
+    cache.setSettingsEditMode(false);
   };
 
   // Theme toggle separately from menu item click
   const onToggleDarkMode = () => {
-    onClose();
     settings.toggleDarkMode();
+    onClose();
   };
 
   const onDensityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onClose();
     settings.setDensity(event.target.value as 'sparse' | 'condensed');
+    onClose();
   };
 
   const onCombineThreadsChange = () => {
-    onClose();
     settings.setCombineThreads(!settings.combineThreads);
+    onClose();
   };
 
   // const onUnignoreAllWarnings = () => {
@@ -77,23 +82,27 @@ const SettingsMenu: React.FC = _ => {
 
     <Tooltip title="Settings">
       <IconButton
-        sx={{ mx: -0.75 }} 
+        sx={{ 
+          mx: -0.75, 
+          zIndex: (theme) => theme.zIndex.modal + 1 }} // allows the button to be clickable even when the menu is open
         size="large"
-        onClick={onOpen}
-        aria-controls="settings-menu"
-        aria-haspopup="true"
+        onClick={onToggleOpen}
       >
         <SettingsIcon />
       </IconButton>
     </Tooltip>
 
     <Menu
-      id="settings-menu"
+      disablePortal={true}
       anchorEl={anchorEl}
       open={Boolean(anchorEl)}
-      onClose={onClose}
-      transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-      anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+
+      onClose={(_event, reason) => {
+        // ignore backdrop clicks; only close via icon toggle or explicit handlers (e.g. ESC key)
+        //   this way leaving menu open also becomes an edit mode for the labels side panel (and anything else that comes up like that)
+        if ((reason as string) !== 'backdropClick') onClose();
+      }}
+
     >
       <Box px={2} py={1}>
         <Typography variant="subtitle1">Settings</Typography>
@@ -103,7 +112,7 @@ const SettingsMenu: React.FC = _ => {
 
       <MenuItem
         onClick={onToggleDarkMode} // it seems nice to have the whole menu item clickable versus needing to click the toggle widget specifically
-        sx={{ justifyContent: 'space-between'}}
+        sx={{ justifyContent: 'space-between' }}
       >
         <Box display="flex" alignItems="center">
           <ListItemIcon>
@@ -116,14 +125,14 @@ const SettingsMenu: React.FC = _ => {
 
       <Divider sx={{ my: 0, minHeight: 0 }} />
 
-      <MenuItem sx={{ flexDirection: 'column', alignItems: 'flex-start'}}>
+      <MenuItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
         <Box display="flex"  >
           <ListItemIcon >
             <ViewComfyIcon color="primary" />
           </ListItemIcon>
           <ListItemText primary="Email List Density" />
         </Box>
-        
+
         <RadioGroup
           aria-label="density"
           name="density"
@@ -158,7 +167,7 @@ const SettingsMenu: React.FC = _ => {
         <ListItemText>Un-Ignore All Warnings</ListItemText>
       </MenuItem> */}
 
-      <MenuItem onClick={()=>toast.info("fresh toast!")}>Toast Test</MenuItem>
+      <MenuItem onClick={() => toast.info("fresh toast!")}>Toast Test</MenuItem>
 
     </Menu>
   </>;

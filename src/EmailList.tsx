@@ -3,11 +3,11 @@ import { Box, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useApiDataCache } from './ctxApiDataCache';
+import { useApiDataCache } from './services/ctxApiDataCache';
 import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
-import { GMessage } from './gMailApi';
+import { GMessage } from './services/gMailApi';
 
 const emailRowHeight = 26;
 
