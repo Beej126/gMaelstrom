@@ -82,7 +82,8 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
   const labelCollection = useXCollectionState<string, ExtendedLabel, string>(
     "id", 
-    "displayName", 
+    // sort function: take customized sort first, otherwise sort by name with system labels up top
+    label => ("000" + (label.sortNum ?? 0)).slice(-4) + "~" + (label.isSystem ? "0" : "1") + "~" + label.displayName.toLowerCase(), 
     label => label.isVisible, 
     !settingsEditMode
 );
