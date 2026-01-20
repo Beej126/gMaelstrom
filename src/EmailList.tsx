@@ -79,7 +79,7 @@ const EmailList: React.FC = _ => {
       headerName: 'Labels',
       minWidth: 120,
       valueGetter: (_unused: never, row: GridRowModel) => {
-        return row.labelIds?.map((labelId: string) => cache.labels?.get(labelId)?.displayName).sort().join(', ');
+        return row.labelIds?.map((labelId: string) => cache.labels.byId(labelId)?.displayName).sort().join(', ');
       },
       resizable: true
     }

@@ -25,10 +25,11 @@ const LabelsSidePanel: React.FC = () => {
 
   //select the first label if none already selected
   useEffect(() => {
-    if (!cache.selectedLabelId && cache.labels) {
-      cache.setSelectedLabelId(cache.labels.sortedValues[0].id);
+    if (!cache.selectedLabelId && !!cache.labels.sortedFiltered.length) {
+      cache.setSelectedLabelId(cache.labels.sortedFiltered[0].id);
     }
-  }, [cache.selectedLabelId, cache.labels, cache]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cache.selectedLabelId, cache.labels.sortedFiltered]);
 
 
   return (
@@ -62,7 +63,7 @@ const LabelsSidePanel: React.FC = () => {
 
       <List component="nav" dense aria-label="mail categories" sx={{ py: 0, overflowY: 'auto', overflowX: 'hidden', flex: 1, WebkitOverflowScrolling: 'touch' }}>
 
-        {cache.labels?.sortedValues.map(label =>
+        {cache.labels?.sortedFiltered.map(label =>
 
           <ListItemButton
             dense
@@ -77,7 +78,7 @@ const LabelsSidePanel: React.FC = () => {
               </Box>
             </ListItemIcon>
 
-            {cache.labelSettingsEditMode && label.type === 'system' && (
+            {cache.labelSettingsEditMode && label.isSystem && (
               <Box sx={{ borderRadius: '50%', mt: "-3px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
             )}
 
@@ -114,7 +115,9 @@ const LabelsSidePanel: React.FC = () => {
                 }}
                 size="small"
                 checked={label.isVisible}
-                onChange={(e) => cache.patchLabelItem(label.id, { isVisible: e.target.checked })}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => cache.labels.patchLabelItem(label, { isVisible: e.target.checked })}
                 inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
               />
             )}

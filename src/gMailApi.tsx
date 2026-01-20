@@ -7,7 +7,7 @@ import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only ty
 import { StrictRequired } from './helpers/typeHelpers';
 
 // extend some base gmail API types to make some fields required that we always expect to be present so callers don't need to be littered with unecessary undefined checks to avoid lint errors
-type GLabelVisibility = 'labelShow' | 'labelShowIfUnread' | 'labelHide';
+type GLabelVisibility = 'labelShow' | 'labelShowIfUnread' | 'labelHide' | undefined;
 type GLabelType = "system" | "user";
 export type GLabel = StrictRequired<Pick<gmail_v1.Schema$Label, 'id' | 'name'>> & { type: GLabelType; labelListVisibility: GLabelVisibility };// & gapi.client.gmail.Label;
 
@@ -102,8 +102,8 @@ export const getApiAttachmentData = (messageId: string, attachmentId: string) =>
 const getApiLabels = () => gApiFetchJson<{ labels: GLabel[] }>('labels').then(resp => resp.labels);
 
 // docs: https://developers.google.com/gmail/api/reference/rest/v1/users.labels/patch
-export const setApiLabelVisibility = async (labelId: string, visible: boolean) => {
-  return gApiFetchJson<void>(`labels/${labelId}`, "PATCH", { labelListVisibility: visible ? 'labelShow' : 'labelHide' } satisfies Partial<GLabel>);
+export const setApiLabelVisibility = async (labelId: string, labelListVisibility: GLabelVisibility) => {
+  return gApiFetchJson<void>(`labels/${labelId}`, "PATCH", { labelListVisibility } satisfies Partial<GLabel>);
 };
 
 
@@ -131,7 +131,7 @@ const inflightFetches = new Map<string, Promise<any>>();
  * @param parms converted to `URLSearchParams` for GET requests or request body for POST
  * @param token optional bearer token to use instead of the default authed user
  */
-export const gApiFetchJson = async <T>(
+export const gApiFetchJson = async <T,>(
   endpoint: string,
   method: "GET" | "POST" | "PATCH" = "GET",
   parms?: object,
@@ -168,7 +168,7 @@ export const gApiFetchJson = async <T>(
         // if unauthorized, attempt *once* to get a fresh token and retry
         if (response.status === 401 && !token) { if (attempt === 1) continue; else throw new Error("Auth failed"); }
 
-        if (!response.ok) throw new Error(response.statusText);
+        if (!response.ok) throw new Error(response.statusText ? response.statusText : (await response.json()).error?.message);
 
         // Gmail batchModify returns 204 No Content which is ok
         if (response.status === 204) return null;
@@ -176,7 +176,7 @@ export const gApiFetchJson = async <T>(
         return response.json();
 
       } catch (ex) {
-        toast.error(`Error fetching GMail API '${endpoint}'${ex instanceof Error ? "\n" + ex.message : ""}`);
+        toast.error(<>GMail API: { endpoint } { ex instanceof Error ? <><br/><br/>{ex.message}</> : "" } </>);
         throw ex;
       }
     };

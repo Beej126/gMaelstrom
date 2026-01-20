@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import gMailApi, { GLabel, GMessage } from './gMailApi';
 import { SettingName } from './ctxSettings';
-import { getFromLocalStorage } from './helpers/browserStorage';
+import { getFromLocalStorage, saveToLocalStorage } from './helpers/browserStorage';
 import InboxIcon from '@mui/icons-material/Inbox';
 import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,7 +12,8 @@ import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from './helpers/emailParser';
 import { createContextBundle } from "./helpers/contextFactory";
-import { MultiIndex, useMultiIndexState } from './helpers/multiIndex';
+import { useXCollectionState } from './helpers/multiIndex';
+import { arrayToRecord } from './helpers/typeHelpers';
 
 
 export type ApiDataCacheType = {
@@ -33,8 +34,12 @@ export type ApiDataCacheType = {
   setCheckedMessageIds: (selection: GridRowSelectionModel) => void;
   markCheckedMessageIdsAsRead: (asRead: boolean) => void;
 
-  labels: MultiIndex<string, ExtendedLabel, string> | undefined;
-  patchLabelItem: (id: string, value: Partial<ExtendedLabel>) => void;
+  labels: {
+    sortedFiltered: ExtendedLabel[],
+    byId: (key: string | undefined) => ExtendedLabel | undefined,
+    patchLabelItem: (label: ExtendedLabel, value: Partial<ExtendedLabel>) => void
+  };
+
   labelSettingsEditMode: boolean;
   setLabelSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -75,11 +80,24 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
 
   const [labelSettingsEditMode, setLabelSettingsEditMode] = useState(false);
-  const [labels, initLabels, _setLabelItem, privatePatchLabelItem] = useMultiIndexState<string, ExtendedLabel, string>("displayName", label => label.isVisible, !labelSettingsEditMode);
-  const patchLabelItem = useCallback((id: string, patch: Partial<ExtendedLabel>) => {
-    privatePatchLabelItem(id, patch);
-    if (patch.isVisible !== undefined) gMailApi.setApiLabelVisibility(id, patch.isVisible);
-  }, [privatePatchLabelItem]);
+  const labelCollection = useXCollectionState<string, ExtendedLabel, string>("id", "displayName", label => label.isVisible, !labelSettingsEditMode);
+
+  const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
+    labelCollection.patchItem(existing, patch);
+
+    // save user label visibility settings to google backend so official gMail UI reflects changes as well
+    //   unfortunately google doesn't provide a public API to change visibility of system labels
+    if (patch.isVisible !== undefined) {
+
+      // save user level visibility changes to google backend
+      if (!existing.isSystem) gMailApi.setApiLabelVisibility(existing.id, patch.isVisible ? 'labelShow' : 'labelHide');
+
+      // save hidden system labels to local storage since those can't be saved to google backend
+      else saveToLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY,
+        arrayToRecord(labelCollection.sortedFiltered.filter(l => l.isSystem && !l.isVisible), "id", "isVisible")!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
@@ -90,10 +108,12 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
   // On mount, fetch Gmail labels and merge with visibility
   useEffect(() => {
-    gMailApi.getApiLabels().then(gmailLabels => initLabels(buildExtendedLabels(
-      gmailLabels,
-      getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
-    )));
+    gMailApi.getApiLabels().then(gmailLabels => {
+      labelCollection.setEntries(buildExtendedLabels(
+        gmailLabels,
+        getFromLocalStorage<Record<string, boolean>>(SettingName.LABEL_VISIBILITY) ?? {}
+      ));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -247,8 +267,8 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     setCheckedMessageIds,
     markCheckedMessageIdsAsRead,
 
-    labels,
-    patchLabelItem,
+    labels: { sortedFiltered: labelCollection.sortedFiltered, byId: labelCollection.byId, patchLabelItem },
+
     labelSettingsEditMode,
     setLabelSettingsEditMode,
 
@@ -272,16 +292,13 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
 
 };
 
+interface PersistedLabelSettings { sortNum: number, isVisible: boolean };
 
-export type ExtendedLabel = GLabel & {
+export type ExtendedLabel = Omit<GLabel, "labelListVisibility" | "type"> & PersistedLabelSettings & {
+  isSystem: boolean;
   displayName: string;
   icon?: React.ReactElement<typeof SvgIcon>;
-  sortNum: number;
-  isVisible: boolean;
 };
-
-
-
 
 
 const mainLabelIcons: Record<string, React.ReactElement<typeof SvgIcon>> = {
@@ -299,12 +316,23 @@ const buildLabelDisplayName = (labelRawName: string): string => {
   return displayName;
 };
 
-const buildExtendedLabels = (gLabels: GLabel[], labelOrder: Record<string, number>) =>
+const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolean>) =>
   // build array of [key, value] entries for BTree constructor
-  gLabels.map(l => [l.id, {
-    ...l,
-    displayName: buildLabelDisplayName(l.name),
-    icon: mainLabelIcons[l.id],
-    sortNum: labelOrder[l.id],
-    isVisible: l.labelListVisibility === undefined || !(l.labelListVisibility !== "labelShow"),
-  }] as [string, ExtendedLabel]);
+  gLabels.map(l => {
+    const isSystem = l.type === "system";;
+    const stored = storedVis[l.id];
+    const backend = l.labelListVisibility === undefined || !(l.labelListVisibility !== "labelShow");
+
+    return [l.id, {
+      id: l.id,
+      name: l.name,
+
+      displayName: buildLabelDisplayName(l.name),
+      icon: mainLabelIcons[l.id],
+
+      // sortNum: storedVis[l.id]?.sortNum,
+      isVisible: isSystem ? (stored ?? backend) : (backend ?? stored), //system labels don't update to googles backend so take anything from local storage first and vice versa
+      isSystem
+
+    }] as [string, ExtendedLabel];
+  });

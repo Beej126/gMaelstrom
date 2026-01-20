@@ -12,8 +12,18 @@ export function makeStringEnum<T extends string>(keys: T[]): { [K in T]: K } {
 export type EnumValue<T> = T[keyof T];
 
 
-export function arrayToRecord<T>(array: T[] | undefined, lookupPropertyName: string): { [key: string]: T } | undefined {
-    if (!array || !array.length) return undefined;
+export function arrayToRecord<T, K extends keyof T, V extends keyof T | undefined = undefined>(
+  array: T[] | undefined,
+  lookupPropertyName: K,
+  valuePropertyName?: V
+): Record<PropertyKey, V extends keyof T ? T[V] : T> | undefined {
+  if (!array || !array.length) return undefined;
 
-    return Object.assign({}, ...array.map(item => ({ [(item as Expando)[lookupPropertyName]]: item })));
+  return Object.assign(
+    {},
+    ...array.map(item => ({
+      [String(item[lookupPropertyName]) as PropertyKey]:
+        valuePropertyName ? item[valuePropertyName] : item
+    }))
+  );
 }

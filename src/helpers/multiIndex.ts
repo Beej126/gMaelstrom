@@ -2,64 +2,64 @@ import { useCallback, useState, useEffect } from "react";
 import BTree from "sorted-btree";
 
 
-export function useMultiIndexState<ID, V, SortKey>(
+export function useXCollectionState<ID, V, SortKey>(
+  indexKey: keyof V,
   sortKeyOrFn: keyof V | ((v: V) => SortKey),
   filter?: (v: V) => boolean,
   filterEnabled: boolean = true
-): [
-    MultiIndex<ID, V, SortKey> | undefined,
-    (entries: Array<[ID, V]>) => void,
-    (id: ID, value: V) => void,
-    (id: ID, patch: Partial<V>) => void
-  ] {
-  const [index, setIndex] = useState<MultiIndex<ID, V, SortKey> | undefined>(undefined);
+): {
+  sortedFiltered: V[],
+  byId: (key: ID | undefined) => V | undefined,
+  setEntries: (entries: Array<[ID, V]>) => void,
+  setItem: (id: ID, value: V) => void,
+  patchItem: (existing: V, patch: Partial<V>) => void
+} {
+  const [collection, setCollection] = useState<XCollection<ID, V, SortKey>>(new XCollection(sortKeyOrFn, [], filter, filterEnabled));
 
-  const initEntries = useCallback(
-    (entries: Array<[ID, V]>) => setIndex(new MultiIndex(sortKeyOrFn, entries, filter, filterEnabled)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  const setEntries = useCallback((entries: Array<[ID, V]>) => {
+    setCollection((prev) => {
+      prev.setEntries(entries);
+      return prev.bumpIdentity();
+    });
+  }, []);
 
-  const setItem = useCallback(
-    (id: ID, value: V) => {
-      if (!index) {
-        throw new Error("MultiIndex is not initialized");
-      }
 
-      index.delete(id);
-      index.insert(id, value);
+  const setItem = useCallback((id: ID, value: V) => {
+    setCollection((prev) => {
+      prev.delete(id, true);
+      prev.insert(id, value);
+      return prev.bumpIdentity();
+    });
+  }, []);
 
-      setIndex(index.bumpIdentity());
-    },
-    [index]
-  );
+  const patchItem = useCallback((existing: V, patch: Partial<V>) => {
+    if (!existing) return;
+    const id = existing[indexKey] as ID;
+    setItem(id, { ...existing, ...patch });
+  }, [indexKey, setItem]);
 
-  const patchItem = useCallback(
-    (id: ID, patch: Partial<V>) => {
-
-      const existing = index?.get(id);
-      if (!existing) return;
-
-      // delegate to setItem
-      setItem(id, { ...existing, ...patch });
-    },
-    [index, setItem]
-  );
 
   // When the external boolean changes, toggle the initial filter on the
   // MultiIndex instance (if present) and rebuild the snapshot.
   useEffect(() => {
-    if (index?.setFilterEnabled(filterEnabled)) setIndex(index.bumpIdentity());
-  }, [index, filterEnabled]);
-  
-  return [index, initEntries, setItem, patchItem];
+    if (collection?.setFilterEnabled(filterEnabled)) setCollection(collection.bumpIdentity());
+  }, [collection, filterEnabled]);
+
+
+  return {
+    sortedFiltered: collection.sortedValues,
+    byId: (key: ID | undefined) => collection.get(key),
+    setEntries,
+    setItem,
+    patchItem,
+  };
 };
 
 
 type KeyOf<T> = Extract<keyof T, string | number | symbol>;
 
-export class MultiIndex<ID, V, SortKey> {
-  private readonly byId: Map<ID, V>;
+export class XCollection<ID, V, SortKey> {
+  readonly byId: Map<ID, V>;
   private readonly bySort: BTree<SortKey, V>;
   private readonly sortKey: (value: V) => SortKey;
 
@@ -67,6 +67,7 @@ export class MultiIndex<ID, V, SortKey> {
    * contains the filtered snapshot; otherwise it contains the full sorted list.
    */
   readonly sortedValues: V[];
+
   // The originally-provided filter and a boolean that controls whether it is
   // currently applied. The active filter is computed from these two values
   // when rebuilding the snapshot.
@@ -79,27 +80,22 @@ export class MultiIndex<ID, V, SortKey> {
     filter?: (v: V) => boolean,
     filterEnabled: boolean = !!filter
   ) {
-    this.byId = new Map(entries);
+    this.byId = new Map();
 
     this.sortKey =
       typeof sortKeyOrFn === "function"
         ? sortKeyOrFn
         : (v: V) => v[sortKeyOrFn] as unknown as SortKey;
 
-    this.bySort = new BTree(
-      entries.map(([_id, value]) => [this.sortKey(value), value])
-    );
+    this.bySort = new BTree();
 
     // store the initial filter and whether it's enabled
     this.filter = filter;
     this.filterEnabled = filterEnabled;
     this.sortedValues = [];
-    const active = this.filterEnabled ? this.filter : undefined;
-    for (const [, value] of this.bySort.entries()) {
-      if (!active || active(value)) {
-        this.sortedValues.push(value);
-      }
-    }
+
+    // populate initial entries using shared logic
+    this.setEntries(entries);
   }
 
   private rebuildSortedArray() {
@@ -127,12 +123,30 @@ export class MultiIndex<ID, V, SortKey> {
     this.rebuildSortedArray();
   }
 
-  delete(id: ID): void {
+  delete(id: ID, postponeRebuild: boolean = false): void {
     const value = this.byId.get(id);
     if (value === undefined) return;
 
     this.byId.delete(id);
     this.bySort.delete(this.sortKey(value));
+    if (!postponeRebuild) this.rebuildSortedArray();
+  }
+
+  /** Replace the collection entries with the given array and rebuild. */
+  setEntries(entries: Array<[ID, V]>): void {
+    // clear existing maps/trees
+    this.byId.clear();
+    const existing = Array.from(this.bySort.entries());
+    for (const [k] of existing) {
+      this.bySort.delete(k);
+    }
+
+    // populate
+    for (const [id, value] of entries) {
+      this.byId.set(id, value);
+      this.bySort.set(this.sortKey(value), value);
+    }
+
     this.rebuildSortedArray();
   }
 

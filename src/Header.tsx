@@ -77,7 +77,7 @@ const Header: React.FC = () => {
     </Tooltip>
 
     <Typography variant="h6" component="div" sx={{ fontWeight: 600, ml: 1 }}>
-      {cache.labels?.get(cache.selectedLabelId)?.displayName}
+      {cache.labels.byId(cache.selectedLabelId)?.displayName}
     </Typography>
 
     <Tooltip title="Refresh email list">

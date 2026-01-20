@@ -25,7 +25,7 @@ export const useSettings = () => {
   return context;
 };
 
-export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'LABEL_ORDER'] as const]);
+export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'LABEL_VISIBILITY', 'LABEL_ORDER'] as const]);
 export type SettingNameType = EnumValue<typeof SettingName>;
 
 
