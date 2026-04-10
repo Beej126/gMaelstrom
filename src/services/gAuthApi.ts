@@ -15,16 +15,17 @@ import { StrictRequired } from "../helpers/typeHelpers";
 //     so it's nice not to be wondering whether i'm properly aligned with another library and
 //     provide my preferred auth function signature to the rest of the app
 //
-// FYI Google's minimalist "One Tap" auth flow is not used at all here...
-//   GMail API calls require a full OAuth access token that carries the authorized permissions of the APIs we want to call.
+// FYI Google's minimalist "One Tap" auth flow is intentionally not used at all in this project...
+//   I learned that One Tap only provides an "ID token", not enough to make Gmail API calls.
+//   GMail API calls require a full OAuth "access token" that carries the authorized permissions of the APIs we want to call.
 //     These permissions are requested via the "scopes" provided below in getToken().
-//   One Tap only provides an ID token, not enough to make Gmail API calls.
 //   The full access token is only provided by the full user consent popup flow,
 //      which displays as result of calling requestAccessToken() below.
-//   if interested, see old code in $/keep_scraps/gAuthApi-before_removing_one_tap.ts
+//   i do have working one-tap implemenation here before i became aware:
+//      $/keep_scraps/gAuthApi-before_removing_one_tap.ts
 
 
-
+//provide user state as a hook for typical auto-refresh react bindings
 export function useUser() {
     const [user, setUser] = useState<AuthedUser>();
     useEffect(() => { getAuthedUser().finally(() => setUser(authedUser!)); }, []);

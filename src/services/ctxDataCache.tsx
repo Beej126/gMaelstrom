@@ -16,7 +16,7 @@ import { useXCollectionState } from '../helpers/XCollection';
 import { arrayToRecord } from '../helpers/typeHelpers';
 
 
-export type ApiDataCacheType = {
+export type IDataCache = {
   loading: boolean;
   fetchMessages: (page: number, pageSize: number) => Promise<void>;
   messageHeadersCache: GMessage[];
@@ -55,11 +55,11 @@ export type ApiDataCacheType = {
   updatePageMessage: (email: GMessage) => void;
 };
 
-const { Provider: ApiDataCacheProvider, useCtx: useApiDataCache } = createContextBundle<ApiDataCacheType>();
+const { Provider: DataCacheProvider, useCtx: useDataCache } = createContextBundle<IDataCache>();
 
-export { useApiDataCache };
+export { useDataCache };
 
-export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [settingsEditMode, setSettingsEditMode] = useState(false);
@@ -83,28 +83,10 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
   const labelCollection = useXCollectionState<string, ExtendedLabel, string>(
     "id", 
     // sort function: take customized sort first, otherwise sort by name with system labels up top
-    label => ("000" + (label.sortNum ?? 0)).slice(-4) + "~" + (label.isSystem ? "0" : "1") + "~" + label.displayName.toLowerCase(), 
+    label => ("000" + (label.sortNum ?? 9999)).slice(-4) + "~" + (label.isSystem ? "0" : "1") + "~" + label.displayName.toLowerCase(), 
     label => label.isVisible, 
     !settingsEditMode
 );
-
-  const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
-    labelCollection.patchItem(existing, patch);
-
-    // save user label visibility settings to google backend so official gMail UI reflects changes as well
-    //   unfortunately google doesn't provide a public API to change visibility of *system* labels
-    //   nugget: actually there are *some* system labels that do survive the set visibility API call (e.g. Forums i think) but i just chose to consistently avoid them all
-    if (patch.isVisible !== undefined) {
-
-      // save user level visibility changes to google backend
-      if (!existing.isSystem) gMailApi.setApiLabelVisibility(existing.id, patch.isVisible ? 'labelShow' : 'labelHide');
-
-      // save hidden system labels to local storage since those can't be saved to google backend
-      else saveToLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY,
-        arrayToRecord(labelCollection.sortedFiltered.filter(l => l.isSystem && !l.isVisible), "id", "isVisible")!);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
@@ -132,6 +114,38 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     setTotalMessages(0);
     setCurrentPage(0);
   }, [selectedLabelId]);
+
+
+  const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
+    labelCollection.patchItem(existing, patch);
+
+    // save user label visibility settings to google backend so official gMail UI reflects changes as well
+    //   unfortunately google doesn't provide a public API to change visibility of *system* labels
+    //   nugget: actually there are *some* system labels that do survive the set visibility API call (e.g. Forums i think) but i just chose to consistently avoid them all
+    if (patch.isVisible !== undefined) {
+
+      // save user level visibility changes to google backend
+      if (!existing.isSystem) gMailApi.setApiLabelVisibility(existing.id, patch.isVisible ? 'labelShow' : 'labelHide');
+
+      // save hidden system labels to local storage since those can't be saved to google backend
+      else saveToLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY,
+        arrayToRecord(labelCollection.sortedFiltered.filter(l => l.isSystem && !l.isVisible), "id", "isVisible")!);
+    }
+
+    // persist sort order changes: merge single-item update into stored LABEL_ORDER map
+    else if (patch.sortNum !== undefined) {
+      const existingOrder = getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {};
+
+      // persist the one that was just moved...
+      existingOrder[existing.id] = patch.sortNum;
+
+      // and all the others that were previously stored
+      Object.keys(existingOrder).forEach(existingKey => existingOrder[existingKey] = (labelCollection.byId(existingKey)! as Expando).__$sortedIndex!);
+
+      saveToLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER, existingOrder);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const markCheckedMessageIdsAsRead = (/*asRead: boolean*/) => {
@@ -263,7 +277,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     setInlineAttachments(inlineAttachmentsMap);
   };
 
-  const value: ApiDataCacheType = {
+  const value: IDataCache = {
     loading,
     fetchMessages,
     messageHeadersCache,
@@ -275,6 +289,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     setCheckedMessageIds,
     markCheckedMessageIdsAsRead,
 
+    // don't give out the full labelCollection so internals aren't overly exposed
     labels: { sortedFiltered: labelCollection.sortedFiltered, byId: labelCollection.byId, patchLabelItem },
 
     settingsEditMode,
@@ -296,7 +311,7 @@ export const ApiDataCacheProviderComponent: React.FC<{ children: React.ReactNode
     setSelectedEmail
   };
 
-  return <ApiDataCacheProvider value={value}>{children}</ApiDataCacheProvider>;
+  return <DataCacheProvider value={value}>{children}</DataCacheProvider>;
 
 };
 

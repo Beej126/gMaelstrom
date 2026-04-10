@@ -23,7 +23,7 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import ForwardIcon from '@mui/icons-material/Forward';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarIcon from '@mui/icons-material/Star';
-import { useApiDataCache } from './services/ctxApiDataCache';
+import { useDataCache } from './services/ctxDataCache';
 // import { getEmailDetailsById, getApiThreadMessages as getEmailThread, getAttachmentData, markEmailIdsAsRead, GMessage } from './gMailApi';
 import {
   extractHtmlContent,
@@ -134,7 +134,7 @@ const getInitials = (name: string) => {
 
 const EmailDetail: React.FC = () => {
   const { emailId } = useParams<{ emailId: string }>();
-  const { selectedEmail, setSelectedEmail, updatePageMessage, getCachedMessageDetails } = useApiDataCache();
+  const { selectedEmail, setSelectedEmail, updatePageMessage, getCachedMessageDetails } = useDataCache();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [emailThread, setEmailThread] = useState<GMessage[]>([]);

@@ -17,7 +17,7 @@ import MenuProfile from './HeaderMenu_Profile';
 import MenuSettings from './HeaderMenu_Settings';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useApiDataCache } from './services/ctxApiDataCache';
+import { useDataCache } from './services/ctxDataCache';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -48,7 +48,7 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
 }));
 
 const Header: React.FC = () => {
-  const cache = useApiDataCache();
+  const cache = useDataCache();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   List,
   ListItemButton,
@@ -8,13 +9,14 @@ import {
   Badge,
   Checkbox,
 } from '@mui/material';
-import { useApiDataCache } from './services/ctxApiDataCache';
+import { useDataCache } from './services/ctxDataCache';
 import { isRead } from './helpers/emailParser';
 import { useResizableWidth } from './helpers/useResizableWidth';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
 const LabelsSidePanel: React.FC = () => {
 
-  const cache = useApiDataCache();
+  const cache = useDataCache();
 
   const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
@@ -38,22 +40,7 @@ const LabelsSidePanel: React.FC = () => {
         height: '100%', minHeight: 0,
         width: width, minWidth: width
       }}>
-      {/* <Box sx={{ position: 'absolute', top: -8, left: -6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-        <IconButton
-          aria-label="label settings"
-          size="small"
-          onClick={() => cache.setSettingsEditMode(prev => !prev)}
-          sx={{
-            opacity: cache.settingsEditMode ? 1 : 0.35,
-            transition: 'opacity 200ms ease',
-            bgcolor: cache.settingsEditMode ? 'action.selected' : 'transparent',
-            pointerEvents: 'auto',
-            '&:hover': { bgcolor: 'action.hover', opacity: 1 }
-          }}
-        >
-          <SettingsIcon fontSize={cache.settingsEditMode ? "large" : "small"} color={cache.settingsEditMode ? 'primary' : 'inherit'} />
-        </IconButton>
-      </Box> */}
+
 
       <Box
         onPointerDown={handleProps.onPointerDown}
@@ -65,78 +52,116 @@ const LabelsSidePanel: React.FC = () => {
         <Box sx={{ width: 2, height: 28, borderRadius: 1, bgcolor: 'text.secondary', opacity: 0.28 }} />
       </Box>
 
-      <List component="nav" dense aria-label="mail categories" 
-        sx={{ 
-          WebkitOverflowScrolling: 'touch',
-          flex: 1,
-          py: 0, 
-          overflowY: 'auto', 
-          overflowX: 'hidden'
-        }}>
+      <DragDropContext onDragEnd={(result: DropResult) => {
+        const { source, destination } = result;
+        if (!destination || source.index === destination.index) return;
 
-        {cache.labels?.sortedFiltered.map(label =>
+        const items = cache.labels.sortedFiltered;
+        const next = Array.from(items);
+        const [moved] = next.splice(source.index, 1);
+        next.splice(destination.index, 0, moved);
 
-          <ListItemButton
-            dense
-            key={label.id}
-            selected={cache.selectedLabelId === label.id}
-            onClick={() => cache.setSelectedLabelId(label.id)}
-            sx={{ px: 0 }}
-          >
-            <ListItemIcon sx={{ mt: "-3px", minWidth: 24, display: 'flex', justifyContent: 'center' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {label.icon}
-              </Box>
-            </ListItemIcon>
-
-            {cache.settingsEditMode && label.isSystem && (
-              <Box sx={{ borderRadius: '50%', mt: "-3px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
-            )}
-
-            <ListItemText primary={label.displayName}
-              slotProps={{
-                primary: {
-                  noWrap: true,
-                  fontWeight: 300,
-                  fontSize: "13.7px",
-                  lineHeight: 1.1,
-                  my: -0.4 // 'my' sets the vertical gap between labels
-                }
+        cache.labels.patchLabelItem(moved, { sortNum: destination.index });
+      }}>
+        <Droppable droppableId="labels-droppable">
+          {(provided) => (
+            <List
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              component="nav"
+              dense
+              aria-label="mail categories"
+              sx={{
+                WebkitOverflowScrolling: 'touch',
+                flex: 1,
+                py: 0,
+                overflowY: 'auto',
+                overflowX: 'hidden'
               }}
-            />
+            >
+              {cache.labels?.sortedFiltered.map((label, index) => (
+                <Draggable key={label.id} draggableId={String(label.id)} index={index} isDragDisabled={!cache.settingsEditMode}>
+                  {(providedDraggable, snapshot) => (
+                    <div
+                      ref={providedDraggable.innerRef}
+                      {...providedDraggable.draggableProps}
+                    >
+                      <ListItemButton
+                        dense
+                        selected={cache.selectedLabelId === label.id}
+                        onClick={() => cache.setSelectedLabelId(label.id)}
+                        sx={{ px: 0 }}
+                      >
+                        <ListItemIcon sx={{ mt: "-3px", minWidth: 24, display: 'flex', justifyContent: 'center' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {label.icon}
+                          </Box>
+                        </ListItemIcon>
 
-            {getUnreadCount(label.id) > 0 && (
-              <Badge
-                badgeContent={getUnreadCount(label.id)}
-                color="primary"
-                sx={{ ml: 0.5 }}
-              />
-            )}
+                        {/* Drag handle - visible in edit mode */}
+                        {cache.settingsEditMode && (
+                          <Box
+                            {...providedDraggable.dragHandleProps}
+                            sx={{ zIndex: 1, display: 'flex', alignItems: 'center', mt: "-3px", py: 0, color: 'text.secondary', cursor: snapshot.isDragging ? 'grabbing' : 'grab' }}
+                          >
+                            <DragIndicatorIcon sx={{ fontSize: 13.7 }} />
+                          </Box>
+                        )}
 
-            {cache.settingsEditMode && (
-              <Checkbox
-                sx={{
-                  // alignSelf: 'center',
-                  p: 0, // remove Checkbox padding
-                  mr: 0.5,
-                  '& .MuiSvgIcon-root': {
-                    height: '15px', // 15px is approximately equal to label font size 13.7px + lineHeight 1.1 set above
-                    // transform: 'scale(1.2)', // use >1 to enlarge the glyph inside the svg if it has internal whitespace
-                  }
-                }}
-                size="small"
-                checked={label.isVisible}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onChange={(e) => cache.labels.patchLabelItem(label, { isVisible: e.target.checked })}
-                inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
-              />
-            )}
+                        {cache.settingsEditMode && label.isSystem && (
+                          <Box sx={{ height: "15px", fontSize: 11, borderRadius: '50%', mt: "-4px", mr: "5px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
+                        )}
 
-          </ListItemButton>
-        )}
+                        <ListItemText primary={label.displayName}
+                          slotProps={{
+                            primary: {
+                              noWrap: true,
+                              fontWeight: 300,
+                              fontSize: 13.7,
+                              lineHeight: 1.1,
+                              my: -0.4 // 'my' sets the vertical gap between labels
+                            }
+                          }}
+                        />
 
-      </List>
+                        {getUnreadCount(label.id) > 0 && (
+                          <Badge
+                            badgeContent={getUnreadCount(label.id)}
+                            color="primary"
+                            sx={{ ml: 0.5 }}
+                          />
+                        )}
+
+                        {cache.settingsEditMode && (
+                          <Checkbox
+                            sx={{
+                              // alignSelf: 'center',
+                              p: 0, // remove Checkbox padding
+                              mr: 0.5,
+                              '& .MuiSvgIcon-root': {
+                                height: '15px', // 15px is approximately equal to label font size 13.7px + lineHeight 1.1 set above
+                                // transform: 'scale(1.2)', // use >1 to enlarge the glyph inside the svg if it has internal whitespace
+                              }
+                            }}
+                            size="small"
+                            checked={label.isVisible}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onChange={(e) => cache.labels.patchLabelItem(label, { isVisible: e.target.checked })}
+                            inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
+                          />
+                        )}
+
+                      </ListItemButton>
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </List>
+          )}
+        </Droppable>
+      </DragDropContext>
     </Box>
   );
 };

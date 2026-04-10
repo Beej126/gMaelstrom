@@ -21,12 +21,12 @@ import ForumIcon from '@mui/icons-material/Forum';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useSettings } from './services/ctxSettings';
 import { toast } from 'react-toastify';
-import { useApiDataCache } from './services/ctxApiDataCache';
+import { useDataCache } from './services/ctxDataCache';
 
 
 const SettingsMenu: React.FC = _ => {
 
-  const cache = useApiDataCache();
+  const cache = useDataCache();
   const settings = useSettings();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 

@@ -101,8 +101,11 @@ export class XCollection<ID, V, SortKey> {
   private rebuildSortedArray() {
     this.sortedValues.length = 0;
     const active = this.filterEnabled ? this.filter : undefined;
+    let index = 0;
     for (const [, value] of this.bySort.entries()) {
       if (!active || active(value)) {
+        const v = (value as Expando);
+        if (v.sortNum !== undefined) v.sortNum = index++;
         this.sortedValues.push(value);
       }
     }

@@ -144,7 +144,8 @@ export const gApiFetchJson = async <T,>(
   const existingFetch = inflightFetches.get(endpoint);
   if (existingFetch) return existingFetch;
 
-  // allow full url passed from gAuthApi, otherwise assume just a tail end gmail api endpoint passed in needs to be prefixed with the base url (e.g. "messages")
+  // allow full url passed in from gAuthApi which has different root url
+  // otherwise prefix with gmail api base url for majority of calls that just pass in endpoint "tails" 
   const url = (endpoint.toLowerCase().startsWith('http') ? '' : GMAIL_API_BASE_URL) + endpoint
     + (parms && method === "GET" ? "?" + new URLSearchParams(parms as Record<string, string>).toString() : "");
 

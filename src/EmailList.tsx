@@ -3,7 +3,7 @@ import { Box, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { useApiDataCache } from './services/ctxApiDataCache';
+import { useDataCache } from './services/ctxDataCache';
 import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
@@ -13,7 +13,7 @@ const emailRowHeight = 26;
 
 const EmailList: React.FC = _ => {
 
-  const cache = useApiDataCache();
+  const cache = useDataCache();
   const navigate = useNavigate();
   const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
 
