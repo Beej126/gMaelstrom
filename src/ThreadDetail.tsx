@@ -64,6 +64,22 @@ type AttachmentState = {
   error?: string;
 };
 
+type OpenThreadAttachmentViewer = {
+  id: string;
+  attachment: ThreadAttachment;
+  initialPosition: { x: number; y: number };
+};
+
+const bringViewerToFront = <T extends { id: string }>(viewers: T[], viewerId: string): T[] => {
+  const viewerIndex = viewers.findIndex(viewer => viewer.id === viewerId);
+  if (viewerIndex < 0 || viewerIndex === viewers.length - 1) return viewers;
+
+  const nextViewers = [...viewers];
+  const [viewer] = nextViewers.splice(viewerIndex, 1);
+  nextViewers.push(viewer);
+  return nextViewers;
+};
+
 interface AttachmentChipRowProps {
   attachments: ThreadAttachment[];
   onAttachmentClick: (attachment: ThreadAttachment) => Promise<void>;
@@ -357,8 +373,7 @@ const ThreadDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<GMessage[]>([]);
   const [attachmentState, setAttachmentState] = useState<Record<string, AttachmentState>>({});
-  const [viewingAttachment, setViewingAttachment] = useState<ThreadAttachment | null>(null);
-  const [viewerOpen, setViewerOpen] = useState(false);
+  const [openViewers, setOpenViewers] = useState<OpenThreadAttachmentViewer[]>([]);
   const autoMarkedThreadIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -502,17 +517,29 @@ const ThreadDetail: React.FC = () => {
   const handleThreadAttachmentClick = useCallback(async (attachment: ThreadAttachment) => {
     if (getAttachmentPreviewKind(attachment) !== 'unsupported') {
       await fetchAttachmentData(attachment);
-      setViewingAttachment(attachment);
-      setViewerOpen(true);
+      setOpenViewers(previous => ([
+        ...previous,
+        {
+          id: `${attachment.key}:${Date.now()}`,
+          attachment,
+          initialPosition: {
+            x: 24 * previous.length,
+            y: 24 * previous.length,
+          },
+        },
+      ]));
       return;
     }
 
     await handleDownload(attachment);
   }, [fetchAttachmentData, handleDownload]);
 
-  const handleCloseViewer = useCallback(() => {
-    setViewerOpen(false);
-    setViewingAttachment(null);
+  const handleCloseViewer = useCallback((viewerId: string) => {
+    setOpenViewers(previous => previous.filter(viewer => viewer.id !== viewerId));
+  }, []);
+
+  const handleActivateViewer = useCallback((viewerId: string) => {
+    setOpenViewers(previous => bringViewerToFront(previous, viewerId));
   }, []);
 
   const handleToggleRead = async () => {
@@ -702,15 +729,19 @@ const ThreadDetail: React.FC = () => {
             </Box>
           </Paper>
 
-          {viewingAttachment && (
+          {openViewers.map(viewer => (
             <AttachmentViewer
-              open={viewerOpen}
-              onClose={handleCloseViewer}
-              attachment={viewingAttachment}
-              attachmentData={attachmentState[viewingAttachment.key]?.data}
-              onDownload={() => void handleDownload(viewingAttachment)}
+              key={viewer.id}
+              open={true}
+              onClose={() => handleCloseViewer(viewer.id)}
+              onActivate={() => handleActivateViewer(viewer.id)}
+              attachment={viewer.attachment}
+              attachmentData={attachmentState[viewer.attachment.key]?.data}
+              onDownload={() => void handleDownload(viewer.attachment)}
+              initialPosition={viewer.initialPosition}
+              zIndex={1300 + openViewers.findIndex(openViewer => openViewer.id === viewer.id)}
             />
-          )}
+          ))}
         </Box>
       </div>
     </Box>

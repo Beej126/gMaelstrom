@@ -40,11 +40,26 @@ interface AttachmentState {
   };
 }
 
+type OpenAttachmentViewerEntry = {
+  id: string;
+  attachment: Attachment;
+  initialPosition: { x: number; y: number };
+};
+
+const bringViewerToFront = <T extends { id: string }>(viewers: T[], viewerId: string): T[] => {
+  const viewerIndex = viewers.findIndex(viewer => viewer.id === viewerId);
+  if (viewerIndex < 0 || viewerIndex === viewers.length - 1) return viewers;
+
+  const nextViewers = [...viewers];
+  const [viewer] = nextViewers.splice(viewerIndex, 1);
+  nextViewers.push(viewer);
+  return nextViewers;
+};
+
 const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments }) => {
   const theme = useTheme();
   const [attachmentState, setAttachmentState] = useState<AttachmentState>({});
-  const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
-  const [viewerOpen, setViewerOpen] = useState(false);
+  const [openViewers, setOpenViewers] = useState<OpenAttachmentViewerEntry[]>([]);
 
   // Skip rendering if no attachments are available
   if (!attachments || attachments.length === 0) {
@@ -56,8 +71,17 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
   const handleAttachmentClick = async (attachment: Attachment) => {
     if (canPreview(attachment)) {
       await fetchAttachmentData(attachment);
-      setViewingAttachment(attachment);
-      setViewerOpen(true);
+      setOpenViewers(previous => ([
+        ...previous,
+        {
+          id: `${attachment.id}:${Date.now()}`,
+          attachment,
+          initialPosition: {
+            x: 24 * previous.length,
+            y: 24 * previous.length,
+          },
+        },
+      ]));
     } else {
       void handleDownload(attachment);
     }
@@ -160,9 +184,12 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
     }, 100);
   };
 
-  const handleCloseViewer = () => {
-    setViewerOpen(false);
-    setViewingAttachment(null);
+  const handleCloseViewer = (viewerId: string) => {
+    setOpenViewers(previous => previous.filter(viewer => viewer.id !== viewerId));
+  };
+
+  const handleActivateViewer = (viewerId: string) => {
+    setOpenViewers(previous => bringViewerToFront(previous, viewerId));
   };
 
   const getFileIcon = (mimeType: string) => {
@@ -272,15 +299,19 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
       </Paper>
 
       {/* PDF Viewer Modal */}
-      {viewingAttachment && (
+      {openViewers.map(viewer => (
         <AttachmentViewer
-          open={viewerOpen}
-          onClose={handleCloseViewer}
-          attachment={viewingAttachment}
-          attachmentData={attachmentState[viewingAttachment.id]?.data}
-          onDownload={() => void handleDownload(viewingAttachment)}
+          key={viewer.id}
+          open={true}
+          onClose={() => handleCloseViewer(viewer.id)}
+          onActivate={() => handleActivateViewer(viewer.id)}
+          attachment={viewer.attachment}
+          attachmentData={attachmentState[viewer.attachment.id]?.data}
+          onDownload={() => void handleDownload(viewer.attachment)}
+          initialPosition={viewer.initialPosition}
+          zIndex={1300 + openViewers.findIndex(openViewer => openViewer.id === viewer.id)}
         />
-      )}
+      ))}
     </>
   );
 };

@@ -64,9 +64,10 @@ export const normalizeBase64Data = (data: string): string => {
   return sanitized + padding;
 };
 
+const decodeBase64BinaryString = (data: string): string => atob(normalizeBase64Data(data));
+
 export const decodeBase64ToBytes = (data: string): Uint8Array => {
-  const base64 = normalizeBase64Data(data);
-  const binary = atob(base64);
+  const binary = decodeBase64BinaryString(data);
   const bytes = new Uint8Array(binary.length);
 
   for (let index = 0; index < binary.length; index++) {
@@ -76,11 +77,55 @@ export const decodeBase64ToBytes = (data: string): Uint8Array => {
   return bytes;
 };
 
-export const decodeBase64ToArrayBuffer = (data: string): ArrayBuffer => {
-  const bytes = decodeBase64ToBytes(data);
+export const bytesToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
   const buffer = new ArrayBuffer(bytes.length);
   new Uint8Array(buffer).set(bytes);
   return buffer;
+};
+
+export const decodeBase64ToArrayBuffer = (data: string): ArrayBuffer => {
+  return bytesToArrayBuffer(decodeBase64ToBytes(data));
+};
+
+const countMatchingBytes = (bytes: Uint8Array, startIndex: number, expectedValue: number): number => {
+  let matches = 0;
+
+  for (let index = startIndex; index < bytes.length; index += 2) {
+    if (bytes[index] === expectedValue) {
+      matches += 1;
+    }
+  }
+
+  return matches;
+};
+
+const stripBom = (text: string): string => text.replace(/^\uFEFF/, '');
+
+export const decodeTextBytes = (bytes: Uint8Array): string => {
+  if (bytes.length >= 2) {
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return stripBom(new TextDecoder('utf-16le', { fatal: false }).decode(bytes));
+    }
+
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return stripBom(new TextDecoder('utf-16be', { fatal: false }).decode(bytes));
+    }
+  }
+
+  if (bytes.length >= 4) {
+    const evenNullRatio = countMatchingBytes(bytes, 0, 0) / Math.ceil(bytes.length / 2);
+    const oddNullRatio = countMatchingBytes(bytes, 1, 0) / Math.max(Math.floor(bytes.length / 2), 1);
+
+    if (oddNullRatio > 0.3 && evenNullRatio < 0.1) {
+      return stripBom(new TextDecoder('utf-16le', { fatal: false }).decode(bytes));
+    }
+
+    if (evenNullRatio > 0.3 && oddNullRatio < 0.1) {
+      return stripBom(new TextDecoder('utf-16be', { fatal: false }).decode(bytes));
+    }
+  }
+
+  return stripBom(new TextDecoder('utf-8', { fatal: false }).decode(bytes));
 };
 
 // Helper function to decode base64 content
@@ -100,7 +145,7 @@ export const decodeBase64 = (data: string): string => {
   } catch {
     try {
       // Second attempt: decode directly
-      const decoded = atob(base64);
+      const decoded = decodeBase64BinaryString(data);
       
       // Check for charset specification in the content
       const charsetMatch = decoded.match(/charset=["']?([^"'>\s]+)/i);
@@ -649,7 +694,7 @@ export const replaceInlineAttachments = async (
 // Helper to guess MIME type from base64 data
 const guessMimeType = (base64Data: string): string => {
   // Look at the first few characters to determine file type
-  const firstChars = atob(normalizeBase64Data(base64Data).substring(0, 12));
+  const firstChars = decodeBase64BinaryString(base64Data).substring(0, 12);
   
   // Check for common image file signatures
   if (firstChars.startsWith('\xFF\xD8')) return 'image/jpeg';

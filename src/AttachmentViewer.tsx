@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Close as CloseIcon, Download as DownloadIcon } from '@mui/icons-material';
-import { Attachment, decodeBase64ToArrayBuffer, decodeBase64ToBytes } from './helpers/emailParser';
+import { Attachment, bytesToArrayBuffer, decodeBase64ToBytes, decodeTextBytes } from './helpers/emailParser';
 
 interface AttachmentViewerProps {
   open: boolean;
@@ -18,6 +18,9 @@ interface AttachmentViewerProps {
   attachment: Attachment;
   attachmentData?: string;
   onDownload: () => void;
+  initialPosition?: { x: number; y: number };
+  onActivate?: () => void;
+  zIndex?: number;
 }
 
 type DragState = {
@@ -26,47 +29,6 @@ type DragState = {
 };
 
 export type AttachmentPreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
-
-const countMatchingBytes = (bytes: Uint8Array, startIndex: number, expectedValue: number): number => {
-  let matches = 0;
-
-  for (let index = startIndex; index < bytes.length; index += 2) {
-    if (bytes[index] === expectedValue) {
-      matches += 1;
-    }
-  }
-
-  return matches;
-};
-
-const stripBom = (text: string): string => text.replace(/^\uFEFF/, '');
-
-const decodeTextAttachment = (bytes: Uint8Array): string => {
-  if (bytes.length >= 2) {
-    if (bytes[0] === 0xff && bytes[1] === 0xfe) {
-      return stripBom(new TextDecoder('utf-16le', { fatal: false }).decode(bytes));
-    }
-
-    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
-      return stripBom(new TextDecoder('utf-16be', { fatal: false }).decode(bytes));
-    }
-  }
-
-  if (bytes.length >= 4) {
-    const evenNullRatio = countMatchingBytes(bytes, 0, 0) / Math.ceil(bytes.length / 2);
-    const oddNullRatio = countMatchingBytes(bytes, 1, 0) / Math.max(Math.floor(bytes.length / 2), 1);
-
-    if (oddNullRatio > 0.3 && evenNullRatio < 0.1) {
-      return stripBom(new TextDecoder('utf-16le', { fatal: false }).decode(bytes));
-    }
-
-    if (evenNullRatio > 0.3 && oddNullRatio < 0.1) {
-      return stripBom(new TextDecoder('utf-16be', { fatal: false }).decode(bytes));
-    }
-  }
-
-  return stripBom(new TextDecoder('utf-8', { fatal: false }).decode(bytes));
-};
 
 export const getAttachmentPreviewKind = (attachment: Attachment): AttachmentPreviewKind => {
   const mimeType = attachment.mimeType?.toLowerCase() ?? '';
@@ -84,22 +46,25 @@ const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
   attachment,
   attachmentData,
   onDownload,
+  initialPosition = { x: 0, y: 0 },
+  onActivate,
+  zIndex,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string>('');
   const [dialogReady, setDialogReady] = useState(false);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState(initialPosition);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const previewKind = getAttachmentPreviewKind(attachment);
 
   useEffect(() => {
     if (!open) {
-      setDragPosition({ x: 0, y: 0 });
+      setDragPosition(initialPosition);
       setDragState(null);
     }
-  }, [open]);
+  }, [initialPosition, open]);
 
   useEffect(() => {
     if (!dragState) return;
@@ -152,21 +117,21 @@ const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
       const bytes = decodeBase64ToBytes(attachmentData);
 
       if (previewKind === 'pdf') {
-        const buffer = decodeBase64ToArrayBuffer(attachmentData);
+        const buffer = bytesToArrayBuffer(bytes);
         const blob = new Blob([buffer], { type: 'application/pdf' });
         setObjectUrl(URL.createObjectURL(blob));
         return;
       }
 
       if (previewKind === 'image') {
-        const buffer = decodeBase64ToArrayBuffer(attachmentData);
+        const buffer = bytesToArrayBuffer(bytes);
         const blob = new Blob([buffer], { type: attachment.mimeType || 'application/octet-stream' });
         setObjectUrl(URL.createObjectURL(blob));
         return;
       }
 
       if (previewKind === 'text') {
-        setTextContent(decodeTextAttachment(bytes));
+        setTextContent(decodeTextBytes(bytes));
         setLoading(false);
         return;
       }
@@ -189,6 +154,8 @@ const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
   const handleTitleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('button')) return;
 
+    onActivate?.();
+
     setDragState({
       pointerOffsetX: event.clientX - dragPosition.x,
       pointerOffsetY: event.clientY - dragPosition.y,
@@ -198,9 +165,14 @@ const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => {}}
+      onMouseDown={() => onActivate?.()}
       fullWidth
       maxWidth="lg"
+      hideBackdrop
+      disableEscapeKeyDown
+      disableEnforceFocus
+      disableRestoreFocus
       aria-labelledby="attachment-viewer-title"
       slotProps={{
         transition: {
@@ -209,7 +181,11 @@ const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
         },
       }}
       sx={{
+        zIndex,
+        pointerEvents: 'none',
         '& .MuiDialog-paper': {
+          pointerEvents: 'auto',
+          position: 'relative',
           height: '90vh',
           width: 'min(1200px, calc(100vw - 32px))',
           maxWidth: 'calc(100vw - 32px)',
