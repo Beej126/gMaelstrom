@@ -6,6 +6,8 @@ import {
   Tooltip,
   Button,
   Typography,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
@@ -54,8 +56,13 @@ const Header: React.FC = () => {
 
   const onRefreshEmails = async () => {
     setRefreshing(true);
-    await cache.fetchMessages(0, cache.pageSize);
+    await cache.refreshCurrentView();
     setRefreshing(false);
+  };
+
+  const onModeChange = (_event: React.MouseEvent<HTMLElement>, nextMode: 'threads' | 'messages' | null) => {
+    if (!nextMode) return;
+    cache.switchViewMode(nextMode);
   };
 
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,13 +101,13 @@ const Header: React.FC = () => {
         bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
       }}
     >
-      <Tooltip title="Mark Selected Emails as Read" disableInteractive>
+      <Tooltip title={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'} disableInteractive>
         <span>
           <IconButton
-            aria-label="Mark Selected Emails as Read"
+            aria-label={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}
             size="small"
-            onClick={() => cache.markCheckedMessageIdsAsRead(true)}
-            disabled={!cache.checkedMessageIds.ids.size}
+            onClick={() => cache.markCheckedRowIdsAsRead(true)}
+            disabled={!cache.checkedRowIds.ids.size}
           >
             <MarkEmailUnreadIcon />
           </IconButton>
@@ -115,6 +122,21 @@ const Header: React.FC = () => {
       startIcon={<CreateIcon />}
       onClick={onComposeClick}
     >Compose</Button>
+
+    <ToggleButtonGroup
+      exclusive
+      size="small"
+      value={cache.viewMode}
+      onChange={onModeChange}
+      sx={{ ml: 1.5, borderRadius: 2, overflow: 'hidden' }}
+    >
+      <ToggleButton value="messages" aria-label="Messages mode">
+        Messages
+      </ToggleButton>
+      <ToggleButton value="threads" aria-label="Threads mode">
+        Threads
+      </ToggleButton>
+    </ToggleButtonGroup>
 
     <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
       <Search>

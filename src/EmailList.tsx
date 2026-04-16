@@ -8,12 +8,14 @@ import { getFrom, getSubject, getDate, isRead } from './helpers/emailParser';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
 import { GMessage } from './services/gMailApi';
+import { useSettings } from './services/ctxSettings';
 
 const emailRowHeight = 26;
 
 const EmailList: React.FC = _ => {
 
   const cache = useDataCache();
+  const settings = useSettings();
   const navigate = useNavigate();
   const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
 
@@ -38,7 +40,8 @@ const EmailList: React.FC = _ => {
         <Typography
           variant="body2"
           sx={{
-            fontWeight: isRead(params.row) ? 300 : 700,
+            fontWeight: isRead(params.row) ? settings.listFontWeight : settings.listFontWeight + 400,
+            opacity: settings.listFontOpacity,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -83,11 +86,11 @@ const EmailList: React.FC = _ => {
       },
       resizable: true
     }
-  ], [cache]); //move dependencies into separate memos per event handler
+  ], [cache, settings.listFontOpacity, settings.listFontWeight]); //move dependencies into separate memos per event handler
 
 
   const onRowClick = useCallback((params: GridRowParams<GridRowModel>) => {
-    navigate(`/email/${params.row.id}`);
+    navigate(`/email/${params.row.id}?mode=messages`);
   }, [navigate]);
 
 
@@ -121,10 +124,11 @@ const EmailList: React.FC = _ => {
         columns={columns}
 
         checkboxSelection={true}
+        disableRowSelectionOnClick={true}
         //mui datagrid uses the .id property on the objects passed to rows as the unique row identifier
         //so it's convenient gmail messages already have an id property
-        rowSelectionModel={cache.checkedMessageIds}
-        onRowSelectionModelChange={cache.setCheckedMessageIds}
+        rowSelectionModel={cache.checkedRowIds}
+        onRowSelectionModelChange={cache.setCheckedRowIds}
 
         disableColumnFilter={true}
         sortingOrder={[]}
@@ -140,13 +144,39 @@ const EmailList: React.FC = _ => {
         pageSizeOptions={[cache.pageSize]}
 
         sx={{
-          '& .MuiDataGrid-columnHeaderTitle, & .MuiDataGrid-cell': { fontWeight: 300 },
+          '--DataGrid-checkboxSelectionColWidth': '26px',
+          '& .MuiDataGrid-columnHeaderTitle': {
+            fontWeight: settings.listFontWeight,
+            opacity: settings.listFontOpacity,
+          },
+          '& .MuiDataGrid-cell': { fontWeight: settings.listFontWeight },
+          '& .MuiDataGrid-cellContent': {
+            opacity: settings.listFontOpacity,
+          },
+          '& .MuiDataGrid-cellCheckbox, & .MuiDataGrid-columnHeaderCheckbox': {
+            px: 0,
+            width: 26,
+            minWidth: '26px !important',
+            maxWidth: '26px !important',
+          },
+          '& .MuiDataGrid-cellCheckbox .MuiCheckbox-root, & .MuiDataGrid-columnHeaderCheckbox .MuiCheckbox-root': {
+            p: 0,
+            m: 0,
+            opacity: 0.1,
+            transition: 'opacity 140ms ease-in-out',
+          },
+          '& .MuiDataGrid-row:hover .MuiDataGrid-cellCheckbox .MuiCheckbox-root, & .MuiDataGrid-cellCheckbox:hover .MuiCheckbox-root, & .MuiDataGrid-columnHeaderCheckbox:hover .MuiCheckbox-root': {
+            opacity: 1,
+          },
+          '& .MuiDataGrid-row': {
+            cursor: 'pointer',
+          },
           '& .MuiDataGrid-row.email-read': {
             backgroundColor: theme => theme.palette.background.default,
           },
           '& .MuiDataGrid-row.email-read.Mui-selected': {
             backgroundColor: theme => theme.palette.action.selected,
-          }
+          },
         }}
 
       />

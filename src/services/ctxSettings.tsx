@@ -13,6 +13,12 @@ interface SettingsContextType {
   density: DensityMode;
   setDensity: (density: DensityMode) => void;
 
+  listFontWeight: number;
+  setListFontWeight: (fontWeight: number) => void;
+
+  listFontOpacity: number;
+  setListFontOpacity: (opacity: number) => void;
+
   combineThreads: boolean;
   setCombineThreads: (combine: boolean) => void;
 }
@@ -25,7 +31,7 @@ export const useSettings = () => {
   return context;
 };
 
-export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'DARK_MODE', 'COMBINE_THREADS', 'SYSTEM_LABEL_VISIBILITY', 'LABEL_ORDER'] as const]);
+export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'LIST_FONT_WEIGHT', 'LIST_FONT_OPACITY', 'DARK_MODE', 'COMBINE_THREADS', 'SYSTEM_LABEL_VISIBILITY', 'LABEL_ORDER'] as const]);
 export type SettingNameType = EnumValue<typeof SettingName>;
 
 
@@ -36,6 +42,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
   const [density, setDensity] = useLocalStorageState<DensityMode, SettingNameType>(SettingName.EMAIL_LIST_DENSITY, "sparse");
+  const [listFontWeight, setListFontWeight] = useLocalStorageState<number, SettingNameType>(SettingName.LIST_FONT_WEIGHT, 200);
+  const [listFontOpacity, setListFontOpacity] = useLocalStorageState<number, SettingNameType>(SettingName.LIST_FONT_OPACITY, 1);
   const [combineThreads, setCombineThreads] = useLocalStorageState<boolean, SettingNameType>(SettingName.COMBINE_THREADS, true);
 
   return (
@@ -45,6 +53,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       density,
       setDensity,
+
+      listFontWeight,
+      setListFontWeight,
+
+      listFontOpacity,
+      setListFontOpacity,
 
       combineThreads,
       setCombineThreads,

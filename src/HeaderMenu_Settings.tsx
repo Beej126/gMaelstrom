@@ -11,6 +11,7 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  TextField,
   Tooltip,
   IconButton
 } from '@mui/material';
@@ -55,6 +56,18 @@ const SettingsMenu: React.FC = _ => {
   const onCombineThreadsChange = () => {
     settings.setCombineThreads(!settings.combineThreads);
     onClose();
+  };
+
+  const onListFontWeightChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = Number(event.target.value);
+    if (Number.isNaN(nextValue)) return;
+    settings.setListFontWeight(nextValue);
+  };
+
+  const onListFontOpacityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = Number(event.target.value);
+    if (Number.isNaN(nextValue)) return;
+    settings.setListFontOpacity(nextValue);
   };
 
   // const onUnignoreAllWarnings = () => {
@@ -160,6 +173,43 @@ const SettingsMenu: React.FC = _ => {
           <ListItemText>Combine Threads</ListItemText>
         </Box>
         <Switch checked={settings.combineThreads} onChange={onCombineThreadsChange} onClick={e => e.stopPropagation()} />
+      </MenuItem>
+
+      <Divider sx={{ my: 0, minHeight: 0 }} />
+
+      <MenuItem sx={{ justifyContent: 'space-between', gap: 2 }} onClick={e => e.stopPropagation()}>
+        <ListItemText primary="list font weight:" />
+        <Box display="flex" alignItems="center" gap={1}>
+          <TextField
+            type="number"
+            size="small"
+            value={settings.listFontWeight}
+            onChange={onListFontWeightChange}
+            onClick={e => e.stopPropagation()}
+            slotProps={{
+              htmlInput: {
+                step: 100,
+                min: 100,
+              },
+            }}
+            sx={{ width: 90 }}
+          />
+          <TextField
+            type="number"
+            size="small"
+            value={settings.listFontOpacity}
+            onChange={onListFontOpacityChange}
+            onClick={e => e.stopPropagation()}
+            slotProps={{
+              htmlInput: {
+                step: 0.1,
+                min: 0,
+                max: 1,
+              },
+            }}
+            sx={{ width: 78 }}
+          />
+        </Box>
       </MenuItem>
 
       <Divider sx={{ my: 0, minHeight: 0 }} />

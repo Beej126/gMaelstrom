@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import gMailApi, { GLabel, GMessage } from './gMailApi';
+import gMailApi, { GLabel, GMessage, GThread, GThreadHeader } from './gMailApi';
 import { SettingName } from './ctxSettings';
 import { getFromLocalStorage, saveToLocalStorage } from '../helpers/browserStorage';
 import InboxIcon from '@mui/icons-material/Inbox';
@@ -11,91 +11,147 @@ import StarOutlineIcon from '@mui/icons-material/StarOutline';
 import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from '../helpers/emailParser';
-import { createContextBundle } from "../helpers/contextFactory";
+import { createContextBundle } from '../helpers/contextFactory';
 import { useXCollectionState } from '../helpers/XCollection';
 import { arrayToRecord } from '../helpers/typeHelpers';
 
+export type ViewMode = 'threads' | 'messages';
 
 export type IDataCache = {
   loading: boolean;
-  fetchMessages: (page: number, pageSize: number) => Promise<void>;
+  viewMode: ViewMode;
+  switchViewMode: (nextMode: ViewMode) => void;
+  refreshCurrentView: () => Promise<void>;
+
+  fetchMessages: (page: number, pageSize: number, force?: boolean) => Promise<void>;
   messageHeadersCache: GMessage[];
   getCachedMessageDetails: (emailId: string) => Promise<GMessage>;
-  messageAttachments: Map<string, Attachment[]>;
-  inlineAttachments: Map<string, Record<string, InlineAttachment>>;
-  threadMessages: GMessage[];
-
   setCachedEmail: (email: GMessage) => void;
-
   selectedEmail: GMessage | null;
   setSelectedEmail: (email: GMessage | null) => void;
+  messageAttachments: Map<string, Attachment[]>;
+  inlineAttachments: Map<string, Record<string, InlineAttachment>>;
+  totalMessages: number;
+  currentPageMessages: GMessage[];
+  updatePageMessage: (email: GMessage) => void;
 
-  checkedMessageIds: GridRowSelectionModel;
-  setCheckedMessageIds: (selection: GridRowSelectionModel) => void;
-  markCheckedMessageIdsAsRead: (asRead: boolean) => void;
-
+  checkedRowIds: GridRowSelectionModel;
+  setCheckedRowIds: (selection: GridRowSelectionModel) => void;
+  markCheckedRowIdsAsRead: (asRead: boolean) => Promise<void>;
   labels: {
-    sortedFiltered: ExtendedLabel[],
-    byId: (key: string | undefined) => ExtendedLabel | undefined,
-    patchLabelItem: (label: ExtendedLabel, value: Partial<ExtendedLabel>) => void
+    sortedFiltered: ExtendedLabel[];
+    byId: (key: string | undefined) => ExtendedLabel | undefined;
+    patchLabelItem: (label: ExtendedLabel, value: Partial<ExtendedLabel>) => void;
   };
-
   settingsEditMode: boolean;
   setSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
-
   selectedLabelId: string | undefined;
   setSelectedLabelId: (labelId: string) => void;
-
-  totalMessages: number;
+  activeTotalRows: number;
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   pageSize: number;
-  setPageSize: React.Dispatch<React.SetStateAction<number>>;
-  currentPageMessages: GMessage[];
-  updatePageMessage: (email: GMessage) => void;
+  setPageSize: (pageSize: number) => void;
+
+  fetchThreads: (page: number, pageSize: number, force?: boolean) => Promise<void>;
+  threadHeadersCache: GThreadHeader[];
+  getCachedThreadMessages: (threadId: string) => Promise<GMessage[]>;
+  totalThreads: number;
+  currentPageThreads: GThreadHeader[];
+  updatePageThread: (threadId: string, patch: Partial<GThreadHeader>) => void;
 };
 
 const { Provider: DataCacheProvider, useCtx: useDataCache } = createContextBundle<IDataCache>();
 
 export { useDataCache };
 
-export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const createEmptySelection = (): GridRowSelectionModel => ({ type: 'include', ids: new Set() });
+const stalePagedRequest = Symbol('stalePagedRequest');
 
+type PagedRequestScope = {
+  isCurrent: () => boolean;
+  ensureCurrent: () => void;
+  commit: (action: () => void) => boolean;
+};
+
+const getInitialViewMode = (): ViewMode => {
+  const mode = new URLSearchParams(window.location.search).get('mode');
+  return mode === 'messages' ? 'messages' : 'threads';
+};
+
+const applyReadState = (message: GMessage, asRead: boolean): GMessage => ({
+  ...message,
+  labelIds: asRead
+    ? (message.labelIds ?? []).filter(labelId => labelId !== 'UNREAD')
+    : Array.from(new Set([...(message.labelIds ?? []), 'UNREAD'])),
+});
+
+const getSelectionIds = (selection: GridRowSelectionModel): string[] =>
+  selection.type === 'include' ? Array.from(selection.ids) as string[] : [];
+
+export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [settingsEditMode, setSettingsEditMode] = useState(false);
+  const [viewMode] = useState<ViewMode>(getInitialViewMode);
 
-  const [messageHeadersCache, setMessageHeadersCache] = useState<Array<GMessage>>([]);
+  const [messageHeadersCache, setMessageHeadersCache] = useState<GMessage[]>([]);
   const messageDetailsCache = useRef<Record<string, GMessage>>({});
-
-  const setCachedEmail = (email: GMessage) => messageDetailsCache.current[email.id!] = email;
-
+  const setCachedEmail = (email: GMessage) => {
+    messageDetailsCache.current[email.id] = email;
+  };
   const [selectedEmail, setSelectedEmail] = useState<GMessage | null>(null);
-
-  // Gmail API uses pageToken, so we track tokens for each page
-  const [pageTokens, setPageTokens] = useState<Array<string | null>>([null]);
-  const [totalMessages, setTotalMessages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(-1);
-
-  // kindof a stretch to bring MUI type in here
-  const [checkedMessageIds, setCheckedMessageIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
-
-  const labelCollection = useXCollectionState<string, ExtendedLabel, string>(
-    "id", 
-    // sort function: take customized sort first, otherwise sort by name with system labels up top
-    label => ("000" + (label.sortNum ?? 9999)).slice(-4) + "~" + (label.isSystem ? "0" : "1") + "~" + label.displayName.toLowerCase(), 
-    label => label.isVisible, 
-    !settingsEditMode
-);
-
-  const [selectedLabelId, setSelectedLabelId] = useState<string>();
 
   const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
 
-  const [threadMessages, _setThreadMessages] = useState<GMessage[]>([]);
+  // Gmail API uses pageToken, so we track tokens for each page separately for message and thread mode.
+  const [messagePageTokens, setMessagePageTokens] = useState<Array<string | null>>([null]);
+  const [totalMessages, setTotalMessages] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [pageSize, setPageSizeState] = useState<number>(-1);
 
-  // On mount, fetch Gmail labels and merge with visibility
+  const [threadRefsCache, setThreadRefsCache] = useState<GThread[]>([]);
+  const threadDetailsCache = useRef<Record<string, GMessage[]>>({});
+  const threadHeaderDetailsCache = useRef<Record<string, GThreadHeader>>({});
+  const inflightThreadHeaderIds = useRef<Set<string>>(new Set());
+  const [threadPageTokens, setThreadPageTokens] = useState<Array<string | null>>([null]);
+  const [totalThreads, setTotalThreads] = useState<number>(0);
+  const [threadHeaderCacheVersion, setThreadHeaderCacheVersion] = useState(0);
+
+  const inflightFetchKeys = useRef<Set<string>>(new Set());
+  const pagedViewVersion = useRef(0);
+
+  const createPagedRequestScope = useCallback((): PagedRequestScope => {
+    const requestVersion = pagedViewVersion.current;
+    const isCurrent = () => pagedViewVersion.current === requestVersion;
+
+    return {
+      isCurrent,
+      ensureCurrent: () => {
+        if (!isCurrent()) throw stalePagedRequest;
+      },
+      commit: (action: () => void) => {
+        if (!isCurrent()) return false;
+        action();
+        return true;
+      },
+    };
+  }, []);
+
+  // Kind of a stretch to bring MUI row-selection state in here, but this remains the shared list selection source.
+  const [checkedRowIds, setCheckedRowIds] = useState<GridRowSelectionModel>(createEmptySelection);
+
+  const labelCollection = useXCollectionState<string, ExtendedLabel, string>(
+    'id',
+    // Sort function: take customized sort first, otherwise sort by name with system labels up top.
+    label => ('000' + (label.sortNum ?? 9999)).slice(-4) + '~' + (label.isSystem ? '0' : '1') + '~' + label.displayName.toLowerCase(),
+    label => label.isVisible,
+    !settingsEditMode
+  );
+
+  const [selectedLabelId, setSelectedLabelIdState] = useState<string>();
+
+  // On mount, fetch Gmail labels and merge with persisted visibility/order preferences.
   useEffect(() => {
     gMailApi.getApiLabels().then(gmailLabels => {
       labelCollection.setEntries(buildExtendedLabels(
@@ -107,69 +163,138 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-  useEffect(() => {
+  const resetPagedViewState = useCallback(() => {
+    pagedViewVersion.current += 1;
+    inflightFetchKeys.current.clear();
     setMessageHeadersCache([]);
-    setPageTokens([null]);
+    setThreadRefsCache([]);
+    setMessagePageTokens([null]);
+    setThreadPageTokens([null]);
     setTotalMessages(0);
+    setTotalThreads(0);
     setCurrentPage(0);
-  }, [selectedLabelId]);
+    setCheckedRowIds(createEmptySelection());
+    setSelectedEmail(null);
+    threadHeaderDetailsCache.current = {};
+    inflightThreadHeaderIds.current.clear();
+    setThreadHeaderCacheVersion(version => version + 1);
+  }, []);
 
+  const setSelectedLabelId = useCallback((labelId: string) => {
+    if (labelId === selectedLabelId) return;
+    resetPagedViewState();
+    setSelectedLabelIdState(labelId);
+  }, [resetPagedViewState, selectedLabelId]);
+
+  const setPageSize = useCallback((nextPageSize: number) => {
+    if (pageSize === nextPageSize) return;
+
+    // Gmail page tokens are tied to the list query shape, so changing page size invalidates the token chain.
+    resetPagedViewState();
+    setPageSizeState(nextPageSize);
+  }, [pageSize, resetPagedViewState]);
 
   const patchLabelItem = useCallback((existing: ExtendedLabel, patch: Partial<ExtendedLabel>) => {
     labelCollection.patchItem(existing, patch);
 
-    // save user label visibility settings to google backend so official gMail UI reflects changes as well
-    //   unfortunately google doesn't provide a public API to change visibility of *system* labels
-    //   nugget: actually there are *some* system labels that do survive the set visibility API call (e.g. Forums i think) but i just chose to consistently avoid them all
     if (patch.isVisible !== undefined) {
-
-      // save user level visibility changes to google backend
+      // Save user label visibility changes to the Google backend so the official Gmail UI reflects them as well.
+      // Unfortunately Google doesn't provide a public API to change visibility of system labels.
+      // Nugget: some system labels do survive the set-visibility API call, but this code intentionally treats them consistently.
       if (!existing.isSystem) gMailApi.setApiLabelVisibility(existing.id, patch.isVisible ? 'labelShow' : 'labelHide');
 
-      // save hidden system labels to local storage since those can't be saved to google backend
+      // Save hidden system labels to local storage since those can't be persisted to the Google backend.
       else saveToLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY,
-        arrayToRecord(labelCollection.sortedFiltered.filter(l => l.isSystem && !l.isVisible), "id", "isVisible")!);
-    }
-
-    // persist sort order changes: merge single-item update into stored LABEL_ORDER map
-    else if (patch.sortNum !== undefined) {
+        arrayToRecord(labelCollection.sortedFiltered.filter(label => label.isSystem && !label.isVisible), 'id', 'isVisible')!);
+    } else if (patch.sortNum !== undefined) {
+      // Persist sort order changes by merging the moved label back into the stored LABEL_ORDER map.
       const existingOrder = getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {};
 
-      // persist the one that was just moved...
+      // Persist the one that was just moved...
       existingOrder[existing.id] = patch.sortNum;
 
-      // and all the others that were previously stored
+      // ...and all the others that were previously stored.
       Object.keys(existingOrder).forEach(existingKey => existingOrder[existingKey] = (labelCollection.byId(existingKey)! as Expando).__$sortedIndex!);
-
       saveToLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER, existingOrder);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const processEmailAttachments = useCallback((emails: GMessage[]) => {
+    const attachmentsMap = new Map<string, Attachment[]>();
+    const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
 
-  const markCheckedMessageIdsAsRead = (/*asRead: boolean*/) => {
-    //   gMailApi.markMessageIdsAsRead(Array.from(checkedMessageIds.ids) as string[], asRead).then(() => {
-    //     updatePageMessage({
-    //       ...selectedEmail,
-    //       labelIds: selectedEmail?.labelIds?.filter(l => l !== 'UNREAD') ?? [],
+    emails.forEach(email => {
+      if (hasAttachments(email) && email.payload && email.id) {
+        const attachments = extractAttachments(email.payload);
+        if (attachments.length > 0) attachmentsMap.set(email.id, attachments);
+      }
 
-    //       setCheckedMessageIds({ type: 'include', ids: new Set() });
-    // });
-  };
+      if (email.payload && email.id) {
+        const inline = extractInlineAttachments(email.id, email.payload);
+        if (Object.keys(inline).length > 0) inlineAttachmentsMap.set(email.id, inline);
+      }
+    });
 
-  //TODO: incorporate grouping messages into threads and giving a threadcount on those in the message list
-  //       threadCount: pageEmails.filter((e: gmail_Message) => e.threadId && email.threadId && e.threadId === email.threadId).length
+    setEmailAttachments(attachmentsMap);
+    setInlineAttachments(inlineAttachmentsMap);
+  }, []);
 
-  const fetchMessages = useCallback(async (page: number, pageSize: number): Promise<void> => {
+  const getCachedMessageDetails = useCallback(async (messageId: string) => {
+    let message = messageDetailsCache.current[messageId];
+    if (!message) {
+      message = await gMailApi.getApiMessageDetailsById(messageId);
+      messageDetailsCache.current[message.id] = message;
+      const thread = await gMailApi.getApiThreadMessages(message.threadId);
+      threadDetailsCache.current[message.threadId] = thread;
+      processEmailAttachments(thread);
+    }
+    return message;
+  }, [processEmailAttachments]);
 
-    if (pageSize === -1 || !selectedLabelId) { return; }
+  const getCachedThreadMessages = useCallback(async (threadId: string) => {
+    let threadMessages = threadDetailsCache.current[threadId];
+    if (!threadMessages) {
+      threadMessages = await gMailApi.getApiThreadMessages(threadId);
+      threadDetailsCache.current[threadId] = threadMessages;
+      threadMessages.forEach(message => {
+        messageDetailsCache.current[message.id] = message;
+      });
+      processEmailAttachments(threadMessages);
+    }
+    return threadMessages;
+  }, [processEmailAttachments]);
 
-    // Check cache: only skip fetch if all emails for this page are present AND the page is within totalEmails
-    const start = page * pageSize;
-    const end = start + pageSize;
+  const enrichThreadHeaders = useCallback(async (threadRefs: GThread[]) => {
+    const missingIds = threadRefs
+      .map(thread => thread.id)
+      .filter(threadId => !threadHeaderDetailsCache.current[threadId] && !inflightThreadHeaderIds.current.has(threadId));
+
+    if (!missingIds.length) return;
+
+    missingIds.forEach(threadId => inflightThreadHeaderIds.current.add(threadId));
+    try {
+      const headers = await gMailApi.getApiThreadHeadersByIds(missingIds);
+      headers.forEach(header => {
+        threadHeaderDetailsCache.current[header.id] = header;
+      });
+      setThreadHeaderCacheVersion(version => version + 1);
+    } finally {
+      missingIds.forEach(threadId => inflightThreadHeaderIds.current.delete(threadId));
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (page: number, nextPageSize: number, force = false): Promise<void> => {
+    if (nextPageSize === -1 || !selectedLabelId) return;
+
+    const requestScope = createPagedRequestScope();
+    const requestKey = `messages:${selectedLabelId}:${page}:${nextPageSize}:${force ? 'force' : 'cache'}`;
+    if (inflightFetchKeys.current.has(requestKey)) return;
+
+    const start = page * nextPageSize;
+    const end = start + nextPageSize;
     const cacheSlice = messageHeadersCache.slice(start, end);
-    const cacheHit = cacheSlice.length === pageSize && cacheSlice.every(e => !!e) && end <= totalMessages;
+    const cacheHit = !force && cacheSlice.length === nextPageSize && cacheSlice.every(Boolean) && end <= totalMessages;
 
     if (cacheHit) {
       setLoading(false);
@@ -177,185 +302,269 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     }
 
     setLoading(true);
-
+    inflightFetchKeys.current.add(requestKey);
     try {
-      // Use pageTokens to get the correct pageToken for this page
-      const token = pageTokens[page];
-
-      // If we don't have a token for this page, fetch previous pages to get it
-      while (pageTokens.length <= page) {
-        // Fetch previous page to get nextPageToken
-        const prevToken = pageTokens[pageTokens.length - 1];
-        const prevResult = await gMailApi.getApiMessages(selectedLabelId, pageSize, prevToken);
-        setPageTokens(tokens => [...tokens, prevResult.nextPageToken || null]);
+      let tokens = [...messagePageTokens];
+      while (tokens.length <= page) {
+        const prevResult = await gMailApi.getApiMessages(selectedLabelId, nextPageSize, tokens[tokens.length - 1]);
+        requestScope.ensureCurrent();
+        tokens = [...tokens, prevResult.nextPageToken || null];
       }
 
-      // Now fetch the actual page
-      const result = await gMailApi.getApiMessages(selectedLabelId, pageSize, token);
-      setTotalMessages(result.total);
+      requestScope.commit(() => setMessagePageTokens(tokens));
 
-      // Fill the cache at the correct indices
-      setMessageHeadersCache(prev => {
-        const newCache = [...prev];
-        const start = page * pageSize;
-        for (let i = 0; i < result.emails.length; ++i) {
-          newCache[start + i] = result.emails[i];
-        }
-        return newCache;
+      const result = await gMailApi.getApiMessages(selectedLabelId, nextPageSize, tokens[page] ?? null);
+      requestScope.commit(() => {
+        setTotalMessages(result.total);
+        setMessageHeadersCache(prev => {
+          const nextCache = [...prev];
+          for (let index = 0; index < result.emails.length; index++) {
+            nextCache[start + index] = result.emails[index];
+          }
+          return nextCache;
+        });
       });
-
-    } catch {
-
-      setMessageHeadersCache([]);
-      setTotalMessages(0);
-
+    } catch (error) {
+      if (error === stalePagedRequest) return;
+      requestScope.commit(() => {
+        setMessageHeadersCache([]);
+        setTotalMessages(0);
+      });
     } finally {
+      inflightFetchKeys.current.delete(requestKey);
+      requestScope.commit(() => setLoading(false));
+    }
+  }, [createPagedRequestScope, messageHeadersCache, messagePageTokens, selectedLabelId, totalMessages]);
+
+  const fetchThreads = useCallback(async (page: number, nextPageSize: number, force = false): Promise<void> => {
+    if (nextPageSize === -1 || !selectedLabelId) return;
+
+    const requestScope = createPagedRequestScope();
+    const requestKey = `threads:${selectedLabelId}:${page}:${nextPageSize}:${force ? 'force' : 'cache'}`;
+    if (inflightFetchKeys.current.has(requestKey)) return;
+
+    const start = page * nextPageSize;
+    const end = start + nextPageSize;
+    const cacheSlice = threadRefsCache.slice(start, end);
+    const cacheHit = !force && cacheSlice.length === nextPageSize && cacheSlice.every(Boolean) && end <= totalThreads;
+
+    if (cacheHit) {
       setLoading(false);
+      return;
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLabelId, pageTokens]);
+    setLoading(true);
+    inflightFetchKeys.current.add(requestKey);
+    try {
+      let tokens = [...threadPageTokens];
+      while (tokens.length <= page) {
+        const prevResult = await gMailApi.getApiThreadsByLabelId(selectedLabelId, nextPageSize, tokens[tokens.length - 1]);
+        requestScope.ensureCurrent();
+        tokens = [...tokens, prevResult.nextPageToken || null];
+      }
 
+      requestScope.commit(() => setThreadPageTokens(tokens));
+
+      const result = await gMailApi.getApiThreadsByLabelId(selectedLabelId, nextPageSize, tokens[page] ?? null);
+      requestScope.commit(() => {
+        setTotalThreads(typeof result.resultSizeEstimate === 'number' ? result.resultSizeEstimate : 0);
+        setThreadRefsCache(prev => {
+          const nextCache = [...prev];
+          for (let index = 0; index < (result.threads ?? []).length; index++) {
+            nextCache[start + index] = result.threads[index];
+          }
+          return nextCache;
+        });
+      });
+
+      requestScope.ensureCurrent();
+      await enrichThreadHeaders(result.threads ?? []);
+    } catch (error) {
+      if (error === stalePagedRequest) return;
+      requestScope.commit(() => {
+        setThreadRefsCache([]);
+        setTotalThreads(0);
+      });
+    } finally {
+      inflightFetchKeys.current.delete(requestKey);
+      requestScope.commit(() => setLoading(false));
+    }
+  }, [createPagedRequestScope, enrichThreadHeaders, selectedLabelId, threadPageTokens, threadRefsCache, totalThreads]);
+
+  useEffect(() => {
+    if (viewMode === 'messages') fetchMessages(currentPage, pageSize);
+    else fetchThreads(currentPage, pageSize);
+  }, [currentPage, fetchMessages, fetchThreads, pageSize, selectedLabelId, viewMode]);
 
   const currentPageMessages = useMemo(() => {
-    if (!messageHeadersCache || pageSize === -1) return [];
-
+    if (pageSize === -1) return [];
     const start = currentPage * pageSize;
     return messageHeadersCache.slice(start, start + pageSize);
   }, [currentPage, messageHeadersCache, pageSize]);
 
+  const updatePageMessage = useCallback((updatedEmail: GMessage) => {
+    setMessageHeadersCache(prev => prev.map(email => email?.id === updatedEmail.id ? { ...email, ...updatedEmail } : email));
+    messageDetailsCache.current[updatedEmail.id] = { ...(messageDetailsCache.current[updatedEmail.id] ?? updatedEmail), ...updatedEmail };
+    setSelectedEmail(prev => prev?.id === updatedEmail.id ? { ...prev, ...updatedEmail } : prev);
+  }, []);
 
+  const currentPageThreadRefs = useMemo(() => {
+    if (pageSize === -1) return [];
+    const start = currentPage * pageSize;
+    return threadRefsCache.slice(start, start + pageSize);
+  }, [currentPage, pageSize, threadRefsCache]);
 
-  useEffect(() => { fetchMessages(currentPage, pageSize); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentPage, pageSize, selectedLabelId]
-  );
+  useEffect(() => {
+    if (viewMode !== 'threads' || !currentPageThreadRefs.length) return;
+    enrichThreadHeaders(currentPageThreadRefs);
+  }, [currentPageThreadRefs, enrichThreadHeaders, viewMode]);
 
-  const updatePageMessage = (updatedEmail: GMessage) => {
-    setMessageHeadersCache(prev => prev.map((email) =>
-      email && email.id === updatedEmail.id ? { ...email, ...updatedEmail } : email
-    ));
-  };
+  const currentPageThreads = useMemo(() => {
+    void threadHeaderCacheVersion;
+    return currentPageThreadRefs
+      .map(thread => threadHeaderDetailsCache.current[thread.id])
+      .filter((thread): thread is GThreadHeader => thread !== undefined);
+  }, [currentPageThreadRefs, threadHeaderCacheVersion]);
 
+  const threadHeadersCache = useMemo(() => {
+    void threadHeaderCacheVersion;
+    return threadRefsCache
+      .map(thread => threadHeaderDetailsCache.current[thread.id])
+      .filter((thread): thread is GThreadHeader => thread !== undefined);
+  }, [threadHeaderCacheVersion, threadRefsCache]);
 
-  const getCachedMessageDetails = async (messageId: string) => {
-    let message = messageDetailsCache.current[messageId];
-    if (!message) {
-      message = await gMailApi.getApiMessageDetailsById(messageId);
-      messageDetailsCache.current[message.id!] = message;
-      const thread = await gMailApi.getApiThreadMessages(message.threadId);
-      //TODO:setEmailThread(thread);
-      processEmailAttachments(thread);
+  const updatePageThread = useCallback((threadId: string, patch: Partial<GThreadHeader>) => {
+    const existingThread = threadHeaderDetailsCache.current[threadId];
+    if (!existingThread) return;
+    threadHeaderDetailsCache.current[threadId] = { ...existingThread, ...patch };
+    setThreadHeaderCacheVersion(version => version + 1);
+  }, []);
 
+  const markCheckedRowIdsAsRead = useCallback(async (asRead: boolean) => {
+    const ids = getSelectionIds(checkedRowIds);
+    if (!ids.length) return;
+
+    if (viewMode === 'messages') {
+      await gMailApi.markMessageIdsAsRead(ids, asRead);
+      const selectedIds = new Set(ids);
+      setMessageHeadersCache(prev => prev.map(email => selectedIds.has(email.id) ? applyReadState(email, asRead) : email));
+      setSelectedEmail(prev => prev && selectedIds.has(prev.id) ? applyReadState(prev, asRead) : prev);
+    } else {
+      await gMailApi.markThreadIdsAsRead(ids, asRead);
+      const selectedIds = new Set(ids);
+      selectedIds.forEach(threadId => {
+        const existingThread = threadHeaderDetailsCache.current[threadId];
+        if (!existingThread) return;
+        threadHeaderDetailsCache.current[threadId] = {
+          ...existingThread,
+          hasUnread: !asRead,
+          latestMessage: applyReadState(existingThread.latestMessage, asRead),
+        };
+      });
+      setThreadHeaderCacheVersion(version => version + 1);
     }
-    return message;
-  }
 
+    setCheckedRowIds(createEmptySelection());
+  }, [checkedRowIds, viewMode]);
 
+  const refreshCurrentView = useCallback(async () => {
+    if (viewMode === 'messages') await fetchMessages(currentPage, pageSize, true);
+    else {
+      threadHeaderDetailsCache.current = {};
+      inflightThreadHeaderIds.current.clear();
+      setThreadHeaderCacheVersion(version => version + 1);
+      await fetchThreads(currentPage, pageSize, true);
+    }
+  }, [currentPage, fetchMessages, fetchThreads, pageSize, viewMode]);
 
-  // Extract attachments from emails and update state
-  const processEmailAttachments = (emails: GMessage[]) => {
-    const attachmentsMap = new Map<string, Attachment[]>();
-    const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
-
-    emails.forEach((email: GMessage) => {
-      if (hasAttachments(email) && email.payload && email.id) {
-        const attachments = extractAttachments(email.payload);
-        if (attachments.length > 0) {
-          attachmentsMap.set(email.id, attachments);
-        }
-      }
-      if (email.payload && email.id) {
-        const inline = extractInlineAttachments(email.id, email.payload);
-        if (Object.keys(inline).length > 0) {
-          inlineAttachmentsMap.set(email.id, inline);
-        }
-      }
-    });
-
-    setEmailAttachments(attachmentsMap);
-    setInlineAttachments(inlineAttachmentsMap);
-  };
+  const switchViewMode = useCallback((nextMode: ViewMode) => {
+    if (nextMode === viewMode) return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.pathname = '/';
+    nextUrl.searchParams.set('mode', nextMode);
+    nextUrl.hash = '';
+    window.location.assign(nextUrl.toString());
+  }, [viewMode]);
 
   const value: IDataCache = {
     loading,
+    viewMode,
+    switchViewMode,
+    refreshCurrentView,
+
     fetchMessages,
     messageHeadersCache,
     getCachedMessageDetails,
+    setCachedEmail,
+    selectedEmail,
+    setSelectedEmail,
     messageAttachments,
     inlineAttachments,
-    threadMessages,
-    checkedMessageIds,
-    setCheckedMessageIds,
-    markCheckedMessageIdsAsRead,
+    totalMessages,
+    currentPageMessages,
+    updatePageMessage,
 
-    // don't give out the full labelCollection so internals aren't overly exposed
+    checkedRowIds,
+    setCheckedRowIds,
+    markCheckedRowIdsAsRead,
     labels: { sortedFiltered: labelCollection.sortedFiltered, byId: labelCollection.byId, patchLabelItem },
-
     settingsEditMode,
     setSettingsEditMode,
-
     selectedLabelId,
     setSelectedLabelId,
-
-    totalMessages,
+    activeTotalRows: viewMode === 'messages' ? totalMessages : totalThreads,
     currentPage,
     setCurrentPage,
     pageSize,
     setPageSize,
-    currentPageMessages,
-    updatePageMessage,
 
-    setCachedEmail,
-    selectedEmail,
-    setSelectedEmail
+    fetchThreads,
+    threadHeadersCache,
+    getCachedThreadMessages,
+    totalThreads,
+    currentPageThreads,
+    updatePageThread,
   };
 
   return <DataCacheProvider value={value}>{children}</DataCacheProvider>;
-
 };
 
-interface PersistedLabelSettings { sortNum: number, isVisible: boolean };
+interface PersistedLabelSettings { sortNum: number; isVisible: boolean; }
 
-export type ExtendedLabel = Omit<GLabel, "labelListVisibility" | "type"> & PersistedLabelSettings & {
+export type ExtendedLabel = Omit<GLabel, 'labelListVisibility' | 'type'> & PersistedLabelSettings & {
   isSystem: boolean;
   displayName: string;
   icon?: React.ReactElement<typeof SvgIcon>;
 };
 
-
 const mainLabelIcons: Record<string, React.ReactElement<typeof SvgIcon>> = {
-  'INBOX': <InboxIcon sx={{ fontSize: 18 }} />,
-  'SENT': <SendIcon sx={{ fontSize: 18 }} />,
-  'DRAFT': <DescriptionIcon sx={{ fontSize: 18 }} />,
-  'SPAM': <ReportIcon sx={{ fontSize: 18 }} />,
-  'TRASH': <DeleteIcon sx={{ fontSize: 18 }} />,
-  'IMPORTANT': <StarOutlineIcon sx={{ fontSize: 18 }} />,
+  INBOX: <InboxIcon sx={{ fontSize: 18 }} />,
+  SENT: <SendIcon sx={{ fontSize: 18 }} />,
+  DRAFT: <DescriptionIcon sx={{ fontSize: 18 }} />,
+  SPAM: <ReportIcon sx={{ fontSize: 18 }} />,
+  TRASH: <DeleteIcon sx={{ fontSize: 18 }} />,
+  IMPORTANT: <StarOutlineIcon sx={{ fontSize: 18 }} />,
 };
 
 const buildLabelDisplayName = (labelRawName: string): string => {
   let displayName = labelRawName.replace(/^CATEGORY_/, '').replace(/_/g, ' ');
-  displayName = displayName.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+  displayName = displayName.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
   return displayName;
 };
 
 const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolean>, storedOrder: Record<string, number>) =>
-  // build array of [key, value] entries for BTree constructor
-  gLabels.map(l => {
-    const isSystem = l.type === "system";;
-    const stored = storedVis[l.id];
-    const backend = l.labelListVisibility === undefined || !(l.labelListVisibility !== "labelShow");
+  gLabels.map(label => {
+    const isSystem = label.type === 'system';
+    const stored = storedVis[label.id];
+    const backend = label.labelListVisibility === undefined || !(label.labelListVisibility !== 'labelShow');
 
-    return [l.id, {
-      id: l.id,
-      name: l.name,
-
-      displayName: buildLabelDisplayName(l.name),
-      icon: mainLabelIcons[l.id],
-
-      sortNum: storedOrder[l.id],
-      isVisible: isSystem ? (stored ?? backend) : (backend ?? stored), //system labels don't update to googles backend so take anything from local storage first and vice versa
-      isSystem
-
+    return [label.id, {
+      id: label.id,
+      name: label.name,
+      displayName: buildLabelDisplayName(label.name),
+      icon: mainLabelIcons[label.id],
+      sortNum: storedOrder[label.id],
+      isVisible: isSystem ? (stored ?? backend) : (backend ?? stored),
+      isSystem,
     }] as [string, ExtendedLabel];
   });

@@ -7,50 +7,56 @@ import Header from './Header';
 import LabelsSidePanel from './LabelsSidePanel';
 import { AuthFailed } from './AuthFailed';
 import EmailList from './EmailList';
+import ThreadList from './ThreadList';
+import ThreadDetail from './ThreadDetail';
+import { useDataCache } from './services/ctxDataCache';
 
 const App: React.FC = () => {
+  const cache = useDataCache();
 
   return (
-    <div style={{
-      height: "100vh",
-      minHeight: 0,
-      display: "flex", flexDirection: "column",
-      overflow: 'hidden',
-    }}>
-
-      <Toolbar 
-        disableGutters // removes the default left/right inset
-        sx={{ px: 1.5 }} >
-        <Header />
-      </Toolbar>
-
-      <Box sx={{
-        flex: 1, minHeight: 0,
+    <Router>
+      <div style={{
+        height: "100vh",
+        minHeight: 0,
+        display: "flex", flexDirection: "column",
         overflow: 'hidden',
-        display: 'flex'
       }}>
 
-        <LabelsSidePanel />
+        <Toolbar 
+          disableGutters // removes the default left/right inset
+          sx={{ px: 1.5 }} >
+          <Header />
+        </Toolbar>
 
         <Box sx={{
-          flex: 1, minWidth: 0, minHeight: 0,
+          flex: 1, minHeight: 0,
           overflow: 'hidden',
-          display: 'flex', flexDirection: 'column'
+          display: 'flex'
         }}>
-          <AuthFailed />
 
-          <Router>
+          <LabelsSidePanel />
+
+          <Box sx={{
+            flex: 1, minWidth: 0, minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex', flexDirection: 'column'
+          }}>
+            <AuthFailed />
+
             <Routes>
-              <Route path="/" element={<EmailList />} />
+              <Route path="/" element={cache.viewMode === 'messages' ? <EmailList /> : <ThreadList />} />
               <Route path="/email/:emailId" element={<EmailDetail />} />
+              <Route path="/thread/:threadId" element={<ThreadDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </Router>
+
+          </Box>
 
         </Box>
 
-      </Box>
-    </div>
+      </div>
+    </Router>
   );
 };
 

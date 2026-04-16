@@ -85,6 +85,12 @@ function gitHubDlAndInstall(
 }
 
 
+checkInstall "setxx" "for setting env vars" {
+    # localappdata\Microsoft\WindowsApps is a special windows folder that is in the PATH by default and can be used to store user level executables without needing to modify the PATH or restart the terminal
+    $setxxDest = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps' setxx.exe
+    iwr https://github.com/Beej126/setxx/releases/latest/download/setxx.exe -OutFile $setxxDest
+    Unblock-File $setxxDest
+}
 
 # volta is considered the latest/greatest node version manager circa Q1 2026 (i.e. instead of NVM, etc)
 #   and it also manages pnpm installation and versions
@@ -98,16 +104,24 @@ function gitHubDlAndInstall(
 #   the best thing to do right now seems to be removing pnpm.* from c:\program files\volta...
 # winget has a volta package but it is often out of date, so we download the latest from github releases directly
 # dir "$env:ProgramFiles\Volta" | % { if ($_.Name -notlike "volta*" -and $_.Name -notlike "node*") { mv $_ "$env:ProgramFiles\Volta\hide\" } } `
-checkInstall "volta" "volta is latest/greatest node & pnpm manager" `
-  { gitHubDlAndInstall "https://api.github.com/repos/volta-cli/volta/releases/latest" "windows-x86_64\.msi"; `
-    mkdir "$env:ProgramFiles\Volta\hide" -ErrorAction SilentlyContinue; `
-    mv "$env:ProgramFiles\Volta\pnpm.*" "$env:ProgramFiles\Volta\hide\"; `
-  } `
-  -restart $true
+checkInstall "volta" "volta is latest/greatest node manager" {
+    gitHubDlAndInstall "https://api.github.com/repos/volta-cli/volta/releases/latest" "windows-x86_64\.msi"
+    mkdir "$env:ProgramFiles\Volta\hide" -ErrorAction SilentlyContinue
+    mv "$env:ProgramFiles\Volta\pnpm.*" "$env:ProgramFiles\Volta\hide\"
+  } -restart $true
 
 # checkInstall "node" "might be needed for components but not directly yet" { volta install node@lts; volta pin node@lts }
-checkInstall "pnpm" "required package manager for this project" { volta install pnpm }
 
+# checkInstall "pnpm" "required package manager for this project" { volta install pnpm }
+# wanted to avoid CTRL+C prompting, volta's pnpm.exe shim launches everything from a hard coded cmd.exe...
+#   so shifting to installing pnpm not from volta but from native npm which will install %appdata%\pnpm\pnpm.ps1 
+checkInstall "pnpm" "required package manager for this project" {
+    mkdir "$env:APPDATA\npm" -ErrorAction SilentlyContinue
+    npm config set prefix "$env:APPDATA\npm"
+    & "$env:LOCALAPPDATA\Volta\tools\image\node\$((node --version).TrimStart("v"))\npm.ps1" install -g pnpm
+    # make sure the true npm install of pnpm resolves BEFORE volta's shim
+    setxx -add -top PATH %appdata%\npm
+}
 
 checkInstall "openssl" "for local https dev server cert gen" `
     { winget install -e --id Git.Git --interactive --accept-source-agreements --accept-package-agreements } `
@@ -143,4 +157,4 @@ if (
 }
 
 Write-Host "Environment check complete. Starting dev runtime..."
-volta run pnpm -- run dev
+pnpm run dev

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   List,
   ListItemButton,
@@ -13,23 +14,36 @@ import { useDataCache } from './services/ctxDataCache';
 import { isRead } from './helpers/emailParser';
 import { useResizableWidth } from './helpers/useResizableWidth';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import CheckIcon from '@mui/icons-material/Check';
 
 const LabelsSidePanel: React.FC = () => {
 
   const cache = useDataCache();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
   const getUnreadCount = (labelId: string) =>
     cache.messageHeadersCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
 
-  //select the first label if none already selected
+  // Prefer Inbox on first load, otherwise fall back to the first visible label.
+  const { selectedLabelId, setSelectedLabelId, labels } = cache; // destructure these specific values to silence lint wanting the entire cache object added to the dependency array
   useEffect(() => {
-    if (!cache.selectedLabelId && !!cache.labels.sortedFiltered.length) {
-      cache.setSelectedLabelId(cache.labels.sortedFiltered[0].id);
+    if (selectedLabelId || !labels.sortedFiltered.length) return;
+    setSelectedLabelId('INBOX'); //we've ensured INBOX can never be hidden
+  }, [selectedLabelId, labels.sortedFiltered.length, setSelectedLabelId]);
+
+  const handleLabelClick = (labelId: string) => {
+    if (labelId !== cache.selectedLabelId) {
+      cache.setSelectedLabelId(labelId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cache.selectedLabelId, cache.labels.sortedFiltered]);
+
+    const expectedSearch = `?mode=${cache.viewMode}`;
+    if (location.pathname !== '/' || location.search !== expectedSearch) {
+      navigate(`/${expectedSearch}`);
+    }
+  };
 
 
   return (
@@ -89,7 +103,7 @@ const LabelsSidePanel: React.FC = () => {
                       <ListItemButton
                         dense
                         selected={cache.selectedLabelId === label.id}
-                        onClick={() => cache.setSelectedLabelId(label.id)}
+                        onClick={() => handleLabelClick(label.id)}
                         sx={{ px: 0 }}
                       >
                         <ListItemIcon sx={{ mt: "-3px", minWidth: 24, display: 'flex', justifyContent: 'center' }}>
@@ -133,23 +147,38 @@ const LabelsSidePanel: React.FC = () => {
                         )}
 
                         {cache.settingsEditMode && (
-                          <Checkbox
-                            sx={{
-                              // alignSelf: 'center',
-                              p: 0, // remove Checkbox padding
-                              mr: 0.5,
-                              '& .MuiSvgIcon-root': {
-                                height: '15px', // 15px is approximately equal to label font size 13.7px + lineHeight 1.1 set above
-                                // transform: 'scale(1.2)', // use >1 to enlarge the glyph inside the svg if it has internal whitespace
-                              }
-                            }}
-                            size="small"
-                            checked={label.isVisible}
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onChange={(e) => cache.labels.patchLabelItem(label, { isVisible: e.target.checked })}
-                            inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
-                          />
+                          label.id === 'INBOX' ? (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                mr: 0.25,
+                                color: 'primary.main'
+                              }}
+                              aria-label={`${label.displayName} is always visible`}
+                            >
+                              <CheckIcon sx={{ height: '15px' }} />
+                            </Box>
+                          ) : (
+                            <Checkbox
+                              sx={{
+                                // alignSelf: 'center',
+                                p: 0, // remove Checkbox padding
+                                mr: 0.5,
+                                '& .MuiSvgIcon-root': {
+                                  height: '15px', // 15px is approximately equal to label font size 13.7px + lineHeight 1.1 set above
+                                  // transform: 'scale(1.2)', // use >1 to enlarge the glyph inside the svg if it has internal whitespace
+                                }
+                              }}
+                              size="small"
+                              checked={label.isVisible}
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onChange={(e) => cache.labels.patchLabelItem(label, { isVisible: e.target.checked })}
+                              inputProps={{ 'aria-label': `Toggle visibility for ${label.displayName}` }}
+                            />
+                          )
                         )}
 
                       </ListItemButton>

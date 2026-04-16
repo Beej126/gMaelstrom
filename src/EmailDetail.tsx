@@ -108,6 +108,8 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
       className={styles.emailHtmlReset}
       style={{
         color: theme.palette.text.primary,
+        ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
+        ['--email-link-hover-color' as string]: isDarkMode ? theme.palette.primary.main : theme.palette.primary.dark,
       }}
       dangerouslySetInnerHTML={{ __html: content }}
     />
@@ -286,7 +288,7 @@ const EmailDetail: React.FC = () => {
         }}
       >
         <Tooltip title="Back to inbox">
-          <IconButton onClick={() => navigate('/', { replace: true })}>
+          <IconButton onClick={() => navigate('/?mode=messages', { replace: true })}>
             <ArrowBackIcon />
           </IconButton>
         </Tooltip>

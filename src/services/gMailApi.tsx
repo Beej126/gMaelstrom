@@ -2,6 +2,7 @@
 
 import { getAuthedUser } from './gAuthApi';
 import { gmailApiBatchFetch } from './gMailApiBatchFetch';
+import { gmailApiThreadBatchFetch } from './gMailApiThreadBatchFetch';
 import { toast } from 'react-toastify';
 import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
 import { StrictRequired } from '../helpers/typeHelpers';
@@ -12,8 +13,7 @@ type GLabelType = "system" | "user";
 export type GLabel = StrictRequired<Pick<gmail_v1.Schema$Label, 'id' | 'name'>> & { type: GLabelType; labelListVisibility: GLabelVisibility };// & gapi.client.gmail.Label;
 
 export type GMessage = StrictRequired<Pick<gmail_v1.Schema$Message, 'id' | 'threadId' | 'snippet' | 'labelIds'>> & gmail_v1.Schema$Message;
-export type GThread = StrictRequired<Pick<gmail_v1.Schema$Thread, 'id' | 'snippet'>>;
-export type GListThreadsResponse = StrictRequired<Pick<gmail_v1.Schema$ListThreadsResponse, 'nextPageToken' | 'resultSizeEstimate'>> & { threads: GThread[] };
+export type GThread = StrictRequired<Pick<gmail_v1.Schema$Thread, 'id' | 'snippet'>> & gmail_v1.Schema$Thread;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // general error handling convention for all google API calls:
@@ -28,17 +28,14 @@ export type GListThreadsResponse = StrictRequired<Pick<gmail_v1.Schema$ListThrea
 //   put all further bundling logic in the data cache layer APIs
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/list
-export const getApiThreadsByLabelId = (
-  labelId: string,
-  pageSize: number,
-  pageToken: string | null
-) => gApiFetchJson<GListThreadsResponse>("threads", "GET", {
-  maxResults: pageSize.toString(),
-  labelIds: labelId, // Note: The API allows multiple labels via CSV if that's ever handy
-  pageToken: pageToken,
-});
+const getHeaderValue = (message: GMessage, headerName: string) =>
+  message.payload?.headers?.find(header => header.name?.toLowerCase() === headerName.toLowerCase())?.value ?? '';
 
+const getMessageDateValue = (message: GMessage) => {
+  const rawDate = getHeaderValue(message, 'Date');
+  const parsedDate = rawDate ? Date.parse(rawDate) : NaN;
+  return Number.isNaN(parsedDate) ? 0 : parsedDate;
+};
 
 export const getApiMessages = async (
   labelId: string,
@@ -91,9 +88,6 @@ export const getApiMessages = async (
 export const getApiMessageDetailsById = async (id: string): Promise<GMessage> =>
   gApiFetchJson(`messages/${id}?format=full`);
 
-export const getApiThreadMessages = async (threadId: string) =>
-  (await gApiFetchJson<{ messages: GMessage[] }>(`threads/${threadId}`)).messages ?? [];
-
 
 export const getApiAttachmentData = (messageId: string, attachmentId: string) =>
   gApiFetchJson<{ data?: string }>(`messages/${messageId}/attachments/${attachmentId}`).then(resp =>
@@ -114,6 +108,112 @@ export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolea
     ids: emailIds,
     ...(asRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] })
   });
+};
+
+export type GThreadWithMessages = StrictRequired<Pick<gmail_v1.Schema$Thread, 'id' | 'snippet' | 'messages'>> & {
+  messages: GMessage[];
+};
+export type GListThreadsResponse = StrictRequired<Pick<gmail_v1.Schema$ListThreadsResponse, 'nextPageToken' | 'resultSizeEstimate'>> & { threads: GThread[] };
+export type GThreadHeader = {
+  id: string;
+  snippet: string;
+  latestMessage: GMessage;
+  messageCount: number;
+  hasUnread: boolean;
+};
+
+const buildThreadHeader = (thread: GThreadWithMessages): GThreadHeader | null => {
+  const messages = (thread.messages ?? []).filter(
+    (message): message is GMessage =>
+      !!message &&
+      typeof message.id === 'string' &&
+      typeof message.threadId === 'string' &&
+      typeof message.snippet === 'string' &&
+      Array.isArray(message.labelIds)
+  );
+
+  if (!messages.length) return null;
+
+  const orderedMessages = [...messages].sort((left, right) => getMessageDateValue(left) - getMessageDateValue(right));
+  const latestMessage = orderedMessages[orderedMessages.length - 1] ?? messages[messages.length - 1];
+  return {
+    id: thread.id,
+    snippet: thread.snippet,
+    latestMessage,
+    messageCount: messages.length,
+    hasUnread: messages.some(message => (message.labelIds ?? []).includes('UNREAD')),
+  };
+};
+
+// https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/list
+export const getApiThreadsByLabelId = (
+  labelId: string,
+  pageSize: number,
+  pageToken: string | null
+) => gApiFetchJson<GListThreadsResponse>("threads", "GET", {
+  maxResults: pageSize.toString(),
+  labelIds: labelId, // Note: The API allows multiple labels via CSV if that's ever handy
+  pageToken: pageToken,
+});
+
+export const getApiThreadHeaders = async (
+  labelId: string,
+  pageSize: number,
+  pageToken: string | null
+): Promise<{ threads: GThreadHeader[]; nextPageToken: string | null; total: number }> => {
+  const data = await getApiThreadsByLabelId(labelId, pageSize, pageToken);
+  const threadRefs = data.threads ?? [];
+  if (!threadRefs.length) {
+    return {
+      threads: [],
+      nextPageToken: data.nextPageToken || null,
+      total: typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0,
+    };
+  }
+
+  const threadDetails = await gmailApiThreadBatchFetch(threadRefs.map(thread => thread.id));
+  const threads = threadDetails
+    .map(buildThreadHeader)
+    .filter((thread): thread is GThreadHeader => thread !== null);
+
+  return {
+    threads,
+    nextPageToken: data.nextPageToken || null,
+    total: typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0,
+  };
+};
+
+export const getApiThreadHeadersByIds = async (threadIds: string[]): Promise<GThreadHeader[]> => {
+  if (!threadIds.length) return [];
+
+  const threadDetails = await gmailApiThreadBatchFetch(threadIds);
+  return threadDetails
+    .map(buildThreadHeader)
+    .filter((thread): thread is GThreadHeader => thread !== null);
+};
+
+export const getApiThreadDetailsById = async (threadId: string, format: 'full' | 'metadata' = 'full'): Promise<GThreadWithMessages> =>
+  gApiFetchJson<GThreadWithMessages>(`threads/${threadId}?format=${format}`);
+
+export const getApiThreadMessages = async (threadId: string) =>
+  (await getApiThreadDetailsById(threadId, 'full')).messages ?? [];
+
+export const markApiThreadAsRead = async (threadId: string, asRead: boolean) => {
+  if (!threadId) return;
+
+  return gApiFetchJson<GThreadWithMessages>(`threads/${threadId}/modify`, 'POST', {
+    ...(asRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] })
+  });
+};
+
+export const markApiThreadIdsAsRead = async (threadIds: string[], asRead: boolean) => {
+  const validIds = threadIds.filter(Boolean);
+  for (let index = 0; index < validIds.length; index++) {
+    await markApiThreadAsRead(validIds[index], asRead);
+    if (index + 1 < validIds.length) {
+      await new Promise(resolve => window.setTimeout(resolve, 75));
+    }
+  }
 };
 
 const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
@@ -138,18 +238,26 @@ export const gApiFetchJson = async <T,>(
   token?: string
 ): Promise<T> => {
 
-  // avoid duplicate fetches (e.g. react fires effects twice in dev builds under strict mode)
-  //   assuming we're only avoiding **GETs*** that tend to fire during initial mounts, 
-  //   so using endpoint is good enough vs worrying about keying on unique parms
-  const existingFetch = inflightFetches.get(endpoint);
-  if (existingFetch) return existingFetch;
+  const sanitizedParms = parms
+    ? Object.fromEntries(
+        Object.entries(parms).filter(([_key, value]) => value !== undefined && value !== null)
+      )
+    : undefined;
 
   // allow full url passed in from gAuthApi which has different root url
   // otherwise prefix with gmail api base url for majority of calls that just pass in endpoint "tails" 
   const url = (endpoint.toLowerCase().startsWith('http') ? '' : GMAIL_API_BASE_URL) + endpoint
-    + (parms && method === "GET" ? "?" + new URLSearchParams(parms as Record<string, string>).toString() : "");
+    + (sanitizedParms && method === "GET" ? "?" + new URLSearchParams(sanitizedParms as Record<string, string>).toString() : "");
 
-  const body = parms && (["POST", "PATCH"].includes(method)) ? JSON.stringify(parms) : undefined;
+  // Avoid duplicate GET fetches (e.g. React fires effects twice in dev builds under strict mode).
+  // Key by the full resolved URL so different query strings do not collapse into the same inflight request.
+  const inflightKey = `${method}:${url}`;
+  if (method === 'GET') {
+    const existingFetch = inflightFetches.get(inflightKey);
+    if (existingFetch) return existingFetch;
+  }
+
+  const body = sanitizedParms && (["POST", "PATCH"].includes(method)) ? JSON.stringify(sanitizedParms) : undefined;
 
   const aborter = new AbortController();
   const fetchPromise = (async () => {
@@ -179,24 +287,31 @@ export const gApiFetchJson = async <T,>(
       } catch (ex) {
         toast.error(<>GMail API: { endpoint } { ex instanceof Error ? <><br/><br/>{ex.message}</> : "" } </>);
         throw ex;
+      } finally {
+        if (method === 'GET') inflightFetches.delete(inflightKey);
       }
     };
   })();
 
-  inflightFetches.set(endpoint, fetchPromise);
+  if (method === 'GET') inflightFetches.set(inflightKey, fetchPromise);
   return fetchPromise;
 };
 
 export default {
   getApiMessages,
   getApiMessageDetailsById,
-
-  getApiThreadMessages,
-
   getApiAttachmentData,
 
   getApiLabels,
   setApiLabelVisibility,
 
-  markMessageIdsAsRead: markApiMessageIdsAsRead
+  markMessageIdsAsRead: markApiMessageIdsAsRead,
+
+  getApiThreadsByLabelId,
+  getApiThreadHeaders,
+  getApiThreadHeadersByIds,
+  getApiThreadDetailsById,
+  getApiThreadMessages,
+  markThreadAsRead: markApiThreadAsRead,
+  markThreadIdsAsRead: markApiThreadIdsAsRead
 };

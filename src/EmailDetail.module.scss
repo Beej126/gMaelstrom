@@ -54,4 +54,14 @@
     height: auto !important;
     vertical-align: middle !important;
   }
+
+  a,
+  a:visited {
+    color: var(--email-link-color, inherit) !important;
+  }
+
+  a:hover,
+  a:focus-visible {
+    color: var(--email-link-hover-color, var(--email-link-color, inherit)) !important;
+  }
 }
