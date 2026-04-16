@@ -4,6 +4,7 @@ import {
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -12,6 +13,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
@@ -24,8 +26,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ImageIcon from '@mui/icons-material/Image';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import AttachmentList from './AttachmentList';
-import PdfViewer from './PdfViewer';
+import AttachmentViewer, { getAttachmentPreviewKind } from './AttachmentViewer';
 import styles from './EmailDetail.module.scss';
 import { useDataCache } from './services/ctxDataCache';
 import {
@@ -40,6 +41,8 @@ import {
   isRead,
   processEmailContentForDarkMode,
   replaceInlineAttachments,
+  splitQuotedEmailContent,
+  decodeBase64ToArrayBuffer,
 } from './helpers/emailParser';
 import { getApiAttachmentData, GMessage, markApiThreadAsRead } from './services/gMailApi';
 
@@ -61,8 +64,20 @@ type AttachmentState = {
   error?: string;
 };
 
+interface AttachmentChipRowProps {
+  attachments: ThreadAttachment[];
+  onAttachmentClick: (attachment: ThreadAttachment) => Promise<void>;
+  attachmentState: Record<string, AttachmentState>;
+  getAttachmentIcon: (mimeType: string) => React.ReactNode;
+  theme: Theme;
+  label: string;
+}
+
 const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, isDarkMode }) => {
   const [content, setContent] = useState<string>('');
+  const [quotedContent, setQuotedContent] = useState<string>('');
+  const [hasQuotedContent, setHasQuotedContent] = useState(false);
+  const [showQuotedContent, setShowQuotedContent] = useState(false);
   const [loading, setLoading] = useState(true);
   const theme = useTheme();
 
@@ -86,10 +101,17 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
           );
         }
 
-        setContent(processEmailContentForDarkMode(htmlContent, isDarkMode));
+        const processedContent = processEmailContentForDarkMode(htmlContent, isDarkMode);
+        const splitContent = splitQuotedEmailContent(processedContent);
+
+        setContent(splitContent.visibleHtml || processedContent);
+        setQuotedContent(splitContent.quotedHtml);
+        setHasQuotedContent(splitContent.hasQuotedContent);
       } catch (error) {
         console.error(`Error processing email content for ${email.id}:`, error);
         setContent('<p>Error loading content</p>');
+        setQuotedContent('');
+        setHasQuotedContent(false);
       } finally {
         setLoading(false);
       }
@@ -97,6 +119,10 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
 
     processEmailContent();
   }, [email.id, email.payload, email.snippet, inlineAttachments, isDarkMode]);
+
+  useEffect(() => {
+    setShowQuotedContent(false);
+  }, [email.id]);
 
   if (loading) {
     return (
@@ -107,15 +133,69 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
   }
 
   return (
-    <div
-      className={styles.emailHtmlReset}
-      style={{
-        color: theme.palette.text.primary,
-        ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
-        ['--email-link-hover-color' as string]: isDarkMode ? theme.palette.primary.main : theme.palette.primary.dark,
-      }}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
+    <Box>
+      <div
+        className={styles.emailHtmlReset}
+        style={{
+          color: theme.palette.text.primary,
+          ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
+          ['--email-link-hover-color' as string]: isDarkMode ? theme.palette.primary.main : theme.palette.primary.dark,
+        }}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+
+      {hasQuotedContent && quotedContent && (
+        <Box sx={{ mt: 1.5 }}>
+          <Chip
+            clickable
+            label="..."
+            onClick={() => setShowQuotedContent(previous => !previous)}
+            size="small"
+            variant="outlined"
+            title={showQuotedContent ? 'Hide previous thread content' : 'Show previous thread content'}
+            aria-label={showQuotedContent ? 'Hide previous thread content' : 'Show previous thread content'}
+            sx={{
+              height: 13,
+              borderRadius: 999,
+              backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.grey[200],
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              '& .MuiChip-label': {
+                display: 'flex',
+                alignItems: 'center',
+                paddingTop: 0,
+                paddingBottom: 0.75,
+                fontWeight: 800,
+                lineHeight: 1,
+              },
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300],
+              },
+            }}
+          />
+
+          {showQuotedContent && (
+            <Box
+              sx={{
+                mt: 1.5,
+                pt: 1.5,
+                borderTop: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <div
+                className={styles.emailHtmlReset}
+                style={{
+                  color: theme.palette.text.primary,
+                  ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
+                  ['--email-link-hover-color' as string]: isDarkMode ? theme.palette.primary.main : theme.palette.primary.dark,
+                }}
+                dangerouslySetInnerHTML={{ __html: quotedContent }}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
   );
 };
 
@@ -156,6 +236,116 @@ const getAttachmentIcon = (mimeType: string) => {
   return <InsertDriveFileIcon fontSize="small" color="action" />;
 };
 
+const AttachmentChipRow: React.FC<AttachmentChipRowProps> = ({
+  attachments,
+  onAttachmentClick,
+  attachmentState,
+  getAttachmentIcon,
+  theme,
+  label,
+}) => {
+  if (!attachments.length) return null;
+
+  const getAttachmentActionLabel = (attachment: ThreadAttachment) =>
+    getAttachmentPreviewKind(attachment) === 'unsupported' ? 'download file' : 'open preview';
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 1,
+      }}
+    >
+      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, mr: 0.5 }}>
+        <AttachFileIcon fontSize="small" color="action" />
+        <Typography variant="subtitle2" fontWeight={600}>
+          {label}
+        </Typography>
+      </Box>
+
+      {attachments.map(attachment => (
+        <Tooltip
+          key={attachment.key}
+          title={`${attachment.filename} (${formatFileSize(attachment.size)}) - ${getAttachmentActionLabel(attachment)}`}
+        >
+          <Box
+            component="button"
+            type="button"
+            onClick={() => void onAttachmentClick(attachment)}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.75,
+              maxWidth: '100%',
+              px: 1,
+              py: 0.75,
+              borderRadius: 999,
+              border: `1px solid ${theme.palette.divider}`,
+              backgroundColor: theme.palette.action.hover,
+              cursor: 'pointer',
+              textAlign: 'left',
+              appearance: 'none',
+              font: 'inherit',
+              color: 'inherit',
+              transition: 'background-color 120ms ease, border-color 120ms ease',
+              '&:hover': {
+                backgroundColor: theme.palette.action.selected,
+              },
+              '&:focus-visible': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: 2,
+              },
+            }}
+          >
+            <Box sx={{ position: 'relative', display: 'inline-flex', mr: 0.25 }}>
+              {getAttachmentIcon(attachment.mimeType)}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: -5,
+                  bottom: -5,
+                  width: 13,
+                  height: 13,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.palette.background.paper,
+                  border: `1px solid ${theme.palette.divider}`,
+                  color: theme.palette.text.secondary,
+                  boxShadow: theme.shadows[1],
+                }}
+              >
+                {attachmentState[attachment.key]?.loading ? (
+                  <CircularProgress size={8} thickness={7} />
+                ) : getAttachmentPreviewKind(attachment) !== 'unsupported' ? (
+                  <VisibilityIcon sx={{ fontSize: 8 }} />
+                ) : (
+                  <DownloadIcon sx={{ fontSize: 8 }} />
+                )}
+              </Box>
+            </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                maxWidth: { xs: 180, sm: 220, md: 280 },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontWeight: 500,
+              }}
+            >
+              {attachment.filename}
+            </Typography>
+          </Box>
+        </Tooltip>
+      ))}
+    </Box>
+  );
+};
+
 const ThreadDetail: React.FC = () => {
   const { threadId } = useParams<{ threadId: string }>();
   const { getCachedThreadMessages, inlineAttachments, messageAttachments, updatePageThread } = useDataCache();
@@ -167,7 +357,7 @@ const ThreadDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<GMessage[]>([]);
   const [attachmentState, setAttachmentState] = useState<Record<string, AttachmentState>>({});
-  const [viewingPdf, setViewingPdf] = useState<ThreadAttachment | null>(null);
+  const [viewingAttachment, setViewingAttachment] = useState<ThreadAttachment | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const autoMarkedThreadIds = useRef<Set<string>>(new Set());
 
@@ -289,13 +479,8 @@ const ThreadDetail: React.FC = () => {
   }, [attachmentState]);
 
   const downloadAttachment = useCallback((attachment: ThreadAttachment, base64Data: string) => {
-    const binary = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index++) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-
-    const blob = new Blob([bytes], { type: attachment.mimeType || 'application/octet-stream' });
+    const buffer = decodeBase64ToArrayBuffer(base64Data);
+    const blob = new Blob([buffer], { type: attachment.mimeType || 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -315,9 +500,9 @@ const ThreadDetail: React.FC = () => {
   }, [downloadAttachment, fetchAttachmentData]);
 
   const handleThreadAttachmentClick = useCallback(async (attachment: ThreadAttachment) => {
-    if (attachment.mimeType === 'application/pdf') {
+    if (getAttachmentPreviewKind(attachment) !== 'unsupported') {
       await fetchAttachmentData(attachment);
-      setViewingPdf(attachment);
+      setViewingAttachment(attachment);
       setViewerOpen(true);
       return;
     }
@@ -327,7 +512,7 @@ const ThreadDetail: React.FC = () => {
 
   const handleCloseViewer = useCallback(() => {
     setViewerOpen(false);
-    setViewingPdf(null);
+    setViewingAttachment(null);
   }, []);
 
   const handleToggleRead = async () => {
@@ -397,7 +582,7 @@ const ThreadDetail: React.FC = () => {
           <Paper
             elevation={0}
             sx={{
-              p: 3,
+              p: 1,
               mb: 2,
               backgroundColor: theme.palette.background.paper,
             }}
@@ -411,92 +596,14 @@ const ThreadDetail: React.FC = () => {
 
             {!!threadAttachments.length && (
               <Box sx={{ mt: 2.25 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <AttachFileIcon fontSize="small" color="action" />
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    {threadAttachments.length} attachment{threadAttachments.length === 1 ? '' : 's'} across this thread
-                  </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {threadAttachments.map(attachment => (
-                    <Tooltip
-                      key={attachment.key}
-                      title={`${attachment.filename} (${formatFileSize(attachment.size)})${attachment.mimeType === 'application/pdf' ? ' - open PDF' : ' - download file'}`}
-                    >
-                      <Box
-                        component="button"
-                        type="button"
-                        onClick={() => void handleThreadAttachmentClick(attachment)}
-                        sx={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 0.75,
-                          maxWidth: '100%',
-                          px: 1,
-                          py: 0.75,
-                          borderRadius: 999,
-                          border: `1px solid ${theme.palette.divider}`,
-                          backgroundColor: theme.palette.action.hover,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          appearance: 'none',
-                          font: 'inherit',
-                          color: 'inherit',
-                          transition: 'background-color 120ms ease, border-color 120ms ease',
-                          '&:hover': {
-                            backgroundColor: theme.palette.action.selected,
-                          },
-                          '&:focus-visible': {
-                            outline: `2px solid ${theme.palette.primary.main}`,
-                            outlineOffset: 2,
-                          },
-                        }}
-                      >
-                        <Box sx={{ position: 'relative', display: 'inline-flex', mr: 0.25 }}>
-                          {getAttachmentIcon(attachment.mimeType)}
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              right: -5,
-                              bottom: -5,
-                              width: 13,
-                              height: 13,
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: theme.palette.background.paper,
-                              border: `1px solid ${theme.palette.divider}`,
-                              color: theme.palette.text.secondary,
-                              boxShadow: theme.shadows[1],
-                            }}
-                          >
-                            {attachmentState[attachment.key]?.loading ? (
-                              <CircularProgress size={8} thickness={7} />
-                            ) : attachment.mimeType === 'application/pdf' ? (
-                              <VisibilityIcon sx={{ fontSize: 8 }} />
-                            ) : (
-                              <DownloadIcon sx={{ fontSize: 8 }} />
-                            )}
-                          </Box>
-                        </Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            maxWidth: { xs: 180, sm: 220, md: 280 },
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            fontWeight: 500,
-                          }}
-                        >
-                          {attachment.filename}
-                        </Typography>
-                      </Box>
-                    </Tooltip>
-                  ))}
-                </Box>
+                <AttachmentChipRow
+                  attachments={threadAttachments}
+                  onAttachmentClick={handleThreadAttachmentClick}
+                  attachmentState={attachmentState}
+                  getAttachmentIcon={getAttachmentIcon}
+                  theme={theme}
+                  label={`${threadAttachments.length} attachment${threadAttachments.length === 1 ? '' : 's'} across this thread`}
+                />
               </Box>
             )}
           </Paper>
@@ -506,13 +613,20 @@ const ThreadDetail: React.FC = () => {
             const senderName = getFrom(message).split('<')[0].trim() || 'Unknown Sender';
             const messageDate = getDate(message);
             const attachments = message.id ? messageAttachments.get(message.id) as Attachment[] | undefined : undefined;
+            const messageAttachmentChips: ThreadAttachment[] = message.id
+              ? (attachments ?? []).map((attachment, index) => ({
+                  ...attachment,
+                  messageId: message.id!,
+                  key: `${message.id}:${attachment.id}:${index}`,
+                }))
+              : [];
 
             return (
               <Paper
                 key={message.id}
                 elevation={0}
                 sx={{
-                  p: 3,
+                  p: 1,
                   mb: 2,
                   borderLeft: unread ? `4px solid ${theme.palette.primary.main}` : '4px solid transparent',
                   backgroundColor: theme.palette.background.paper,
@@ -543,24 +657,29 @@ const ThreadDetail: React.FC = () => {
                   <Typography variant="body1" fontWeight={unread ? 700 : 500}>
                     {getSubject(message) || '(No subject)'}
                   </Typography>
+
+                  {!!messageAttachmentChips.length && (
+                    <Box sx={{ mt: 1.25 }}>
+                      <AttachmentChipRow
+                        attachments={messageAttachmentChips}
+                        onAttachmentClick={handleThreadAttachmentClick}
+                        attachmentState={attachmentState}
+                        getAttachmentIcon={getAttachmentIcon}
+                        theme={theme}
+                        label={`${messageAttachmentChips.length} attachment${messageAttachmentChips.length === 1 ? '' : 's'}`}
+                      />
+                    </Box>
+                  )}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
 
-                <Box sx={{ p: 1 }}>
-                  <EmailContent
-                    email={message}
-                    inlineAttachments={inlineAttachments}
-                    isDarkMode={isDarkMode}
-                  />
-                </Box>
+                <EmailContent
+                  email={message}
+                  inlineAttachments={inlineAttachments}
+                  isDarkMode={isDarkMode}
+                />
 
-                {message.id && attachments && (
-                  <AttachmentList
-                    messageId={message.id}
-                    attachments={attachments}
-                  />
-                )}
               </Paper>
             );
           })}
@@ -568,7 +687,7 @@ const ThreadDetail: React.FC = () => {
           <Paper
             elevation={0}
             sx={{
-              p: 3,
+              p: 1,
               backgroundColor: theme.palette.background.paper,
             }}
           >
@@ -583,13 +702,13 @@ const ThreadDetail: React.FC = () => {
             </Box>
           </Paper>
 
-          {viewingPdf && (
-            <PdfViewer
+          {viewingAttachment && (
+            <AttachmentViewer
               open={viewerOpen}
               onClose={handleCloseViewer}
-              attachment={viewingPdf}
-              attachmentData={attachmentState[viewingPdf.key]?.data}
-              onDownload={() => void handleDownload(viewingPdf)}
+              attachment={viewingAttachment}
+              attachmentData={attachmentState[viewingAttachment.key]?.data}
+              onDownload={() => void handleDownload(viewingAttachment)}
             />
           )}
         </Box>

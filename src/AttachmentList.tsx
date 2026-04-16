@@ -22,9 +22,9 @@ import {
   Download as DownloadIcon,
   Visibility as ViewIcon
 } from '@mui/icons-material';
-import { Attachment, formatFileSize } from './helpers/emailParser';
+import { Attachment, decodeBase64ToArrayBuffer, formatFileSize } from './helpers/emailParser';
 import { getApiAttachmentData } from './services/gMailApi';
-import PdfViewer from './PdfViewer';
+import AttachmentViewer, { getAttachmentPreviewKind } from './AttachmentViewer';
 
 interface AttachmentListProps {
   messageId: string;
@@ -43,7 +43,7 @@ interface AttachmentState {
 const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments }) => {
   const theme = useTheme();
   const [attachmentState, setAttachmentState] = useState<AttachmentState>({});
-  const [viewingPdf, setViewingPdf] = useState<Attachment | null>(null);
+  const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
 
   // Skip rendering if no attachments are available
@@ -51,19 +51,15 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
     return null;
   }
 
-  const isPdf = (attachment: Attachment) => {
-    return attachment.mimeType === 'application/pdf';
-  };
+  const canPreview = (attachment: Attachment) => getAttachmentPreviewKind(attachment) !== 'unsupported';
 
   const handleAttachmentClick = async (attachment: Attachment) => {
-    if (isPdf(attachment)) {
-      // For PDFs, fetch data and open the viewer
+    if (canPreview(attachment)) {
       await fetchAttachmentData(attachment);
-      setViewingPdf(attachment);
+      setViewingAttachment(attachment);
       setViewerOpen(true);
     } else {
-      // For other file types, download directly
-      handleDownload(attachment);
+      void handleDownload(attachment);
     }
   };
 
@@ -146,12 +142,8 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
 
   const downloadAttachment = (attachment: Attachment, base64Data: string) => {
     // Create blob from base64
-    const binary = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: attachment.mimeType || 'application/octet-stream' });
+    const buffer = decodeBase64ToArrayBuffer(base64Data);
+    const blob = new Blob([buffer], { type: attachment.mimeType || 'application/octet-stream' });
     
     // Create download link
     const url = URL.createObjectURL(blob);
@@ -170,7 +162,7 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
 
   const handleCloseViewer = () => {
     setViewerOpen(false);
-    setViewingPdf(null);
+    setViewingAttachment(null);
   };
 
   const getFileIcon = (mimeType: string) => {
@@ -210,19 +202,19 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
           {attachments.map((attachment) => {
             const state = attachmentState[attachment.id];
             const isLoading = state?.loading || false;
-            const isPdfFile = isPdf(attachment);
+            const previewable = canPreview(attachment);
             
             return (
               <ListItem 
                 key={attachment.id}
                 sx={{ 
                   borderRadius: 1,
-                  cursor: isPdfFile ? 'pointer' : 'default',
+                  cursor: previewable ? 'pointer' : 'default',
                   '&:hover': {
                     backgroundColor: theme.palette.action.hover
                   }
                 }}
-                onClick={isPdfFile ? () => handleAttachmentClick(attachment) : undefined}
+                onClick={previewable ? () => handleAttachmentClick(attachment) : undefined}
               >
                 <ListItemIcon>
                   {getFileIcon(attachment.mimeType)}
@@ -235,8 +227,8 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
                   }}
                 />
                 <ListItemSecondaryAction>
-                  {isPdfFile && (
-                    <Tooltip title="View PDF">
+                  {previewable && (
+                    <Tooltip title="Open preview">
                       <IconButton 
                         edge="end" 
                         onClick={(e) => {
@@ -280,13 +272,13 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
       </Paper>
 
       {/* PDF Viewer Modal */}
-      {viewingPdf && (
-        <PdfViewer
+      {viewingAttachment && (
+        <AttachmentViewer
           open={viewerOpen}
           onClose={handleCloseViewer}
-          attachment={viewingPdf}
-          attachmentData={attachmentState[viewingPdf.id]?.data}
-          onDownload={() => handleDownload(viewingPdf)}
+          attachment={viewingAttachment}
+          attachmentData={attachmentState[viewingAttachment.id]?.data}
+          onDownload={() => void handleDownload(viewingAttachment)}
         />
       )}
     </>

@@ -56,15 +56,38 @@ export const isStarred = (message: GMessage): boolean => {
 };
 
 
+export const normalizeBase64Data = (data: string): string => {
+  if (!data) return '';
+
+  const sanitized = data.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = '='.repeat((4 - sanitized.length % 4) % 4);
+  return sanitized + padding;
+};
+
+export const decodeBase64ToBytes = (data: string): Uint8Array => {
+  const base64 = normalizeBase64Data(data);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index++) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+};
+
+export const decodeBase64ToArrayBuffer = (data: string): ArrayBuffer => {
+  const bytes = decodeBase64ToBytes(data);
+  const buffer = new ArrayBuffer(bytes.length);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+};
+
 // Helper function to decode base64 content
 export const decodeBase64 = (data: string): string => {
   if (!data) return '';
-  
-  // Replace URL-safe characters
-  const sanitized = data.replace(/-/g, '+').replace(/_/g, '/');
-  // Handle padding
-  const padding = '='.repeat((4 - sanitized.length % 4) % 4);
-  const base64 = sanitized + padding;
+
+  const base64 = normalizeBase64Data(data);
   
   try {
     // First attempt: try to decode as UTF-8
@@ -198,6 +221,257 @@ export const processEmailContentForDarkMode = (htmlContent: string, isDarkMode: 
   
   return tempDiv.innerHTML;
 }
+
+export interface SplitQuotedEmailContentResult {
+  visibleHtml: string;
+  quotedHtml: string;
+  hasQuotedContent: boolean;
+}
+
+const quotedClassFragments = [
+  'gmail_attr',
+  'gmail_extra',
+  'gmail_quote',
+  'protonmail_quote',
+  'yahoo_quoted',
+];
+
+const quotedIdFragments = [
+  'divrplyfwdmsg',
+  'replyforward',
+];
+
+const inlineBoundaryTags = new Set([
+  'A',
+  'ABBR',
+  'B',
+  'CITE',
+  'CODE',
+  'EM',
+  'FONT',
+  'I',
+  'LABEL',
+  'SMALL',
+  'SPAN',
+  'STRONG',
+  'SUB',
+  'SUP',
+  'U',
+]);
+
+const quoteHeaderPatterns = [
+  /^on\s.+wrote:?$/i,
+  /^-+\s*original message\s*-+$/i,
+  /^begin forwarded message:?$/i,
+  /^forwarded message:?$/i,
+];
+
+const normalizeNodeText = (text: string): string => text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+
+const isQuoteHeaderText = (text: string): boolean => {
+  const normalized = normalizeNodeText(text);
+  if (!normalized) return false;
+  return quoteHeaderPatterns.some(pattern => pattern.test(normalized));
+};
+
+const hasQuotedMarkerClass = (element: Element): boolean => {
+  const className = typeof element.className === 'string' ? element.className.toLowerCase() : '';
+  if (className && quotedClassFragments.some(fragment => className.includes(fragment))) return true;
+
+  const id = element.id?.toLowerCase() ?? '';
+  return !!id && quotedIdFragments.some(fragment => id.includes(fragment));
+};
+
+const isOutlookReplyHeader = (element: Element): boolean => {
+  const text = normalizeNodeText(element.textContent || '');
+  if (!/^from:\s+/i.test(text)) return false;
+  return /(sent|date):\s+/i.test(text) && /(to|subject):\s+/i.test(text);
+};
+
+const isQuotedBoundaryElement = (element: Element): boolean => {
+  if (hasQuotedMarkerClass(element)) return true;
+
+  if (element instanceof HTMLElement && isQuoteHeaderText(element.innerText || element.textContent || '')) {
+    return true;
+  }
+
+  if (element.tagName === 'BLOCKQUOTE') {
+    const type = element.getAttribute('type')?.toLowerCase();
+    if (type === 'cite' || element.hasAttribute('cite')) return true;
+  }
+
+  return isOutlookReplyHeader(element);
+};
+
+const getPromotedBoundaryNode = (node: Node, root: HTMLElement): Node => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const parent = node.parentElement;
+    if (!parent) return node;
+    return getPromotedBoundaryNode(parent, root);
+  }
+
+  if (!(node instanceof Element)) return node;
+
+  let current: Node = node;
+  while (
+    current instanceof Element &&
+    current.parentElement &&
+    current.parentElement !== root &&
+    inlineBoundaryTags.has(current.tagName)
+  ) {
+    current = current.parentElement;
+  }
+
+  return current;
+};
+
+const findQuotedContentBoundary = (root: HTMLElement): Node | null => {
+  const nodeQueue: Node[] = Array.from(root.childNodes);
+
+  while (nodeQueue.length > 0) {
+    const node = nodeQueue.shift();
+    if (!node) continue;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (isQuoteHeaderText(node.textContent || '')) {
+        return getPromotedBoundaryNode(node, root);
+      }
+      continue;
+    }
+
+    if (!(node instanceof Element)) continue;
+
+    if (isQuotedBoundaryElement(node)) {
+      return getPromotedBoundaryNode(node, root);
+    }
+
+    nodeQueue.unshift(...Array.from(node.childNodes));
+  }
+
+  return null;
+};
+
+const nodeContainsBoundary = (node: Node, boundary: Node): boolean => {
+  if (node === boundary) return true;
+  return node instanceof Element || node instanceof DocumentFragment ? node.contains(boundary) : false;
+};
+
+const isRenderableNode = (node: Node | null): boolean => {
+  if (!node) return false;
+  if (node.nodeType === Node.TEXT_NODE) return !!node.textContent?.trim();
+  if (!(node instanceof Element)) return false;
+  return node.childNodes.length > 0 || !!node.textContent?.trim() || !!node.querySelector('img, table, hr, br');
+};
+
+const splitNodeAtBoundary = (node: Node, boundary: Node): { visibleNode: Node | null; quotedNode: Node | null } => {
+  if (node === boundary) {
+    return { visibleNode: null, quotedNode: node.cloneNode(true) };
+  }
+
+  if (!nodeContainsBoundary(node, boundary)) {
+    return { visibleNode: node.cloneNode(true), quotedNode: null };
+  }
+
+  if (!(node instanceof Element)) {
+    return { visibleNode: null, quotedNode: node.cloneNode(true) };
+  }
+
+  const visibleClone = node.cloneNode(false);
+  const quotedClone = node.cloneNode(false);
+  let boundaryReached = false;
+
+  Array.from(node.childNodes).forEach(child => {
+    if (boundaryReached) {
+      quotedClone.appendChild(child.cloneNode(true));
+      return;
+    }
+
+    if (!nodeContainsBoundary(child, boundary)) {
+      visibleClone.appendChild(child.cloneNode(true));
+      return;
+    }
+
+    const splitChild = splitNodeAtBoundary(child, boundary);
+    if (isRenderableNode(splitChild.visibleNode)) {
+      visibleClone.appendChild(splitChild.visibleNode!);
+    }
+    if (isRenderableNode(splitChild.quotedNode)) {
+      quotedClone.appendChild(splitChild.quotedNode!);
+    }
+    boundaryReached = true;
+  });
+
+  return {
+    visibleNode: isRenderableNode(visibleClone) ? visibleClone : null,
+    quotedNode: isRenderableNode(quotedClone) ? quotedClone : null,
+  };
+};
+
+const serializeNodesToHtml = (nodes: Node[]): string => {
+  const container = document.createElement('div');
+  nodes.forEach(node => container.appendChild(node));
+  return container.innerHTML;
+};
+
+export const splitQuotedEmailContent = (htmlContent: string): SplitQuotedEmailContentResult => {
+  if (!htmlContent) {
+    return {
+      visibleHtml: '',
+      quotedHtml: '',
+      hasQuotedContent: false,
+    };
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = htmlContent;
+
+  const boundary = findQuotedContentBoundary(container);
+  if (!boundary) {
+    return {
+      visibleHtml: htmlContent,
+      quotedHtml: '',
+      hasQuotedContent: false,
+    };
+  }
+
+  const visibleNodes: Node[] = [];
+  const quotedNodes: Node[] = [];
+  let boundaryReached = false;
+
+  Array.from(container.childNodes).forEach(child => {
+    if (boundaryReached) {
+      quotedNodes.push(child.cloneNode(true));
+      return;
+    }
+
+    if (!nodeContainsBoundary(child, boundary)) {
+      visibleNodes.push(child.cloneNode(true));
+      return;
+    }
+
+    const splitChild = splitNodeAtBoundary(child, boundary);
+    if (isRenderableNode(splitChild.visibleNode)) visibleNodes.push(splitChild.visibleNode!);
+    if (isRenderableNode(splitChild.quotedNode)) quotedNodes.push(splitChild.quotedNode!);
+    boundaryReached = true;
+  });
+
+  const visibleHtml = serializeNodesToHtml(visibleNodes).trim();
+  const quotedHtml = serializeNodesToHtml(quotedNodes).trim();
+
+  if (!quotedHtml) {
+    return {
+      visibleHtml: htmlContent,
+      quotedHtml: '',
+      hasQuotedContent: false,
+    };
+  }
+
+  return {
+    visibleHtml,
+    quotedHtml,
+    hasQuotedContent: true,
+  };
+};
 
 // Helper function to extract HTML content from a Gmail message or message part
 export const extractHtmlContent = (item: GMessage | gmail_v1.Schema$MessagePart): string => {
@@ -375,7 +649,7 @@ export const replaceInlineAttachments = async (
 // Helper to guess MIME type from base64 data
 const guessMimeType = (base64Data: string): string => {
   // Look at the first few characters to determine file type
-  const firstChars = atob(base64Data.substring(0, 8));
+  const firstChars = atob(normalizeBase64Data(base64Data).substring(0, 12));
   
   // Check for common image file signatures
   if (firstChars.startsWith('\xFF\xD8')) return 'image/jpeg';
