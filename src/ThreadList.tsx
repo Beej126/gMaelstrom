@@ -1,16 +1,71 @@
 import React, { useMemo, useCallback } from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
+import { Box, IconButton, MenuItem, Typography } from '@mui/material';
+import { DataGrid, GridColDef, GridColumnMenu, GridColumnMenuItemProps, GridColumnMenuProps, GridColumnResizeParams, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CompareArrows from '@mui/icons-material/CompareArrows';
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import { useDataCache } from './services/ctxDataCache';
 import { getFrom, getSubject, getDate } from './helpers/emailParser';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
 import { GThreadHeader } from './services/gMailApi';
-import { useSettings } from './services/ctxSettings';
+import { ThreadListAutoSizeField, ThreadListColumnWidths, useSettings } from './services/ctxSettings';
 
 const emailRowHeight = 26;
+const DEFAULT_THREAD_LIST_COLUMN_WIDTHS: Record<ThreadListAutoSizeField, number> = {
+  from: 150,
+  subject: 360,
+  date: 120,
+  labels: 180,
+};
+
+type ThreadListColumnMenuAutoSizeItemProps = GridColumnMenuItemProps & {
+  autoSizeField?: ThreadListAutoSizeField;
+  onSetAutoSizeField?: (field: ThreadListAutoSizeField) => void;
+};
+
+const ThreadListColumnMenuAutoSizeItem: React.FC<ThreadListColumnMenuAutoSizeItemProps> = ({
+  autoSizeField,
+  colDef,
+  onClick,
+  onSetAutoSizeField,
+}) => {
+  const handleClick = useCallback((event: React.MouseEvent<HTMLLIElement>) => {
+    if (!onSetAutoSizeField) return;
+    onSetAutoSizeField(colDef.field as ThreadListAutoSizeField);
+    onClick(event);
+  }, [colDef.field, onClick, onSetAutoSizeField]);
+
+  return (
+    <MenuItem selected={autoSizeField === colDef.field} onClick={handleClick}>
+      <CompareArrows fontSize="small" style={{ marginRight: 16 }} />
+      Auto-size
+    </MenuItem>
+  );
+};
+
+type ThreadListColumnMenuProps = GridColumnMenuProps & {
+  autoSizeField?: ThreadListAutoSizeField;
+  onSetAutoSizeField?: (field: ThreadListAutoSizeField) => void;
+};
+
+const ThreadListColumnMenu: React.FC<ThreadListColumnMenuProps> = ({ autoSizeField, onSetAutoSizeField, ...props }) => (
+  <GridColumnMenu
+    {...props}
+    slots={{
+      columnMenuAutoSizeItem: ThreadListColumnMenuAutoSizeItem,
+    }}
+    slotProps={{
+      columnMenuAutoSizeItem: {
+        autoSizeField,
+        displayOrder: 25,
+        onSetAutoSizeField,
+      },
+    }}
+  />
+);
 
 const ThreadList: React.FC = () => {
   const cache = useDataCache();
@@ -23,19 +78,44 @@ const ThreadList: React.FC = () => {
     await cache.trashThreadById(threadId);
   }, [cache]);
 
+  const getStoredWidth = useCallback((field: ThreadListAutoSizeField) => {
+    return settings.threadListColumnWidths[field] ?? DEFAULT_THREAD_LIST_COLUMN_WIDTHS[field];
+  }, [settings.threadListColumnWidths]);
+
+  const onColumnWidthChange = useCallback((params: GridColumnResizeParams) => {
+    const field = params.colDef.field as ThreadListAutoSizeField;
+    if (!['from', 'subject', 'date', 'labels'].includes(field)) return;
+
+    const nextWidth = Math.round(params.width);
+    if (settings.threadListColumnWidths[field] === nextWidth) return;
+
+    settings.setThreadListColumnWidths({
+      ...settings.threadListColumnWidths,
+      [field]: nextWidth,
+    } satisfies ThreadListColumnWidths);
+  }, [settings]);
+
+  const renderHeaderLabel = useCallback((label: string, field: ThreadListAutoSizeField) => (
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+      <Box component="span">{label}</Box>
+      {settings.threadListAutoSizeField === field ? <CompareArrows fontSize="small" titleAccess="Auto-sized column" /> : null}
+    </Box>
+  ), [settings.threadListAutoSizeField]);
+
   const columns = useMemo<GridColDef<GThreadHeader>[]>(() => [
     {
       field: 'from',
       headerName: 'From',
-      width: 150,
+      renderHeader: () => renderHeaderLabel('From', 'from'),
+      ...(settings.threadListAutoSizeField === 'from' ? { flex: 1, minWidth: 150 } : { width: getStoredWidth('from') }),
       valueGetter: (_unused, row) => getFrom(row.latestMessage),
       resizable: true,
     },
     {
       field: 'subject',
       headerName: 'Subject',
-      flex: 1,
-      minWidth: 360,
+      renderHeader: () => renderHeaderLabel('Subject', 'subject'),
+      ...(settings.threadListAutoSizeField === 'subject' ? { flex: 1, minWidth: 360 } : { width: getStoredWidth('subject') }),
       resizable: true,
       renderCell: (params: GridRenderCellParams<GThreadHeader>) => (
         <Box sx={{ width: '100%', overflow: 'hidden' }}>
@@ -43,6 +123,9 @@ const ThreadList: React.FC = () => {
             <Typography
               variant="body2"
               sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
                 flex: 1,
                 minWidth: 0,
                 fontWeight: params.row.hasUnread ? settings.listFontWeight + 400 : settings.listFontWeight,
@@ -52,7 +135,18 @@ const ThreadList: React.FC = () => {
                 textOverflow: 'ellipsis',
               }}
             >
-              {getSubject(params.row.latestMessage) || '(No subject)'}
+              {params.row.hasAttachments ? (
+                <AttachFileIcon fontSize="inherit" titleAccess="Attachment" sx={{ flexShrink: 0, fontSize: '1.05em' }} />
+              ) : null}
+              <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {getSubject(params.row.latestMessage) || '(No subject)'}
+              </Box>
+              {params.row.messageCount > 1 ? (
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5, fontSize: '0.95em' }}>
+                  
+                  [<SubdirectoryArrowRightIcon sx={{ fontSize: '1.05em', mr: 0.125 }} />{params.row.messageCount}]
+                </Box>
+              ) : null}
             </Typography>
             <Box className="thread-row-actions" sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, transform: 'translateY(-2px)'}}>
               <IconButton
@@ -83,25 +177,50 @@ const ThreadList: React.FC = () => {
       ),
     },
     {
-      field: 'count',
-      headerName: 'Count',
-      width: 70,
-      align: 'center',
-      headerAlign: 'center',
-      valueGetter: (_unused, row) => row.messageCount,
-      resizable: false,
-    },
-    {
       field: 'date',
       headerName: 'Date',
-      width: 120,
+      renderHeader: () => renderHeaderLabel('Date', 'date'),
+      ...(settings.threadListAutoSizeField === 'date' ? { flex: 1, minWidth: 120 } : { width: getStoredWidth('date') }),
       valueGetter: (_unused, row) => {
         const date = getDate(row.latestMessage);
-        return date ? formatDistanceToNow(date) : '';
+        return date ? formatDistanceToNow(date).replace(/^about\s+/, '~') : '';
       },
       resizable: true,
     },
-  ], [onTrashThread, settings.listFontOpacity, settings.listFontWeight]);
+    {
+      field: 'labels',
+      headerName: 'Labels',
+      renderHeader: () => renderHeaderLabel('Labels', 'labels'),
+      ...(settings.threadListAutoSizeField === 'labels' ? { flex: 1, minWidth: 160 } : { width: getStoredWidth('labels') }),
+      renderCell: (params: GridRenderCellParams<GThreadHeader>) => {
+        const labels = (params.row.labelIds ?? [])
+          .map(labelId => cache.labels.byId(labelId))
+          .filter((label): label is NonNullable<ReturnType<typeof cache.labels.byId>> => !!label);
+
+        const userLabels = labels
+          .filter(label => !label.isSystem)
+          .map(label => label.displayName)
+          .sort();
+
+        const systemLabels = labels
+          .filter(label => label.isSystem)
+          .map(label => label.displayName)
+          .sort();
+
+        return (
+          <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {userLabels.length ? userLabels.join(', ') : null}
+            {systemLabels.length ? (
+              <Box component="span" sx={{ fontSize: '0.82em', opacity: 0.72 }}>
+                {userLabels.length ? ` - ${systemLabels.join(', ')}` : systemLabels.join(', ')}
+              </Box>
+            ) : null}
+          </Box>
+        );
+      },
+      resizable: true,
+    },
+  ], [cache, getStoredWidth, onTrashThread, renderHeaderLabel, settings.listFontOpacity, settings.listFontWeight, settings.threadListAutoSizeField]);
 
   const onRowClick = useCallback((params: GridRowParams<GThreadHeader>) => {
     navigate(`/thread/${params.row.id}?mode=threads`);
@@ -116,13 +235,24 @@ const ThreadList: React.FC = () => {
         rowHeight={emailRowHeight}
         rowCount={cache.totalThreads}
         onRowClick={onRowClick}
+        onColumnWidthChange={onColumnWidthChange}
         getRowClassName={params => params.row.hasUnread ? 'email-unread' : 'email-read'}
         columns={columns}
+        slots={{
+          columnMenu: ThreadListColumnMenu,
+        }}
+        slotProps={{
+          columnMenu: {
+            autoSizeField: settings.threadListAutoSizeField,
+            onSetAutoSizeField: settings.setThreadListAutoSizeField,
+          } as ThreadListColumnMenuProps,
+        }}
         checkboxSelection={true}
         disableRowSelectionOnClick={true}
         rowSelectionModel={cache.checkedRowIds}
         onRowSelectionModelChange={cache.setCheckedRowIds}
         disableColumnFilter={true}
+        disableColumnSorting={true}
         sortingOrder={[]}
         paginationMode="server"
         paginationModel={{ page: cache.currentPage, pageSize: cache.pageSize }}

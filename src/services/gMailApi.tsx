@@ -37,6 +37,31 @@ const getMessageDateValue = (message: GMessage) => {
   return Number.isNaN(parsedDate) ? 0 : parsedDate;
 };
 
+const messageHasAttachments = (message: GMessage): boolean => {
+  const checkPartsForAttachments = (parts?: gmail_v1.Schema$MessagePart[]): boolean => {
+    if (!parts?.length) return false;
+
+    for (const part of parts) {
+      if (part.filename && part.filename.length > 0) {
+        const contentDispositionHeader = (part.headers || []).find(header =>
+          header.name?.toLowerCase() === 'content-disposition'
+        );
+        const isInlineImage = contentDispositionHeader?.value?.toLowerCase().includes('inline')
+          && typeof part.mimeType === 'string'
+          && part.mimeType.startsWith('image/');
+
+        if (!isInlineImage) return true;
+      }
+
+      if (checkPartsForAttachments(part.parts)) return true;
+    }
+
+    return false;
+  };
+
+  return checkPartsForAttachments(message.payload?.parts);
+};
+
 export const getApiMessages = async (
   labelId: string,
   pageSize: number,
@@ -118,8 +143,10 @@ export type GThreadHeader = {
   id: string;
   snippet: string;
   latestMessage: GMessage;
+  labelIds: string[];
   messageCount: number;
   hasUnread: boolean;
+  hasAttachments: boolean;
 };
 
 const buildThreadHeader = (thread: GThreadWithMessages): GThreadHeader | null => {
@@ -140,8 +167,10 @@ const buildThreadHeader = (thread: GThreadWithMessages): GThreadHeader | null =>
     id: thread.id,
     snippet: thread.snippet,
     latestMessage,
+    labelIds: Array.from(new Set(messages.flatMap(message => message.labelIds ?? []))),
     messageCount: messages.length,
     hasUnread: messages.some(message => (message.labelIds ?? []).includes('UNREAD')),
+    hasAttachments: messages.some(message => messageHasAttachments(message)),
   };
 };
 

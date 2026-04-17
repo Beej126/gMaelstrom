@@ -3,7 +3,7 @@ import type { GThreadWithMessages } from './gMailApi';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const THREAD_METADATA_FIELDS = encodeURIComponent('id,snippet,messages(id,threadId,snippet,labelIds,payload(headers))');
+const THREAD_METADATA_FIELDS = encodeURIComponent('id,snippet,messages(id,threadId,snippet,labelIds,payload(headers,parts(filename,mimeType,headers,parts(filename,mimeType,headers,parts(filename,mimeType,headers,parts(filename,mimeType,headers))))))');
 
 export const gmailApiThreadBatchFetch = async (
   threadIds: string[]
@@ -21,7 +21,7 @@ export const gmailApiThreadBatchFetch = async (
       `--${boundary}`,
       'Content-Type: application/http',
       '',
-      `GET /gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date&fields=${THREAD_METADATA_FIELDS}`,
+      `GET /gmail/v1/users/me/threads/${threadId}?format=full&fields=${THREAD_METADATA_FIELDS}`,
       '',
     ].join('\r\n')).join('') + `\r\n--${boundary}--`;
 

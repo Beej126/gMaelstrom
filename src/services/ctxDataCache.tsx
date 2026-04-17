@@ -284,6 +284,20 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     setInlineAttachments(inlineAttachmentsMap);
   }, []);
 
+  const syncThreadHeaderAttachmentState = useCallback((threadId: string, threadMessages: GMessage[]) => {
+    const existingThreadHeader = threadHeaderDetailsCache.current[threadId];
+    if (!existingThreadHeader) return;
+
+    const nextHasAttachments = threadMessages.some(message => hasAttachments(message));
+    if (existingThreadHeader.hasAttachments === nextHasAttachments) return;
+
+    threadHeaderDetailsCache.current[threadId] = {
+      ...existingThreadHeader,
+      hasAttachments: nextHasAttachments,
+    };
+    setThreadHeaderCacheVersion(version => version + 1);
+  }, []);
+
   const getCachedMessageDetails = useCallback(async (messageId: string) => {
     let message = messageDetailsCache.current[messageId];
     if (!message) {
@@ -292,9 +306,10 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
       const thread = await gMailApi.getApiThreadMessages(message.threadId);
       threadDetailsCache.current[message.threadId] = thread;
       processEmailAttachments(thread);
+      syncThreadHeaderAttachmentState(message.threadId, thread);
     }
     return message;
-  }, [processEmailAttachments]);
+  }, [processEmailAttachments, syncThreadHeaderAttachmentState]);
 
   const getCachedThreadMessages = useCallback(async (threadId: string) => {
     let threadMessages = threadDetailsCache.current[threadId];
@@ -306,8 +321,9 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
       });
       processEmailAttachments(threadMessages);
     }
+    syncThreadHeaderAttachmentState(threadId, threadMessages);
     return threadMessages;
-  }, [processEmailAttachments]);
+  }, [processEmailAttachments, syncThreadHeaderAttachmentState]);
 
   const enrichThreadHeaders = useCallback(async (threadRefs: GThread[]) => {
     const missingIds = threadRefs
