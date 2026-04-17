@@ -1,7 +1,6 @@
 // @internal - Only import this module into ctxApiDataCache.tsx, don't use it anywhere else in the app
 
 import { getAuthedUser } from './gAuthApi';
-import { gmailApiBatchFetch } from './gMailApiBatchFetch';
 import { gmailApiThreadBatchFetch } from './gMailApiThreadBatchFetch';
 import { toast } from 'react-toastify';
 import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
@@ -62,58 +61,6 @@ const messageHasAttachments = (message: GMessage): boolean => {
   return checkPartsForAttachments(message.payload?.parts);
 };
 
-export const getApiMessages = async (
-  labelId: string,
-  pageSize: number,
-  pageToken: string | null
-): Promise<{ emails: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken: string | null; total: number }> => {
-
-  const params = new URLSearchParams({
-    maxResults: String(pageSize),
-    ...(pageToken ? { pageToken } : {}),
-    ...(labelId ? { labelIds: labelId } : {}),
-  });
-  const data = await gApiFetchJson<{ messages?: Array<{ id: string; threadId: string; snippet: string; labelIds: string[] }>; nextPageToken?: string; resultSizeEstimate?: number }>(`messages?${params.toString()}`);
-  const messages = data.messages || [];
-  const nextPageToken = data.nextPageToken || null;
-  const total = typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : 0;
-  if (!messages.length) return { emails: [], nextPageToken, total };
-
-  // Batch fetch message metadata for all messages in this page
-  const messageIds = messages.map((m: { id: string }) => m.id);
-
-  const batchResults = await gmailApiBatchFetch(messageIds);
-  // Only include valid message objects (must have id)
-  const emails = batchResults
-    .filter(
-      (meta): meta is {
-        id: string;
-        threadId: string;
-        snippet: string;
-        labelIds: string[];
-        payload?: gmail_v1.Schema$MessagePart;
-      } =>
-        !!meta &&
-        typeof meta.id === 'string' &&
-        typeof meta.threadId === 'string' &&
-        typeof meta.snippet === 'string' &&
-        Array.isArray(meta.labelIds)
-    )
-    .map(meta => ({
-      id: meta.id,
-      threadId: meta.threadId,
-      snippet: meta.snippet,
-      labelIds: meta.labelIds,
-      payload: meta.payload,
-    }));
-  return { emails, nextPageToken, total };
-};
-
-// Fetch full message details only when needed (e.g., when user opens an email)
-export const getApiMessageDetailsById = async (id: string): Promise<GMessage> =>
-  gApiFetchJson(`messages/${id}?format=full`);
-
-
 export const getApiAttachmentData = (messageId: string, attachmentId: string) =>
   gApiFetchJson<{ data?: string }>(`messages/${messageId}/attachments/${attachmentId}`).then(resp =>
     resp.data?.replace(/-/g, '+').replace(/_/g, '/'));
@@ -125,15 +72,6 @@ export const setApiLabelVisibility = async (labelId: string, labelListVisibility
   return gApiFetchJson<void>(`labels/${labelId}`, "PATCH", { labelListVisibility } satisfies Partial<GLabel>);
 };
 
-
-export const markApiMessageIdsAsRead = async (emailIds: string[], asRead: boolean) => {
-  if (!emailIds.length || !emailIds.filter(Boolean)) return;
-
-  return gApiFetchJson<void>('messages/batchModify', "POST", {
-    ids: emailIds,
-    ...(asRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] })
-  });
-};
 
 export type GThreadWithMessages = StrictRequired<Pick<gmail_v1.Schema$Thread, 'id' | 'snippet' | 'messages'>> & {
   messages: GMessage[];
@@ -333,14 +271,10 @@ export const gApiFetchJson = async <T,>(
 };
 
 export default {
-  getApiMessages,
-  getApiMessageDetailsById,
   getApiAttachmentData,
 
   getApiLabels,
   setApiLabelVisibility,
-
-  markMessageIdsAsRead: markApiMessageIdsAsRead,
 
   getApiThreadsByLabelId,
   getApiThreadHeaders,

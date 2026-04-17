@@ -5,8 +5,6 @@ import {
   Box,
   Button,
   Typography,
-  ToggleButton,
-  ToggleButtonGroup,
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
@@ -59,11 +57,6 @@ const Header: React.FC = () => {
     setRefreshing(false);
   };
 
-  const onModeChange = (_event: React.MouseEvent<HTMLElement>, nextMode: 'threads' | 'messages' | null) => {
-    if (!nextMode) return;
-    cache.switchViewMode(nextMode);
-  };
-
   const onSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   };
@@ -84,7 +77,7 @@ const Header: React.FC = () => {
       {cache.labels.byId(cache.selectedLabelId)?.displayName}
     </Typography>
 
-    <IconButton sx={{ left: -5, width: 35 }} size="large" onClick={onRefreshEmails} aria-label="Refresh email list" title="Refresh email list" disabled={refreshing || cache.loading}>
+    <IconButton sx={{ left: -5, width: 35 }} size="large" onClick={onRefreshEmails} aria-label="Refresh thread list" title="Refresh thread list" disabled={refreshing || cache.loading}>
       <RefreshIcon fontSize="small" />
     </IconButton>
 
@@ -96,9 +89,9 @@ const Header: React.FC = () => {
         bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
       }}
     >
-      <span title={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}>
+      <span title="Mark selected threads as read">
         <IconButton
-          aria-label={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}
+          aria-label="Mark selected threads as read"
           size="small"
           onClick={() => cache.markCheckedRowIdsAsRead(true)}
           disabled={!cache.checkedRowIds.ids.size}
@@ -116,28 +109,13 @@ const Header: React.FC = () => {
       onClick={onComposeClick}
     >Compose</Button>
 
-    <ToggleButtonGroup
-      exclusive
-      size="small"
-      value={cache.viewMode}
-      onChange={onModeChange}
-      sx={{ ml: 1.5, borderRadius: 2, overflow: 'hidden' }}
-    >
-      <ToggleButton value="messages" aria-label="Messages mode">
-        Messages
-      </ToggleButton>
-      <ToggleButton value="threads" aria-label="Threads mode">
-        Threads
-      </ToggleButton>
-    </ToggleButtonGroup>
-
     <Box component="form" onSubmit={onSearchSubmit} sx={{ flexGrow: 1, mx: 2 }}>
       <Search>
         <SearchIconWrapper>
           <SearchIcon />
         </SearchIconWrapper>
         <SearchInput
-          placeholder="Search for emails…"
+          placeholder="Search threads…"
           inputProps={{ 'aria-label': 'search' }}
           value={searchQuery}
           onChange={onSearchChange}

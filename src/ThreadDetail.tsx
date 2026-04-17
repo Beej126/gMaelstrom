@@ -27,7 +27,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import AttachmentViewer, { getAttachmentPreviewKind } from './AttachmentViewer';
-import styles from './EmailDetail.module.scss';
+import styles from './ThreadDetail.module.scss';
 import { useDataCache } from './services/ctxDataCache';
 import {
   Attachment,
@@ -151,7 +151,7 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
   return (
     <Box>
       <div
-        className={styles.emailHtmlReset}
+        className={styles.threadHtmlReset}
         style={{
           color: theme.palette.text.primary,
           ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
@@ -199,7 +199,7 @@ const EmailContent: React.FC<EmailContentProps> = ({ email, inlineAttachments, i
               }}
             >
               <div
-                className={styles.emailHtmlReset}
+                className={styles.threadHtmlReset}
                 style={{
                   color: theme.palette.text.primary,
                   ['--email-link-color' as string]: isDarkMode ? theme.palette.primary.light : theme.palette.primary.main,
@@ -551,7 +551,7 @@ const ThreadDetail: React.FC = () => {
     if (!threadId) return;
 
     await trashThreadById(threadId);
-    navigate('/?mode=threads', { replace: true });
+    navigate('/', { replace: true });
   }, [navigate, threadId, trashThreadById]);
 
   if (error) {
@@ -560,7 +560,7 @@ const ThreadDetail: React.FC = () => {
         <Typography color="error" variant="h6" gutterBottom>
           {error}
         </Typography>
-        <Button variant="contained" startIcon={<ArrowBackIcon />} onClick={() => navigate('/?mode=threads')}>
+        <Button variant="contained" startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
           Back to Threads
         </Button>
       </Box>
@@ -575,6 +575,8 @@ const ThreadDetail: React.FC = () => {
     );
   }
 
+  const showThreadHeader = orderedMessages.length > 1;
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Paper
@@ -587,7 +589,7 @@ const ThreadDetail: React.FC = () => {
           borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <IconButton onClick={() => navigate('/?mode=threads', { replace: true })} title="Back to threads">
+        <IconButton onClick={() => navigate('/', { replace: true })} title="Back to threads">
           <ArrowBackIcon />
         </IconButton>
 
@@ -611,34 +613,36 @@ const ThreadDetail: React.FC = () => {
             bgcolor: theme.palette.mode === 'dark' ? theme.palette.background.default : '#f5f5f5',
           }}
         >
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1,
-              mb: 2,
-              backgroundColor: theme.palette.background.paper,
-            }}
-          >
-            <Typography variant="h5" fontWeight="600">
-              {getSubject(latestMessage) || '(No subject)'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {orderedMessages.length} message{orderedMessages.length === 1 ? '' : 's'} in this thread
-            </Typography>
+          {showThreadHeader && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1,
+                mb: 2,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              <Typography variant="h5" fontWeight="600">
+                {getSubject(latestMessage) || '(No subject)'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {orderedMessages.length} message{orderedMessages.length === 1 ? '' : 's'} in this thread
+              </Typography>
 
-            {!!threadAttachments.length && (
-              <Box sx={{ mt: 2.25 }}>
-                <AttachmentChipRow
-                  attachments={threadAttachments}
-                  onAttachmentClick={handleThreadAttachmentClick}
-                  attachmentState={attachmentState}
-                  getAttachmentIcon={getAttachmentIcon}
-                  theme={theme}
-                  label={`${threadAttachments.length} attachment${threadAttachments.length === 1 ? '' : 's'} across this thread`}
-                />
-              </Box>
-            )}
-          </Paper>
+              {!!threadAttachments.length && (
+                <Box sx={{ mt: 2.25 }}>
+                  <AttachmentChipRow
+                    attachments={threadAttachments}
+                    onAttachmentClick={handleThreadAttachmentClick}
+                    attachmentState={attachmentState}
+                    getAttachmentIcon={getAttachmentIcon}
+                    theme={theme}
+                    label={`${threadAttachments.length} attachment${threadAttachments.length === 1 ? '' : 's'} across this thread`}
+                  />
+                </Box>
+              )}
+            </Paper>
+          )}
 
           {orderedMessages.map(message => {
             const unread = !isRead(message);

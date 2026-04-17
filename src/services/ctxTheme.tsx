@@ -42,8 +42,6 @@ interface FontWeightSettings {
   regular: number;
   medium: number;
   bold: number;
-  emailListFrom: number;
-  emailListSubject: number;
 }
 
 interface ThemeContextType {
@@ -83,8 +81,6 @@ const DEFAULT_FONT_WEIGHTS: FontWeightSettings = {
   regular: 400,
   medium: 500,
   bold: 700,
-  emailListFrom: 700,    // Bold by default for unread emails
-  emailListSubject: 700, // Bold by default for unread emails
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

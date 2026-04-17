@@ -15,25 +15,12 @@ import { createContextBundle } from '../helpers/contextFactory';
 import { useXCollectionState } from '../helpers/XCollection';
 import { arrayToRecord } from '../helpers/typeHelpers';
 
-export type ViewMode = 'threads' | 'messages';
-
 export type IDataCache = {
   loading: boolean;
-  viewMode: ViewMode;
-  switchViewMode: (nextMode: ViewMode) => void;
   refreshCurrentView: () => Promise<void>;
 
-  fetchMessages: (page: number, pageSize: number, force?: boolean) => Promise<void>;
-  messageHeadersCache: GMessage[];
-  getCachedMessageDetails: (emailId: string) => Promise<GMessage>;
-  setCachedEmail: (email: GMessage) => void;
-  selectedEmail: GMessage | null;
-  setSelectedEmail: (email: GMessage | null) => void;
   messageAttachments: Map<string, Attachment[]>;
   inlineAttachments: Map<string, Record<string, InlineAttachment>>;
-  totalMessages: number;
-  currentPageMessages: GMessage[];
-  updatePageMessage: (email: GMessage) => void;
 
   checkedRowIds: GridRowSelectionModel;
   setCheckedRowIds: (selection: GridRowSelectionModel) => void;
@@ -48,13 +35,12 @@ export type IDataCache = {
   setSettingsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   selectedLabelId: string | undefined;
   setSelectedLabelId: (labelId: string) => void;
-  activeTotalRows: number;
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   pageSize: number;
   setPageSize: (pageSize: number) => void;
+  knownUnreadThreadCounts: Record<string, number>;
 
-  fetchThreads: (page: number, pageSize: number, force?: boolean) => Promise<void>;
   getCachedThreadMessages: (threadId: string) => Promise<GMessage[]>;
   totalThreads: number;
   currentPageThreads: GThreadHeader[];
@@ -72,11 +58,6 @@ type PagedRequestScope = {
   isCurrent: () => boolean;
   ensureCurrent: () => void;
   commit: (action: () => void) => boolean;
-};
-
-const getInitialViewMode = (): ViewMode => {
-  const mode = new URLSearchParams(window.location.search).get('mode');
-  return mode === 'messages' ? 'messages' : 'threads';
 };
 
 const applyReadState = (message: GMessage, asRead: boolean): GMessage => ({
@@ -100,26 +81,12 @@ const removeIdFromSelection = (selection: GridRowSelectionModel, id: string): Gr
 export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [settingsEditMode, setSettingsEditMode] = useState(false);
-  const [viewMode] = useState<ViewMode>(getInitialViewMode);
-
-  const [messageHeadersCache, setMessageHeadersCache] = useState<GMessage[]>([]);
-  const messageDetailsCache = useRef<Record<string, GMessage>>({});
-  const setCachedEmail = (email: GMessage) => {
-    messageDetailsCache.current[email.id] = email;
-  };
-  const [selectedEmail, setSelectedEmail] = useState<GMessage | null>(null);
 
   const [messageAttachments, setEmailAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [inlineAttachments, setInlineAttachments] = useState<Map<string, Record<string, InlineAttachment>>>(new Map());
 
-  // Gmail API uses pageToken, so we track tokens for each page separately for message and thread mode.
-  const [messagePageTokens, setMessagePageTokens] = useState<Array<string | null>>([null]);
-  const [totalMessages, setTotalMessages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSizeState] = useState<number>(-1);
-  const messageHeadersCacheRef = useRef<GMessage[]>([]);
-  const messagePageTokensRef = useRef<Array<string | null>>([null]);
-  const totalMessagesRef = useRef<number>(0);
 
   const [threadRefsCache, setThreadRefsCache] = useState<GThread[]>([]);
   const threadDetailsCache = useRef<Record<string, GMessage[]>>({});
@@ -166,18 +133,6 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
   const [selectedLabelId, setSelectedLabelIdState] = useState<string>();
 
   useEffect(() => {
-    messageHeadersCacheRef.current = messageHeadersCache;
-  }, [messageHeadersCache]);
-
-  useEffect(() => {
-    messagePageTokensRef.current = messagePageTokens;
-  }, [messagePageTokens]);
-
-  useEffect(() => {
-    totalMessagesRef.current = totalMessages;
-  }, [totalMessages]);
-
-  useEffect(() => {
     threadRefsCacheRef.current = threadRefsCache;
   }, [threadRefsCache]);
 
@@ -204,23 +159,19 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
   const resetPagedViewState = useCallback(() => {
     pagedViewVersion.current += 1;
     inflightFetchKeys.current.clear();
-    messageHeadersCacheRef.current = [];
     threadRefsCacheRef.current = [];
-    messagePageTokensRef.current = [null];
     threadPageTokensRef.current = [null];
-    totalMessagesRef.current = 0;
     totalThreadsRef.current = 0;
-    setMessageHeadersCache([]);
     setThreadRefsCache([]);
-    setMessagePageTokens([null]);
     setThreadPageTokens([null]);
-    setTotalMessages(0);
     setTotalThreads(0);
     setCurrentPage(0);
     setCheckedRowIds(createEmptySelection());
-    setSelectedEmail(null);
+    threadDetailsCache.current = {};
     threadHeaderDetailsCache.current = {};
     inflightThreadHeaderIds.current.clear();
+    setEmailAttachments(new Map());
+    setInlineAttachments(new Map());
     setThreadHeaderCacheVersion(version => version + 1);
   }, []);
 
@@ -298,27 +249,11 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     setThreadHeaderCacheVersion(version => version + 1);
   }, []);
 
-  const getCachedMessageDetails = useCallback(async (messageId: string) => {
-    let message = messageDetailsCache.current[messageId];
-    if (!message) {
-      message = await gMailApi.getApiMessageDetailsById(messageId);
-      messageDetailsCache.current[message.id] = message;
-      const thread = await gMailApi.getApiThreadMessages(message.threadId);
-      threadDetailsCache.current[message.threadId] = thread;
-      processEmailAttachments(thread);
-      syncThreadHeaderAttachmentState(message.threadId, thread);
-    }
-    return message;
-  }, [processEmailAttachments, syncThreadHeaderAttachmentState]);
-
   const getCachedThreadMessages = useCallback(async (threadId: string) => {
     let threadMessages = threadDetailsCache.current[threadId];
     if (!threadMessages) {
       threadMessages = await gMailApi.getApiThreadMessages(threadId);
       threadDetailsCache.current[threadId] = threadMessages;
-      threadMessages.forEach(message => {
-        messageDetailsCache.current[message.id] = message;
-      });
       processEmailAttachments(threadMessages);
     }
     syncThreadHeaderAttachmentState(threadId, threadMessages);
@@ -343,65 +278,6 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
       missingIds.forEach(threadId => inflightThreadHeaderIds.current.delete(threadId));
     }
   }, []);
-
-  const fetchMessages = useCallback(async (page: number, nextPageSize: number, force = false): Promise<void> => {
-    if (nextPageSize === -1 || !selectedLabelId) return;
-
-    const requestScope = createPagedRequestScope();
-    const requestKey = `messages:${selectedLabelId}:${page}:${nextPageSize}:${force ? 'force' : 'cache'}`;
-    if (inflightFetchKeys.current.has(requestKey)) return;
-
-    const start = page * nextPageSize;
-    const end = start + nextPageSize;
-    const cacheSlice = messageHeadersCacheRef.current.slice(start, end);
-    const cacheHit = !force && cacheSlice.length === nextPageSize && cacheSlice.every(Boolean) && end <= totalMessagesRef.current;
-
-    if (cacheHit) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    inflightFetchKeys.current.add(requestKey);
-    try {
-      let tokens = [...messagePageTokensRef.current];
-      while (tokens.length <= page) {
-        const prevResult = await gMailApi.getApiMessages(selectedLabelId, nextPageSize, tokens[tokens.length - 1]);
-        requestScope.ensureCurrent();
-        tokens = [...tokens, prevResult.nextPageToken || null];
-      }
-
-      requestScope.commit(() => {
-        messagePageTokensRef.current = tokens;
-        setMessagePageTokens(tokens);
-      });
-
-      const result = await gMailApi.getApiMessages(selectedLabelId, nextPageSize, tokens[page] ?? null);
-      requestScope.commit(() => {
-        totalMessagesRef.current = result.total;
-        setTotalMessages(result.total);
-        setMessageHeadersCache(prev => {
-          const nextCache = [...prev];
-          for (let index = 0; index < result.emails.length; index++) {
-            nextCache[start + index] = result.emails[index];
-          }
-          messageHeadersCacheRef.current = nextCache;
-          return nextCache;
-        });
-      });
-    } catch (error) {
-      if (error === stalePagedRequest) return;
-      requestScope.commit(() => {
-        messageHeadersCacheRef.current = [];
-        totalMessagesRef.current = 0;
-        setMessageHeadersCache([]);
-        setTotalMessages(0);
-      });
-    } finally {
-      inflightFetchKeys.current.delete(requestKey);
-      requestScope.commit(() => setLoading(false));
-    }
-  }, [createPagedRequestScope, selectedLabelId]);
 
   const fetchThreads = useCallback(async (page: number, nextPageSize: number, force = false): Promise<void> => {
     if (nextPageSize === -1 || !selectedLabelId) return;
@@ -467,21 +343,8 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
   }, [createPagedRequestScope, enrichThreadHeaders, selectedLabelId]);
 
   useEffect(() => {
-    if (viewMode === 'messages') fetchMessages(currentPage, pageSize);
-    else fetchThreads(currentPage, pageSize);
-  }, [currentPage, fetchMessages, fetchThreads, pageSize, selectedLabelId, viewMode]);
-
-  const currentPageMessages = useMemo(() => {
-    if (pageSize === -1) return [];
-    const start = currentPage * pageSize;
-    return messageHeadersCache.slice(start, start + pageSize);
-  }, [currentPage, messageHeadersCache, pageSize]);
-
-  const updatePageMessage = useCallback((updatedEmail: GMessage) => {
-    setMessageHeadersCache(prev => prev.map(email => email?.id === updatedEmail.id ? { ...email, ...updatedEmail } : email));
-    messageDetailsCache.current[updatedEmail.id] = { ...(messageDetailsCache.current[updatedEmail.id] ?? updatedEmail), ...updatedEmail };
-    setSelectedEmail(prev => prev?.id === updatedEmail.id ? { ...prev, ...updatedEmail } : prev);
-  }, []);
+    fetchThreads(currentPage, pageSize);
+  }, [currentPage, fetchThreads, pageSize, selectedLabelId]);
 
   const currentPageThreadRefs = useMemo(() => {
     if (pageSize === -1) return [];
@@ -490,9 +353,9 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
   }, [currentPage, pageSize, threadRefsCache]);
 
   useEffect(() => {
-    if (viewMode !== 'threads' || !currentPageThreadRefs.length) return;
+    if (!currentPageThreadRefs.length) return;
     enrichThreadHeaders(currentPageThreadRefs);
-  }, [currentPageThreadRefs, enrichThreadHeaders, viewMode]);
+  }, [currentPageThreadRefs, enrichThreadHeaders]);
 
   const currentPageThreads = useMemo(() => {
     void threadHeaderCacheVersion;
@@ -500,6 +363,19 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
       .map(thread => threadHeaderDetailsCache.current[thread.id])
       .filter((thread): thread is GThreadHeader => thread !== undefined);
   }, [currentPageThreadRefs, threadHeaderCacheVersion]);
+
+  const knownUnreadThreadCounts = useMemo(() => {
+    void threadHeaderCacheVersion;
+
+    const counts: Record<string, number> = {};
+    for (const threadHeader of Object.values(threadHeaderDetailsCache.current)) {
+      if (!threadHeader.hasUnread) continue;
+      for (const labelId of threadHeader.labelIds ?? []) {
+        counts[labelId] = (counts[labelId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [threadHeaderCacheVersion]);
 
   const updatePageThread = useCallback((threadId: string, patch: Partial<GThreadHeader>) => {
     const existingThread = threadHeaderDetailsCache.current[threadId];
@@ -575,65 +451,35 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     const ids = getSelectionIds(checkedRowIds);
     if (!ids.length) return;
 
-    if (viewMode === 'messages') {
-      await gMailApi.markMessageIdsAsRead(ids, asRead);
-      const selectedIds = new Set(ids);
-      setMessageHeadersCache(prev => prev.map(email => selectedIds.has(email.id) ? applyReadState(email, asRead) : email));
-      setSelectedEmail(prev => prev && selectedIds.has(prev.id) ? applyReadState(prev, asRead) : prev);
-    } else {
-      await gMailApi.markThreadIdsAsRead(ids, asRead);
-      const selectedIds = new Set(ids);
-      selectedIds.forEach(threadId => {
-        const existingThread = threadHeaderDetailsCache.current[threadId];
-        if (!existingThread) return;
-        threadHeaderDetailsCache.current[threadId] = {
-          ...existingThread,
-          hasUnread: !asRead,
-          latestMessage: applyReadState(existingThread.latestMessage, asRead),
-        };
-      });
-      setThreadHeaderCacheVersion(version => version + 1);
-    }
+    await gMailApi.markThreadIdsAsRead(ids, asRead);
+    const selectedIds = new Set(ids);
+    selectedIds.forEach(threadId => {
+      const existingThread = threadHeaderDetailsCache.current[threadId];
+      if (!existingThread) return;
+      threadHeaderDetailsCache.current[threadId] = {
+        ...existingThread,
+        hasUnread: !asRead,
+        latestMessage: applyReadState(existingThread.latestMessage, asRead),
+      };
+    });
+    setThreadHeaderCacheVersion(version => version + 1);
 
     setCheckedRowIds(createEmptySelection());
-  }, [checkedRowIds, viewMode]);
+  }, [checkedRowIds]);
 
   const refreshCurrentView = useCallback(async () => {
-    if (viewMode === 'messages') await fetchMessages(currentPage, pageSize, true);
-    else {
-      threadHeaderDetailsCache.current = {};
-      inflightThreadHeaderIds.current.clear();
-      setThreadHeaderCacheVersion(version => version + 1);
-      await fetchThreads(currentPage, pageSize, true);
-    }
-  }, [currentPage, fetchMessages, fetchThreads, pageSize, viewMode]);
-
-  const switchViewMode = useCallback((nextMode: ViewMode) => {
-    if (nextMode === viewMode) return;
-    const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = '/';
-    nextUrl.searchParams.set('mode', nextMode);
-    nextUrl.hash = '';
-    window.location.assign(nextUrl.toString());
-  }, [viewMode]);
+    threadHeaderDetailsCache.current = {};
+    inflightThreadHeaderIds.current.clear();
+    setThreadHeaderCacheVersion(version => version + 1);
+    await fetchThreads(currentPage, pageSize, true);
+  }, [currentPage, fetchThreads, pageSize]);
 
   const value: IDataCache = {
     loading,
-    viewMode,
-    switchViewMode,
     refreshCurrentView,
 
-    fetchMessages,
-    messageHeadersCache,
-    getCachedMessageDetails,
-    setCachedEmail,
-    selectedEmail,
-    setSelectedEmail,
     messageAttachments,
     inlineAttachments,
-    totalMessages,
-    currentPageMessages,
-    updatePageMessage,
 
     checkedRowIds,
     setCheckedRowIds,
@@ -644,13 +490,12 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     setSettingsEditMode,
     selectedLabelId,
     setSelectedLabelId,
-    activeTotalRows: viewMode === 'messages' ? totalMessages : totalThreads,
     currentPage,
     setCurrentPage,
     pageSize,
     setPageSize,
+    knownUnreadThreadCounts,
 
-    fetchThreads,
     getCachedThreadMessages,
     totalThreads,
     currentPageThreads,

@@ -11,7 +11,6 @@ import {
   Checkbox,
 } from '@mui/material';
 import { useDataCache } from './services/ctxDataCache';
-import { isRead } from './helpers/emailParser';
 import { useResizableWidth } from './helpers/useResizableWidth';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import CheckIcon from '@mui/icons-material/Check';
@@ -24,8 +23,7 @@ const LabelsSidePanel: React.FC = () => {
 
   const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
-  const getUnreadCount = (labelId: string) =>
-    cache.messageHeadersCache.filter(email => (email.labelIds || []).includes(labelId) && !isRead(email)).length;
+  const getUnreadCount = (labelId: string) => cache.knownUnreadThreadCounts[labelId] ?? 0;
 
   // Prefer Inbox on first load, otherwise fall back to the first visible label.
   const { selectedLabelId, setSelectedLabelId, labels } = cache; // destructure these specific values to silence lint wanting the entire cache object added to the dependency array
@@ -39,9 +37,8 @@ const LabelsSidePanel: React.FC = () => {
       cache.setSelectedLabelId(labelId);
     }
 
-    const expectedSearch = `?mode=${cache.viewMode}`;
-    if (location.pathname !== '/' || location.search !== expectedSearch) {
-      navigate(`/${expectedSearch}`);
+    if (location.pathname !== '/' || location.search) {
+      navigate('/');
     }
   };
 

@@ -1,19 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import EmailDetail from './EmailDetail';
 import './AppGlobal.scss';
 import { Box, Toolbar } from '@mui/material';
 import Header from './Header';
 import LabelsSidePanel from './LabelsSidePanel';
 import { AuthFailed } from './AuthFailed';
-import EmailList from './EmailList';
 import ThreadList from './ThreadList';
 import ThreadDetail from './ThreadDetail';
-import { useDataCache } from './services/ctxDataCache';
 
 const App: React.FC = () => {
-  const cache = useDataCache();
-
   return (
     <Router>
       <div style={{
@@ -45,8 +40,7 @@ const App: React.FC = () => {
             <AuthFailed />
 
             <Routes>
-              <Route path="/" element={cache.viewMode === 'messages' ? <EmailList /> : <ThreadList />} />
-              <Route path="/email/:emailId" element={<EmailDetail />} />
+              <Route path="/" element={<ThreadList />} />
               <Route path="/thread/:threadId" element={<ThreadDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

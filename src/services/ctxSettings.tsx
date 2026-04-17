@@ -21,9 +21,6 @@ interface SettingsContextType {
   listFontOpacity: number;
   setListFontOpacity: (opacity: number) => void;
 
-  combineThreads: boolean;
-  setCombineThreads: (combine: boolean) => void;
-
   threadListAutoSizeField: ThreadListAutoSizeField;
   setThreadListAutoSizeField: (field: ThreadListAutoSizeField) => void;
 
@@ -39,7 +36,7 @@ export const useSettings = () => {
   return context;
 };
 
-export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'LIST_FONT_WEIGHT', 'LIST_FONT_OPACITY', 'DARK_MODE', 'COMBINE_THREADS', 'SYSTEM_LABEL_VISIBILITY', 'LABEL_ORDER', 'THREAD_LIST_AUTO_SIZE_FIELD', 'THREAD_LIST_COLUMN_WIDTHS'] as const]);
+export const SettingName = makeStringEnum([...['EMAIL_LIST_DENSITY', 'LIST_FONT_WEIGHT', 'LIST_FONT_OPACITY', 'DARK_MODE', 'SYSTEM_LABEL_VISIBILITY', 'LABEL_ORDER', 'THREAD_LIST_AUTO_SIZE_FIELD', 'THREAD_LIST_COLUMN_WIDTHS'] as const]);
 export type SettingNameType = EnumValue<typeof SettingName>;
 
 
@@ -52,7 +49,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [density, setDensity] = useLocalStorageState<DensityMode, SettingNameType>(SettingName.EMAIL_LIST_DENSITY, "sparse");
   const [listFontWeight, setListFontWeight] = useLocalStorageState<number, SettingNameType>(SettingName.LIST_FONT_WEIGHT, 200);
   const [listFontOpacity, setListFontOpacity] = useLocalStorageState<number, SettingNameType>(SettingName.LIST_FONT_OPACITY, 1);
-  const [combineThreads, setCombineThreads] = useLocalStorageState<boolean, SettingNameType>(SettingName.COMBINE_THREADS, true);
   const [threadListAutoSizeField, setThreadListAutoSizeField] = useLocalStorageState<ThreadListAutoSizeField, SettingNameType>(SettingName.THREAD_LIST_AUTO_SIZE_FIELD, 'subject');
   const [threadListColumnWidths, setThreadListColumnWidths] = useLocalStorageState<ThreadListColumnWidths, SettingNameType>(SettingName.THREAD_LIST_COLUMN_WIDTHS, {});
 
@@ -69,9 +65,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       listFontOpacity,
       setListFontOpacity,
-
-      combineThreads,
-      setCombineThreads,
 
       threadListAutoSizeField,
       setThreadListAutoSizeField,

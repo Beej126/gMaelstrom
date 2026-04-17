@@ -223,7 +223,7 @@ const ThreadList: React.FC = () => {
   ], [cache, getStoredWidth, onTrashThread, renderHeaderLabel, settings.listFontOpacity, settings.listFontWeight, settings.threadListAutoSizeField]);
 
   const onRowClick = useCallback((params: GridRowParams<GThreadHeader>) => {
-    navigate(`/thread/${params.row.id}?mode=threads`);
+    navigate(`/thread/${params.row.id}`);
   }, [navigate]);
 
   return (

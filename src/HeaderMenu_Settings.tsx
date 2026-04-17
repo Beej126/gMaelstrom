@@ -17,7 +17,6 @@ import {
 import ViewComfyIcon from '@mui/icons-material/ViewComfy';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import ForumIcon from '@mui/icons-material/Forum';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useSettings } from './services/ctxSettings';
 import { toast } from 'react-toastify';
@@ -49,11 +48,6 @@ const SettingsMenu: React.FC = _ => {
 
   const onDensityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     settings.setDensity(event.target.value as 'sparse' | 'condensed');
-    onClose();
-  };
-
-  const onCombineThreadsChange = () => {
-    settings.setCombineThreads(!settings.combineThreads);
     onClose();
   };
 
@@ -145,7 +139,7 @@ const SettingsMenu: React.FC = _ => {
           <ListItemIcon >
             <ViewComfyIcon color="primary" />
           </ListItemIcon>
-          <ListItemText primary="Email List Density" />
+          <ListItemText primary="List Density" />
         </Box>
 
         <RadioGroup
@@ -159,18 +153,6 @@ const SettingsMenu: React.FC = _ => {
           <FormControlLabel value="sparse" control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Sparse</Typography>} sx={{ ml: 0, mr: 2, py: 0, minHeight: 0, alignItems: 'center' }} />
           <FormControlLabel value="condensed" control={<Radio size="small" sx={{ p: 0.5, alignSelf: 'center' }} />} label={<Typography variant="body2" sx={{ lineHeight: 1.5, alignSelf: 'center', mt: 0.1 }}>Condensed</Typography>} sx={{ ml: 0, mr: 0, py: 0, minHeight: 0, alignItems: 'center' }} />
         </RadioGroup>
-      </MenuItem>
-
-      <Divider sx={{ my: 0, minHeight: 0 }} />
-
-      <MenuItem onClick={onCombineThreadsChange}>
-        <Box display="flex" alignItems="center">
-          <ListItemIcon>
-            <ForumIcon color="primary" />
-          </ListItemIcon>
-          <ListItemText>Combine Threads</ListItemText>
-        </Box>
-        <Switch checked={settings.combineThreads} onChange={onCombineThreadsChange} onClick={e => e.stopPropagation()} />
       </MenuItem>
 
       <Divider sx={{ my: 0, minHeight: 0 }} />
