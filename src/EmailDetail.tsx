@@ -6,7 +6,6 @@ import {
   Typography,
   IconButton,
   Divider,
-  Tooltip,
   Avatar,
   CircularProgress,
   Button,
@@ -287,42 +286,30 @@ const EmailDetail: React.FC = () => {
           borderBottom: `1px solid ${theme.palette.divider}`
         }}
       >
-        <Tooltip title="Back to inbox">
-          <IconButton onClick={() => navigate('/?mode=messages', { replace: true })}>
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
+        <IconButton onClick={() => navigate('/?mode=messages', { replace: true })} title="Back to inbox">
+          <ArrowBackIcon />
+        </IconButton>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Archive">
-            <IconButton>
-              <ArchiveIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton title="Archive">
+            <ArchiveIcon />
+          </IconButton>
 
-          <Tooltip title="Delete">
-            <IconButton>
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton title="Delete">
+            <DeleteIcon />
+          </IconButton>
 
-          <Tooltip title={isReadLocal ? "Mark as unread" : "Mark as read"}>
-            <IconButton onClick={handleToggleRead}>
-              {isReadLocal ? <MarkEmailReadIcon /> : <MarkEmailUnreadIcon /> }
-            </IconButton>
-          </Tooltip>
+          <IconButton onClick={handleToggleRead} title={isReadLocal ? "Mark as unread" : "Mark as read"}>
+            {isReadLocal ? <MarkEmailReadIcon /> : <MarkEmailUnreadIcon /> }
+          </IconButton>
 
-          <Tooltip title="Labels">
-            <IconButton>
-              <LabelIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton title="Labels">
+            <LabelIcon />
+          </IconButton>
 
-          <Tooltip title="More options">
-            <IconButton>
-              <MoreVertIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton title="More options">
+            <MoreVertIcon />
+          </IconButton>
         </Box>
       </Paper>
 
@@ -350,11 +337,9 @@ const EmailDetail: React.FC = () => {
                 <Typography variant="h5" fontWeight="500">
                   {getSubject(selectedEmail) || '(No subject)'}
                 </Typography>
-                <Tooltip title={isStarred(selectedEmail) ? "Starred" : "Not starred"}>
-                  <IconButton>
-                    {isStarred(selectedEmail) ? <StarIcon color="warning" /> : <StarBorderIcon />}
-                  </IconButton>
-                </Tooltip>
+                <IconButton title={isStarred(selectedEmail) ? "Starred" : "Not starred"}>
+                  {isStarred(selectedEmail) ? <StarIcon color="warning" /> : <StarBorderIcon />}
+                </IconButton>
               </Box>
 
               {/* Email metadata */}

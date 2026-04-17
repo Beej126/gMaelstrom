@@ -9,13 +9,13 @@ import {
   Divider,
   IconButton,
   Paper,
-  Tooltip,
   Typography,
   useTheme,
 } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -34,7 +34,7 @@ import {
   extractHtmlContent,
   formatFileSize,
   getDate,
-  getFrom,
+  getFromParts,
   getSubject,
   getTo,
   InlineAttachment,
@@ -282,81 +282,78 @@ const AttachmentChipRow: React.FC<AttachmentChipRowProps> = ({
       </Box>
 
       {attachments.map(attachment => (
-        <Tooltip
+        <Box
           key={attachment.key}
+          component="button"
+          type="button"
+          onClick={() => void onAttachmentClick(attachment)}
           title={`${attachment.filename} (${formatFileSize(attachment.size)}) - ${getAttachmentActionLabel(attachment)}`}
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            maxWidth: '100%',
+            px: 1,
+            py: 0.75,
+            borderRadius: 999,
+            border: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.action.hover,
+            cursor: 'pointer',
+            textAlign: 'left',
+            appearance: 'none',
+            font: 'inherit',
+            color: 'inherit',
+            transition: 'background-color 120ms ease, border-color 120ms ease',
+            '&:hover': {
+              backgroundColor: theme.palette.action.selected,
+            },
+            '&:focus-visible': {
+              outline: `2px solid ${theme.palette.primary.main}`,
+              outlineOffset: 2,
+            },
+          }}
         >
-          <Box
-            component="button"
-            type="button"
-            onClick={() => void onAttachmentClick(attachment)}
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 0.75,
-              maxWidth: '100%',
-              px: 1,
-              py: 0.75,
-              borderRadius: 999,
-              border: `1px solid ${theme.palette.divider}`,
-              backgroundColor: theme.palette.action.hover,
-              cursor: 'pointer',
-              textAlign: 'left',
-              appearance: 'none',
-              font: 'inherit',
-              color: 'inherit',
-              transition: 'background-color 120ms ease, border-color 120ms ease',
-              '&:hover': {
-                backgroundColor: theme.palette.action.selected,
-              },
-              '&:focus-visible': {
-                outline: `2px solid ${theme.palette.primary.main}`,
-                outlineOffset: 2,
-              },
-            }}
-          >
-            <Box sx={{ position: 'relative', display: 'inline-flex', mr: 0.25 }}>
-              {getAttachmentIcon(attachment.mimeType)}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  right: -5,
-                  bottom: -5,
-                  width: 13,
-                  height: 13,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: theme.palette.background.paper,
-                  border: `1px solid ${theme.palette.divider}`,
-                  color: theme.palette.text.secondary,
-                  boxShadow: theme.shadows[1],
-                }}
-              >
-                {attachmentState[attachment.key]?.loading ? (
-                  <CircularProgress size={8} thickness={7} />
-                ) : getAttachmentPreviewKind(attachment) !== 'unsupported' ? (
-                  <VisibilityIcon sx={{ fontSize: 8 }} />
-                ) : (
-                  <DownloadIcon sx={{ fontSize: 8 }} />
-                )}
-              </Box>
-            </Box>
-            <Typography
-              variant="body2"
+          <Box sx={{ position: 'relative', display: 'inline-flex', mr: 0.25 }}>
+            {getAttachmentIcon(attachment.mimeType)}
+            <Box
               sx={{
-                maxWidth: { xs: 180, sm: 220, md: 280 },
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontWeight: 500,
+                position: 'absolute',
+                right: -5,
+                bottom: -5,
+                width: 13,
+                height: 13,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                color: theme.palette.text.secondary,
+                boxShadow: theme.shadows[1],
               }}
             >
-              {attachment.filename}
-            </Typography>
+              {attachmentState[attachment.key]?.loading ? (
+                <CircularProgress size={8} thickness={7} />
+              ) : getAttachmentPreviewKind(attachment) !== 'unsupported' ? (
+                <VisibilityIcon sx={{ fontSize: 8 }} />
+              ) : (
+                <DownloadIcon sx={{ fontSize: 8 }} />
+              )}
+            </Box>
           </Box>
-        </Tooltip>
+          <Typography
+            variant="body2"
+            sx={{
+              maxWidth: { xs: 180, sm: 220, md: 280 },
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontWeight: 500,
+            }}
+          >
+            {attachment.filename}
+          </Typography>
+        </Box>
       ))}
     </Box>
   );
@@ -364,7 +361,7 @@ const AttachmentChipRow: React.FC<AttachmentChipRowProps> = ({
 
 const ThreadDetail: React.FC = () => {
   const { threadId } = useParams<{ threadId: string }>();
-  const { getCachedThreadMessages, inlineAttachments, messageAttachments, updatePageThread } = useDataCache();
+  const { getCachedThreadMessages, inlineAttachments, messageAttachments, trashThreadById, updatePageThread } = useDataCache();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
@@ -550,6 +547,13 @@ const ThreadDetail: React.FC = () => {
     applyThreadReadState(markAsRead);
   };
 
+  const handleTrashThread = useCallback(async () => {
+    if (!threadId) return;
+
+    await trashThreadById(threadId);
+    navigate('/?mode=threads', { replace: true });
+  }, [navigate, threadId, trashThreadById]);
+
   if (error) {
     return (
       <Box p={3} display="flex" flexDirection="column" alignItems="center">
@@ -583,17 +587,18 @@ const ThreadDetail: React.FC = () => {
           borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Tooltip title="Back to threads">
-          <IconButton onClick={() => navigate('/?mode=threads', { replace: true })}>
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
+        <IconButton onClick={() => navigate('/?mode=threads', { replace: true })} title="Back to threads">
+          <ArrowBackIcon />
+        </IconButton>
 
-        <Tooltip title={isThreadRead ? 'Mark thread as unread' : 'Mark thread as read'}>
-          <IconButton onClick={handleToggleRead}>
-            {isThreadRead ? <MarkEmailReadIcon /> : <MarkEmailUnreadIcon />}
-          </IconButton>
-        </Tooltip>
+
+        <IconButton onClick={handleToggleRead} title={isThreadRead ? 'Mark thread as unread' : 'Mark thread as read'}>
+          {isThreadRead ? <MarkEmailReadIcon /> : <MarkEmailUnreadIcon />}
+        </IconButton>
+
+        <IconButton onClick={() => void handleTrashThread()} title="Move thread to trash">
+          <DeleteOutlineIcon />
+        </IconButton>
       </Paper>
 
       <div className="email-list-container">
@@ -637,7 +642,8 @@ const ThreadDetail: React.FC = () => {
 
           {orderedMessages.map(message => {
             const unread = !isRead(message);
-            const senderName = getFrom(message).split('<')[0].trim() || 'Unknown Sender';
+            const { name: parsedSenderName, address: senderAddress } = getFromParts(message);
+            const senderName = parsedSenderName || 'Unknown Sender';
             const messageDate = getDate(message);
             const attachments = message.id ? messageAttachments.get(message.id) as Attachment[] | undefined : undefined;
             const messageAttachmentChips: ThreadAttachment[] = message.id
@@ -667,8 +673,16 @@ const ThreadDetail: React.FC = () => {
                       </Avatar>
 
                       <Box>
-                        <Typography variant="subtitle1" fontWeight={unread ? 800 : 500}>
-                          {senderName}
+                        <Typography variant="subtitle1" fontWeight={unread ? 800 : 500} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, flexWrap: 'wrap' }}>
+                          <Box component="span" sx={{ fontSize: '0.875em', fontWeight: 400, color: 'text.secondary' }}>
+                            From:
+                          </Box>
+                          <Box component="span">{senderName}</Box>
+                          {senderAddress && senderAddress !== senderName && (
+                            <Box component="span" sx={{ fontSize: '0.875em', fontWeight: 400, color: 'text.secondary' }}>
+                              ({senderAddress})
+                            </Box>
+                          )}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" fontWeight={unread ? 600 : 400}>
                           To: {getTo(message).join(', ') || 'me'}

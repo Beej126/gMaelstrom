@@ -10,8 +10,7 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemSecondaryAction,
-  useTheme,
-  Tooltip
+  useTheme
 } from '@mui/material';
 import { 
   AttachFile as AttachmentIcon,
@@ -255,42 +254,40 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ messageId, attachments 
                 />
                 <ListItemSecondaryAction>
                   {previewable && (
-                    <Tooltip title="Open preview">
-                      <IconButton 
-                        edge="end" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAttachmentClick(attachment);
-                        }}
-                        disabled={isLoading}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      >
-                        {isLoading ? (
-                          <CircularProgress size={20} />
-                        ) : (
-                          <ViewIcon />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  <Tooltip title="Download">
                     <IconButton 
                       edge="end" 
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownload(attachment);
+                        handleAttachmentClick(attachment);
                       }}
                       disabled={isLoading}
                       size="small"
+                      sx={{ mr: 1 }}
+                      title="Open preview"
                     >
                       {isLoading ? (
                         <CircularProgress size={20} />
                       ) : (
-                        <DownloadIcon />
+                        <ViewIcon />
                       )}
                     </IconButton>
-                  </Tooltip>
+                  )}
+                  <IconButton 
+                    edge="end" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload(attachment);
+                    }}
+                    disabled={isLoading}
+                    size="small"
+                    title="Download"
+                  >
+                    {isLoading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <DownloadIcon />
+                    )}
+                  </IconButton>
                 </ListItemSecondaryAction>
               </ListItem>
             );

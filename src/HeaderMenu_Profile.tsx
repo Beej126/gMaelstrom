@@ -7,7 +7,6 @@ import {
   Typography,
   ListItemIcon,
   ListItemText,
-  Tooltip,
   IconButton,
   Avatar,
 } from '@mui/material';
@@ -31,23 +30,22 @@ const ProfileMenu: React.FC = _ => {
 
   return <>
 
-    <Tooltip title={user?.name ?? 'Please sign in'}>
-      <IconButton
-        sx={{ mx: -0.75 }}
-        size="large"
-        edge="end"
-        aria-haspopup="true"
-        onClick={onOpen}
-      >
-        {user?.picture ? (
-          <Avatar src={user.picture} alt={user.name ?? user.email} />
-        ) : (
-          <Avatar >
-            {user?.initials ?? '??'}
-          </Avatar>
-        )}
-      </IconButton>
-    </Tooltip>
+    <IconButton
+      sx={{ mx: -0.75 }}
+      size="large"
+      edge="end"
+      aria-haspopup="true"
+      onClick={onOpen}
+      title={user?.name ?? 'Please sign in'}
+    >
+      {user?.picture ? (
+        <Avatar src={user.picture} alt={user.name ?? user.email} />
+      ) : (
+        <Avatar >
+          {user?.initials ?? '??'}
+        </Avatar>
+      )}
+    </IconButton>
 
 
     <Menu

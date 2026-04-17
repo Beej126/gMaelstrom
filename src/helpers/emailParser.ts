@@ -1,19 +1,31 @@
 import { GMessage } from "../services/gMailApi";
 import type { gmail_v1 } from "googleapis"; //be SUPER CAREFUL to import only types ... without "type" it could severly expand the runtime bundle size!!
 
-// Extract the 'From' field from a Gmail message
-export const getFrom = (message?: GMessage | null): string => {
+export const getFromHeaderValue = (message?: GMessage | null): string => {
   if (!message) return '';
   const headers = message.payload?.headers || [];
   const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from');
-  if (!fromHeader?.value) return '';
+  return fromHeader?.value?.trim() ?? '';
+};
 
-  // Extract the display name (pretty portion) before <...>
-  // Example: '"John Doe" <john@example.com>' => John Doe
-  // Example: 'John Doe <john@example.com>' => John Doe
-  // Example: 'john@example.com' => john@example.com
-  const match = fromHeader.value.match(/^["' ]*(.*?)["' ]*(<.*>)$/);
-  return match && match[1] ? match[1].trim() : fromHeader.value.trim();
+export const getFromParts = (message?: GMessage | null): { name: string; address?: string } => {
+  const rawFrom = getFromHeaderValue(message);
+  if (!rawFrom) return { name: '' };
+
+  const bracketMatch = rawFrom.match(/^\s*["']?(.+?)["']?\s*<([^>]+)>\s*$/);
+  if (bracketMatch) {
+    return {
+      name: bracketMatch[1].trim(),
+      address: bracketMatch[2].trim(),
+    };
+  }
+
+  return { name: rawFrom };
+};
+
+// Extract the 'From' field from a Gmail message
+export const getFrom = (message?: GMessage | null): string => {
+  return getFromParts(message).name;
 };
 
 // Extract the 'To' field from a Gmail message

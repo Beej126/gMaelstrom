@@ -216,6 +216,12 @@ export const markApiThreadIdsAsRead = async (threadIds: string[], asRead: boolea
   }
 };
 
+export const trashApiThread = async (threadId: string) => {
+  if (!threadId) return;
+
+  return gApiFetchJson<GThreadWithMessages>(`threads/${threadId}/trash`, 'POST');
+};
+
 const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
 
 // React 18+ "strict mode" causes useEffect to double invoke in dev mode which drives double fetches
@@ -313,5 +319,6 @@ export default {
   getApiThreadDetailsById,
   getApiThreadMessages,
   markThreadAsRead: markApiThreadAsRead,
-  markThreadIdsAsRead: markApiThreadIdsAsRead
+  markThreadIdsAsRead: markApiThreadIdsAsRead,
+  trashThread: trashApiThread,
 };

@@ -3,7 +3,6 @@ import {
   InputBase,
   IconButton,
   Box,
-  Tooltip,
   Button,
   Typography,
   ToggleButton,
@@ -79,19 +78,15 @@ const Header: React.FC = () => {
   };
   return <>
 
-    <Tooltip title="gMaelstrom">
-      <GMaelstromIcon sx={{ color: 'rgb(33, 150, 243)', fontSize: 30, cursor: 'pointer' }} onClick={() => window.location.reload()} />
-    </Tooltip>
+    <GMaelstromIcon titleAccess="gMaelstrom" sx={{ color: 'rgb(33, 150, 243)', fontSize: 30, cursor: 'pointer' }} onClick={() => window.location.reload()} />
 
     <Typography variant="h6" component="div" sx={{ fontWeight: 600, ml: 1 }}>
       {cache.labels.byId(cache.selectedLabelId)?.displayName}
     </Typography>
 
-    <Tooltip title="Refresh email list">
-      <IconButton sx={{ left: -5, width: 35 }} size="large" onClick={onRefreshEmails} aria-label="Refresh email list" disabled={refreshing || cache.loading}>
-        <RefreshIcon fontSize="small" />
-      </IconButton>
-    </Tooltip>
+    <IconButton sx={{ left: -5, width: 35 }} size="large" onClick={onRefreshEmails} aria-label="Refresh email list" title="Refresh email list" disabled={refreshing || cache.loading}>
+      <RefreshIcon fontSize="small" />
+    </IconButton>
 
     <Box
       sx={{
@@ -101,18 +96,16 @@ const Header: React.FC = () => {
         bgcolor: theme => theme.palette.mode === 'dark' ? '#232323' : '#fafbfc',
       }}
     >
-      <Tooltip title={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'} disableInteractive>
-        <span>
-          <IconButton
-            aria-label={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}
-            size="small"
-            onClick={() => cache.markCheckedRowIdsAsRead(true)}
-            disabled={!cache.checkedRowIds.ids.size}
-          >
-            <MarkEmailUnreadIcon />
-          </IconButton>
-        </span>
-      </Tooltip>
+      <span title={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}>
+        <IconButton
+          aria-label={cache.viewMode === 'threads' ? 'Mark selected threads as read' : 'Mark selected emails as read'}
+          size="small"
+          onClick={() => cache.markCheckedRowIdsAsRead(true)}
+          disabled={!cache.checkedRowIds.ids.size}
+        >
+          <MarkEmailUnreadIcon />
+        </IconButton>
+      </span>
 
     </Box>
 
@@ -153,11 +146,9 @@ const Header: React.FC = () => {
       </Search>
     </Box>
 
-    <Tooltip title="Help">
-      <IconButton sx={{ mx: -0.75 }} size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer">
-        <HelpOutlineIcon />
-      </IconButton>
-    </Tooltip>
+    <IconButton sx={{ mx: -0.75 }} size="large" component="a" href="https://github.com/Beej126/gMaelstrom#readme" target="_blank" rel="noopener noreferrer" title="Help">
+      <HelpOutlineIcon />
+    </IconButton>
 
     <MenuSettings />
 

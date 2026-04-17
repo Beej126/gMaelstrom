@@ -1,8 +1,9 @@
 import React, { useMemo, useCallback } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useDataCache } from './services/ctxDataCache';
 import { getFrom, getSubject, getDate } from './helpers/emailParser';
 import useMuiGridHelpers from './helpers/useMuiGridHelpers';
@@ -16,6 +17,11 @@ const ThreadList: React.FC = () => {
   const settings = useSettings();
   const navigate = useNavigate();
   const refGrid = useMuiGridHelpers(emailRowHeight, cache.setPageSize);
+
+  const onTrashThread = useCallback(async (event: React.MouseEvent, threadId: string) => {
+    event.stopPropagation();
+    await cache.trashThreadById(threadId);
+  }, [cache]);
 
   const columns = useMemo<GridColDef<GThreadHeader>[]>(() => [
     {
@@ -32,19 +38,34 @@ const ThreadList: React.FC = () => {
       minWidth: 360,
       resizable: true,
       renderCell: (params: GridRenderCellParams<GThreadHeader>) => (
-        <Box sx={{ overflow: 'hidden', py: 0.25 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: params.row.hasUnread ? settings.listFontWeight + 400 : settings.listFontWeight,
-              opacity: settings.listFontOpacity,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {getSubject(params.row.latestMessage) || '(No subject)'}
-          </Typography>
+        <Box sx={{ width: '100%', overflow: 'hidden' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                fontWeight: params.row.hasUnread ? settings.listFontWeight + 400 : settings.listFontWeight,
+                opacity: settings.listFontOpacity,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {getSubject(params.row.latestMessage) || '(No subject)'}
+            </Typography>
+            <Box className="thread-row-actions" sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, transform: 'translateY(-2px)'}}>
+              <IconButton
+                size="small"
+                aria-label="Move thread to trash"
+                title="Move thread to trash"
+                onClick={event => void onTrashThread(event, params.row.id)}
+                onMouseDown={event => event.stopPropagation()}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
           <Typography
             variant="caption"
             color="text.secondary"
@@ -80,7 +101,7 @@ const ThreadList: React.FC = () => {
       },
       resizable: true,
     },
-  ], [settings.listFontOpacity, settings.listFontWeight]);
+  ], [onTrashThread, settings.listFontOpacity, settings.listFontWeight]);
 
   const onRowClick = useCallback((params: GridRowParams<GThreadHeader>) => {
     navigate(`/thread/${params.row.id}?mode=threads`);
@@ -112,6 +133,15 @@ const ThreadList: React.FC = () => {
         pageSizeOptions={[cache.pageSize]}
         sx={{
           '--DataGrid-checkboxSelectionColWidth': '26px',
+          '& .thread-row-actions': {
+            opacity: 0,
+            pointerEvents: 'none',
+            transition: 'opacity 140ms ease-in-out',
+          },
+          '& .MuiDataGrid-row:hover .thread-row-actions': {
+            opacity: 1,
+            pointerEvents: 'auto',
+          },
           '& .MuiDataGrid-columnHeaderTitle': {
             fontWeight: settings.listFontWeight,
             opacity: settings.listFontOpacity,

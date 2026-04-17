@@ -115,7 +115,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           },
           background: {
             default: '#121212',
-            paper: '#1e1e1e',
+            paper: '#262626',
           },
         }
         : {
@@ -151,20 +151,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         styleOverrides: {
           root: {
             textTransform: 'none',
-          },
-        },
-      },
-      MuiTooltip: {
-        defaultProps: {
-          PopperProps: {
-            modifiers: [
-              {
-                name: 'offset',
-                options: {
-                  offset: [0, -16], // Move up by ~1em (16px)
-                },
-              },
-            ],
           },
         },
       },

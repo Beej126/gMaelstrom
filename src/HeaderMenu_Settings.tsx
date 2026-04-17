@@ -12,7 +12,6 @@ import {
   FormControlLabel,
   Radio,
   TextField,
-  Tooltip,
   IconButton
 } from '@mui/material';
 import ViewComfyIcon from '@mui/icons-material/ViewComfy';
@@ -93,19 +92,18 @@ const SettingsMenu: React.FC = _ => {
 
   return <>
 
-    <Tooltip title="Settings">
-      <IconButton
-        sx={{
-          mx: -0.75,
-          // zIndex allows the button to be clickable even when the menu is open
-          zIndex: (theme) => theme.zIndex.modal + 1 
-        }} 
-        size="large"
-        onClick={onToggleOpen}
-      >
-        <SettingsIcon />
-      </IconButton>
-    </Tooltip>
+    <IconButton
+      sx={{
+        mx: -0.75,
+        // zIndex allows the button to be clickable even when the menu is open
+        zIndex: (theme) => theme.zIndex.modal + 1 
+      }} 
+      size="large"
+      onClick={onToggleOpen}
+      title="Settings"
+    >
+      <SettingsIcon />
+    </IconButton>
 
     <Menu
       // lowering the zIndex down to 1 (theme default 1300) allows the label panel settings to be clickable while the menu is open
