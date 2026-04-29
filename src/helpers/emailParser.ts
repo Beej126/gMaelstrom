@@ -8,6 +8,11 @@ export const getFromHeaderValue = (message?: GMessage | null): string => {
   return fromHeader?.value?.trim() ?? '';
 };
 
+export const getHeaderValue = (message: GMessage | null | undefined, headerName: string): string => {
+  if (!message) return '';
+  return message.payload?.headers?.find(header => header.name?.toLowerCase() === headerName.toLowerCase())?.value ?? '';
+};
+
 export const getFromParts = (message?: GMessage | null): { name: string; address?: string } => {
   const rawFrom = getFromHeaderValue(message);
   if (!rawFrom) return { name: '' };
@@ -54,6 +59,12 @@ export const getDate = (message?: GMessage | null): string => {
   // Try to parse the date string
   const date = new Date(dateHeader.value);
   return isNaN(date.getTime()) ? '' : date.toISOString();
+};
+
+export const getMessageDateValue = (message: GMessage | null | undefined): number => {
+  const rawDate = getHeaderValue(message, 'Date');
+  const parsedDate = rawDate ? Date.parse(rawDate) : NaN;
+  return Number.isNaN(parsedDate) ? 0 : parsedDate;
 };
 
 // Check if a Gmail message is read
@@ -717,8 +728,6 @@ const guessMimeType = (base64Data: string): string => {
   // Default to generic binary data
   return 'application/octet-stream';
 };
-
-// (getHeader removed: unused)
 
 // Helper to check if an email has attachments
 export const hasAttachments = (message: GMessage): boolean => {

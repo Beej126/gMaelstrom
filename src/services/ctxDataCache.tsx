@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import gMailApi, { GLabel, GMessage, GThread, GThreadHeader } from './gMailApi';
+import gMailApi, { GLabel, GMessage, GThread, GThreadHeader, GThreadWithMessages } from './gMailApi';
+import { gmailApiThreadBatchFetch } from './gMailApiThreadBatchFetch';
 import { SettingName } from './ctxSettings';
 import { getFromLocalStorage, saveToLocalStorage } from '../helpers/browserStorage';
 import InboxIcon from '@mui/icons-material/Inbox';
@@ -10,7 +11,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import StarOutlineIcon from '@mui/icons-material/StarOutline';
 import { SvgIcon } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
-import { Attachment, extractAttachments, extractInlineAttachments, hasAttachments, InlineAttachment } from '../helpers/emailParser';
+import { Attachment, extractAttachments, extractInlineAttachments, getMessageDateValue, hasAttachments, InlineAttachment } from '../helpers/emailParser';
 import { createContextBundle } from '../helpers/contextFactory';
 import { useXCollectionState } from '../helpers/XCollection';
 import { arrayToRecord } from '../helpers/typeHelpers';
@@ -39,12 +40,12 @@ export type IDataCache = {
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   pageSize: number;
   setPageSize: (pageSize: number) => void;
-  knownUnreadThreadCounts: Record<string, number>;
 
   getCachedThreadMessages: (threadId: string) => Promise<GMessage[]>;
   totalThreads: number;
   currentPageThreads: GThreadHeader[];
   updatePageThread: (threadId: string, patch: Partial<GThreadHeader>) => void;
+  setCachedThreadReadState: (threadId: string, asRead: boolean) => void;
 };
 
 const { Provider: DataCacheProvider, useCtx: useDataCache } = createContextBundle<IDataCache>();
@@ -66,6 +67,31 @@ const applyReadState = (message: GMessage, asRead: boolean): GMessage => ({
     ? (message.labelIds ?? []).filter(labelId => labelId !== 'UNREAD')
     : Array.from(new Set([...(message.labelIds ?? []), 'UNREAD'])),
 });
+
+const buildThreadHeader = (thread: GThreadWithMessages): GThreadHeader | null => {
+  const messages = (thread.messages ?? []).filter(
+    (message): message is GMessage =>
+      !!message &&
+      typeof message.id === 'string' &&
+      typeof message.threadId === 'string' &&
+      typeof message.snippet === 'string' &&
+      Array.isArray(message.labelIds)
+  );
+
+  if (!messages.length) return null;
+
+  const orderedMessages = [...messages].sort((left, right) => getMessageDateValue(left) - getMessageDateValue(right));
+  const latestMessage = orderedMessages[orderedMessages.length - 1] ?? messages[messages.length - 1];
+  return {
+    id: thread.id,
+    snippet: thread.snippet,
+    latestMessage,
+    labelIds: Array.from(new Set(messages.flatMap(message => message.labelIds ?? []))),
+    messageCount: messages.length,
+    hasUnread: messages.some(message => (message.labelIds ?? []).includes('UNREAD')),
+    hasAttachments: messages.some(message => hasAttachments(message)),
+  };
+};
 
 const getSelectionIds = (selection: GridRowSelectionModel): string[] =>
   selection.type === 'include' ? Array.from(selection.ids) as string[] : [];
@@ -146,13 +172,31 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
 
   // On mount, fetch Gmail labels and merge with persisted visibility/order preferences.
   useEffect(() => {
-    gMailApi.getApiLabels().then(gmailLabels => {
+    let cancelled = false;
+
+    const loadLabels = async () => {
+      const gmailLabels = await gMailApi.getApiLabels();
+      const detailedLabels = [];
+
+      for (const label of gmailLabels) {
+        detailedLabels.push(await gMailApi.getApiLabel(label.id));
+        if (cancelled) return;
+      }
+
+      if (cancelled) return;
+
       labelCollection.setEntries(buildExtendedLabels(
-        gmailLabels,
+        detailedLabels,
         getFromLocalStorage<Record<string, boolean>>(SettingName.SYSTEM_LABEL_VISIBILITY) ?? {},
         getFromLocalStorage<Record<string, number>>(SettingName.LABEL_ORDER) ?? {}
       ));
-    });
+    };
+
+    void loadLabels();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -215,6 +259,19 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const adjustLabelUnreadCounts = useCallback((labelIds: string[], delta: number) => {
+    if (!delta) return;
+
+    for (const labelId of labelIds) {
+      const existingLabel = labelCollection.byId(labelId);
+      if (!existingLabel) continue;
+
+      labelCollection.patchItem(existingLabel, {
+        unreadThreadCount: Math.max(0, (existingLabel.unreadThreadCount ?? 0) + delta),
+      });
+    }
+  }, [labelCollection]);
+
   const processEmailAttachments = useCallback((emails: GMessage[]) => {
     const attachmentsMap = new Map<string, Attachment[]>();
     const inlineAttachmentsMap = new Map<string, Record<string, InlineAttachment>>();
@@ -269,7 +326,9 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
 
     missingIds.forEach(threadId => inflightThreadHeaderIds.current.add(threadId));
     try {
-      const headers = await gMailApi.getApiThreadHeadersByIds(missingIds);
+      const headers = (await gmailApiThreadBatchFetch(missingIds))
+        .map(buildThreadHeader)
+        .filter((thread): thread is GThreadHeader => thread !== null);
       headers.forEach(header => {
         threadHeaderDetailsCache.current[header.id] = header;
       });
@@ -364,25 +423,29 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
       .filter((thread): thread is GThreadHeader => thread !== undefined);
   }, [currentPageThreadRefs, threadHeaderCacheVersion]);
 
-  const knownUnreadThreadCounts = useMemo(() => {
-    void threadHeaderCacheVersion;
-
-    const counts: Record<string, number> = {};
-    for (const threadHeader of Object.values(threadHeaderDetailsCache.current)) {
-      if (!threadHeader.hasUnread) continue;
-      for (const labelId of threadHeader.labelIds ?? []) {
-        counts[labelId] = (counts[labelId] ?? 0) + 1;
-      }
-    }
-    return counts;
-  }, [threadHeaderCacheVersion]);
-
   const updatePageThread = useCallback((threadId: string, patch: Partial<GThreadHeader>) => {
     const existingThread = threadHeaderDetailsCache.current[threadId];
     if (!existingThread) return;
     threadHeaderDetailsCache.current[threadId] = { ...existingThread, ...patch };
     setThreadHeaderCacheVersion(version => version + 1);
   }, []);
+
+  const setCachedThreadReadState = useCallback((threadId: string, asRead: boolean) => {
+    const existingThread = threadHeaderDetailsCache.current[threadId];
+    if (!existingThread) return;
+
+    const nextHasUnread = !asRead;
+    if (existingThread.hasUnread !== nextHasUnread) {
+      adjustLabelUnreadCounts(existingThread.labelIds ?? [], nextHasUnread ? 1 : -1);
+    }
+
+    threadHeaderDetailsCache.current[threadId] = {
+      ...existingThread,
+      hasUnread: nextHasUnread,
+      latestMessage: applyReadState(existingThread.latestMessage, asRead),
+    };
+    setThreadHeaderCacheVersion(version => version + 1);
+  }, [adjustLabelUnreadCounts]);
 
   const trashThreadById = useCallback(async (threadId: string) => {
     if (!threadId) return;
@@ -403,6 +466,9 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     });
     delete threadHeaderDetailsCache.current[threadId];
     delete threadDetailsCache.current[threadId];
+    if (existingThreadHeader?.hasUnread) {
+      adjustLabelUnreadCounts(existingThreadHeader.labelIds ?? [], -1);
+    }
     setThreadHeaderCacheVersion(version => version + 1);
     setTotalThreads(prev => {
       const nextTotalThreads = Math.max(0, prev - 1);
@@ -427,6 +493,9 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
 
       if (existingThreadHeader) threadHeaderDetailsCache.current[threadId] = existingThreadHeader;
       if (existingThreadDetails) threadDetailsCache.current[threadId] = existingThreadDetails;
+      if (existingThreadHeader?.hasUnread) {
+        adjustLabelUnreadCounts(existingThreadHeader.labelIds ?? [], 1);
+      }
       setThreadHeaderCacheVersion(version => version + 1);
       setTotalThreads(prev => {
         const nextTotalThreads = prev + 1;
@@ -445,27 +514,17 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
 
       throw error;
     }
-  }, [checkedRowIds]);
+  }, [adjustLabelUnreadCounts, checkedRowIds]);
 
   const markCheckedRowIdsAsRead = useCallback(async (asRead: boolean) => {
     const ids = getSelectionIds(checkedRowIds);
     if (!ids.length) return;
 
     await gMailApi.markThreadIdsAsRead(ids, asRead);
-    const selectedIds = new Set(ids);
-    selectedIds.forEach(threadId => {
-      const existingThread = threadHeaderDetailsCache.current[threadId];
-      if (!existingThread) return;
-      threadHeaderDetailsCache.current[threadId] = {
-        ...existingThread,
-        hasUnread: !asRead,
-        latestMessage: applyReadState(existingThread.latestMessage, asRead),
-      };
-    });
-    setThreadHeaderCacheVersion(version => version + 1);
+    ids.forEach(threadId => setCachedThreadReadState(threadId, asRead));
 
     setCheckedRowIds(createEmptySelection());
-  }, [checkedRowIds]);
+  }, [checkedRowIds, setCachedThreadReadState]);
 
   const refreshCurrentView = useCallback(async () => {
     threadHeaderDetailsCache.current = {};
@@ -494,12 +553,12 @@ export const DataCacheProviderComponent: React.FC<{ children: React.ReactNode }>
     setCurrentPage,
     pageSize,
     setPageSize,
-    knownUnreadThreadCounts,
 
     getCachedThreadMessages,
     totalThreads,
     currentPageThreads,
     updatePageThread,
+    setCachedThreadReadState,
   };
 
   return <DataCacheProvider value={value}>{children}</DataCacheProvider>;
@@ -510,6 +569,7 @@ interface PersistedLabelSettings { sortNum: number; isVisible: boolean; }
 export type ExtendedLabel = Omit<GLabel, 'labelListVisibility' | 'type'> & PersistedLabelSettings & {
   isSystem: boolean;
   displayName: string;
+  unreadThreadCount: number;
   icon?: React.ReactElement<typeof SvgIcon>;
 };
 
@@ -538,6 +598,7 @@ const buildExtendedLabels = (gLabels: GLabel[], storedVis: Record<string, boolea
       id: label.id,
       name: label.name,
       displayName: buildLabelDisplayName(label.name),
+      unreadThreadCount: label.threadsUnread ?? 0,
       icon: mainLabelIcons[label.id],
       sortNum: storedOrder[label.id],
       isVisible: isSystem ? (stored ?? backend) : (backend ?? stored),

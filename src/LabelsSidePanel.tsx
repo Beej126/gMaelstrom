@@ -7,7 +7,6 @@ import {
   ListItemIcon,
   ListItemText,
   Box,
-  Badge,
   Checkbox,
 } from '@mui/material';
 import { useDataCache } from './services/ctxDataCache';
@@ -23,7 +22,7 @@ const LabelsSidePanel: React.FC = () => {
 
   const { containerRef, width, handleProps } = useResizableWidth('labelsSidePanelWidth', 240, 100, 300);
 
-  const getUnreadCount = (labelId: string) => cache.knownUnreadThreadCounts[labelId] ?? 0;
+  const getUnreadCount = (labelId: string) => cache.labels.byId(labelId)?.unreadThreadCount ?? 0;
 
   // Prefer Inbox on first load, otherwise fall back to the first visible label.
   const { selectedLabelId, setSelectedLabelId, labels } = cache; // destructure these specific values to silence lint wanting the entire cache object added to the dependency array
@@ -123,7 +122,7 @@ const LabelsSidePanel: React.FC = () => {
                           <Box sx={{ height: "15px", fontSize: 11, borderRadius: '50%', mt: "-4px", mr: "5px", px: "5px", py: 0, bgcolor: "blue" }}>s</Box>
                         )}
 
-                        <ListItemText primary={label.displayName}
+                        <ListItemText primary={`${label.displayName} (${getUnreadCount(label.id)})`}
                           slotProps={{
                             primary: {
                               noWrap: true,
@@ -134,14 +133,6 @@ const LabelsSidePanel: React.FC = () => {
                             }
                           }}
                         />
-
-                        {getUnreadCount(label.id) > 0 && (
-                          <Badge
-                            badgeContent={getUnreadCount(label.id)}
-                            color="primary"
-                            sx={{ ml: 0.5 }}
-                          />
-                        )}
 
                         {cache.settingsEditMode && (
                           label.id === 'INBOX' ? (

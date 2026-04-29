@@ -361,7 +361,7 @@ const AttachmentChipRow: React.FC<AttachmentChipRowProps> = ({
 
 const ThreadDetail: React.FC = () => {
   const { threadId } = useParams<{ threadId: string }>();
-  const { getCachedThreadMessages, inlineAttachments, messageAttachments, trashThreadById, updatePageThread } = useDataCache();
+  const { getCachedThreadMessages, inlineAttachments, messageAttachments, trashThreadById, setCachedThreadReadState } = useDataCache();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
@@ -411,11 +411,8 @@ const ThreadDetail: React.FC = () => {
 
   const applyThreadReadState = useCallback((asRead: boolean) => {
     setThreadMessages(prev => prev.map(message => applyReadState(message, asRead)));
-    updatePageThread(threadId!, {
-      hasUnread: !asRead,
-      latestMessage: latestMessage ? applyReadState(latestMessage, asRead) : latestMessage ?? undefined,
-    });
-  }, [latestMessage, threadId, updatePageThread]);
+    setCachedThreadReadState(threadId!, asRead);
+  }, [setCachedThreadReadState, threadId]);
 
   useEffect(() => {
     if (!threadId) return;

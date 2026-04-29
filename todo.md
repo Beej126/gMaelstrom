@@ -1,0 +1,9 @@
+- breaking big modules like datacache and email parser into smaller modules
+  - email parser seems good to create dedicated subfolder
+  - datacache - breaking out labels from threads/messages into a new context maybe?
+- don't display (0) unread count next to labels on >1
+- remove "mark as unread" from threaddetail
+- probably just merge return arrow and delete into thread header but that will require a little footwork since thread header is hidden when only one message
+- figure out where to do thread label management, multiselect chips?
+- i think consolidate all action buttons to upper header including label mgmt
+- move header action toolbar to the right of [compose] button
